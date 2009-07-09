@@ -1,28 +1,42 @@
 from __future__ import absolute_import
 
+import cgi
+import urllib
+
 import httplib2
+import simplejson
 
 h = httplib2.Http(".cache")
 
 class SolrException(Exception):
     pass
 
+
 class SolrConnection(object):
     def __init__(self, url):
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
+        self.select_url = self.url + "select/"
 
-    def add(self, doc):
-        print self.update_url
+    def update(self, doc):
         if isinstance(doc, unicode):
             body = doc
         else:
             body = doc.encode('utf-8')
         headers = {"Content-Type":"text/xml; charset=utf-8"}
-        r, c = h.request(self.update_url, method="POST", body=body,
+        r, _ = h.request(self.update_url, method="POST", body=body,
                          headers=headers)
         if r.status != 200:
             raise SolrException(r, c)
+
+    def select(self, **kwargs):
+        kwargs['wt'] = 'json'
+        qs = urllib.urlencode(kwargs)
+        url = "%s?%s" % (self.select_url, qs)
+        r, c = h.request(url)
+        if r.status != 200:
+            raise SolrException(r, c)
+        return simplejson.loads(c)
 
 solr_xml = """
 <add>
@@ -48,4 +62,5 @@ solr_xml = """
 
 
 s = SolrConnection("http://localhost:8983/solr")
-s.add(solr_xml)
+s.update(solr_xml)
+print s.select(q="solr")
