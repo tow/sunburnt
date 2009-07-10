@@ -4,9 +4,19 @@ import cgi
 import urllib
 
 import httplib2
+from lxml.builder import ElementMaker
+from lxml import etree
 import simplejson
 
 h = httplib2.Http(".cache")
+E = ElementMaker()
+
+def force_unicode(s):
+    if isinstance(s, unicode):
+        return s
+    else:
+        return s.encode('utf-8')
+
 
 class SolrException(Exception):
     pass
@@ -18,13 +28,10 @@ class SolrConnection(object):
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
 
-    def update(self, doc):
-        if isinstance(doc, unicode):
-            body = doc
-        else:
-            body = doc.encode('utf-8')
+    def update(self, update_doc):
+        body = force_unicode(update_doc)
         headers = {"Content-Type":"text/xml; charset=utf-8"}
-        r, _ = h.request(self.update_url, method="POST", body=body,
+        r, c = h.request(self.update_url, method="POST", body=body,
                          headers=headers)
         if r.status != 200:
             raise SolrException(r, c)
@@ -37,6 +44,22 @@ class SolrConnection(object):
         if r.status != 200:
             raise SolrException(r, c)
         return simplejson.loads(c)
+
+    @staticmethod
+    def _make_update_doc(docs):
+        if hasattr(docs, "items"):
+            docs = [docs]
+        xml = E.add(*[
+                E.doc(*[
+                        E.field({'name':k}, v)
+                        for k, v in doc.items()])
+                      for doc in docs])
+        return etree.tostring(xml)
+
+    def add(self, docs):
+        self.update(self._make_update_doc(docs))
+
+
 
 solr_xml = """
 <add>
@@ -62,5 +85,5 @@ solr_xml = """
 
 
 s = SolrConnection("http://localhost:8983/solr")
-s.update(solr_xml)
+s.add({"key1":"value1", "key2":"value2"})
 print s.select(q="solr")
