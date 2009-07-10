@@ -22,6 +22,12 @@ class SolrException(Exception):
     pass
 
 
+class SolrResults(object):
+    def __init__(self, d):
+        if isinstance(basestring, d):
+            d = simplejson.loads(d)
+
+
 class SolrConnection(object):
     def __init__(self, url):
         self.url = url.rstrip("/") + "/"
@@ -30,6 +36,15 @@ class SolrConnection(object):
 
     def add(self, docs):
         self.update(self._make_update_doc(docs))
+
+    def search(self, **kwargs):
+        return SolrResults(self.select(**kwargs))
+
+    def commit(self):
+        response = self.update("<commit/>")
+
+    def optimize(self):
+        response = self.update("<optimize/>")
 
     def update(self, update_doc):
         body = force_utf8(update_doc)
@@ -62,4 +77,5 @@ class SolrConnection(object):
 
 s = SolrConnection("http://localhost:8983/solr")
 s.add({"key1":"value1", "key2":"value2"})
+s.commit()
 print s.select(q="solr")
