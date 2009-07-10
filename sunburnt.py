@@ -17,6 +17,19 @@ def force_utf8(s):
     else:
         return s.encode('utf-8')
 
+ADD = E.add
+DOC = E.doc
+FIELD = E.field
+def _make_update_doc(docs):
+    if hasattr(docs, "items"):
+        docs = [docs]
+    xml = ADD(*[
+            DOC(*[
+                    FIELD({'name':k}, v)
+                    for k, v in doc.items()])
+            for doc in docs])
+    return etree.tostring(xml, encoding='utf-8')
+
 
 class SolrException(Exception):
     pass
@@ -36,7 +49,7 @@ class SolrConnection(object):
         self.request = h.request
 
     def add(self, docs):
-        self.update(self._make_update_doc(docs))
+        self.update(_make_update_doc(docs))
 
     def search(self, **kwargs):
         params = kwargs.copy()
@@ -68,17 +81,6 @@ class SolrConnection(object):
         if r.status != 200:
             raise SolrException(r, c)
         return simplejson.loads(c)
-
-    @staticmethod
-    def _make_update_doc(docs):
-        if hasattr(docs, "items"):
-            docs = [docs]
-        xml = E.add(*[
-                E.doc(*[
-                        E.field({'name':k}, v)
-                        for k, v in doc.items()])
-                      for doc in docs])
-        return etree.tostring(xml, encoding='utf-8')
 
 
 s = SolrConnection("http://localhost:8983/solr")
