@@ -39,7 +39,13 @@ class SolrConnection(object):
         self.update(self._make_update_doc(docs))
 
     def search(self, **kwargs):
-        return SolrResults(self.select(**kwargs))
+        params = kwargs.copy()
+        for k, v in kwargs.items():
+            if hasattr(v, "items"):
+                del params[k]
+                params.update(v)
+        params['wt'] = 'json'
+        return SolrResults(self.select(params))
 
     def commit(self):
         response = self.update("<commit/>")
@@ -55,9 +61,8 @@ class SolrConnection(object):
         if r.status != 200:
             raise SolrException(r, c)
 
-    def select(self, **kwargs):
-        kwargs['wt'] = 'json'
-        qs = urllib.urlencode(kwargs)
+    def select(self, params):
+        qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         r, c = self.request(url)
         if r.status != 200:
