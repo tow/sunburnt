@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import cgi
+import operator
 import urllib
 
 import httplib2
@@ -20,15 +21,22 @@ def force_utf8(s):
 ADD = E.add
 DOC = E.doc
 FIELD = E.field
+
+def _serialize_field(name, value):
+    if not hasattr(value, "__iter__"):
+        value = [value]
+    return [FIELD({'name':name}, v) for v in value]
+
+def _serialize_fields(doc):
+    if not doc:
+       return DOC()
+    return DOC(*reduce(operator.add,
+                       [_serialize_field(k, v) for k, v in doc.items()]))
+
 def _make_update_doc(docs):
     if hasattr(docs, "items"):
         docs = [docs]
-    xml = ADD(*[
-            DOC(*[
-                    FIELD({'name':k}, v)
-                    for k, v in doc.items()])
-            for doc in docs])
-    return etree.tostring(xml, encoding='utf-8')
+    return ADD(*[_serialize_fields(doc) for doc in docs])
 
 
 class SolrException(Exception):
@@ -49,7 +57,8 @@ class SolrConnection(object):
         self.request = h.request
 
     def add(self, docs):
-        self.update(_make_update_doc(docs))
+        xml = etree.tostring(_make_update_doc(docs), encoding='utf-8')
+        self.update(xml)
 
     def search(self, **kwargs):
         params = kwargs.copy()
