@@ -18,6 +18,15 @@ def force_utf8(s):
     else:
         return s.encode('utf-8')
 
+def _serialize(v):
+    if isinstance(v, basestring):
+        return v
+    elif hasattr(v, 'strftime'):
+        return v.strftime("%Y-%m-%dT%H:%M:%S")
+    else:
+        return simplejson.dumps(v)
+
+
 ADD = E.add
 DOC = E.doc
 FIELD = E.field
@@ -25,7 +34,7 @@ FIELD = E.field
 def _serialize_field(name, value):
     if not hasattr(value, "__iter__"):
         value = [value]
-    return [FIELD({'name':name}, v) for v in value]
+    return [FIELD({'name':name}, _serialize(v)) for v in value]
 
 def _serialize_fields(doc):
     if not doc:
@@ -92,7 +101,8 @@ class SolrConnection(object):
         return simplejson.loads(c)
 
 
+import datetime
 s = SolrConnection("http://localhost:8983/solr")
-s.add({"key1":"value1", "key2":"value2"})
+s.add({"key1":"value1", "key2":"value2", "key3":["value_A", "value_B"], "int":1, "date":datetime.datetime.now()})
 s.commit()
 print s.select(q="solr")
