@@ -29,10 +29,11 @@ class SolrResults(object):
 
 
 class SolrConnection(object):
-    def __init__(self, url):
+    def __init__(self, url, h=h):
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
+        self.request = h.request
 
     def add(self, docs):
         self.update(self._make_update_doc(docs))
@@ -49,8 +50,8 @@ class SolrConnection(object):
     def update(self, update_doc):
         body = force_utf8(update_doc)
         headers = {"Content-Type":"text/xml; charset=utf-8"}
-        r, c = h.request(self.update_url, method="POST", body=body,
-                         headers=headers)
+        r, c = self.request(self.update_url, method="POST", body=body,
+                            headers=headers)
         if r.status != 200:
             raise SolrException(r, c)
 
@@ -58,7 +59,7 @@ class SolrConnection(object):
         kwargs['wt'] = 'json'
         qs = urllib.urlencode(kwargs)
         url = "%s?%s" % (self.select_url, qs)
-        r, c = h.request(url)
+        r, c = self.request(url)
         if r.status != 200:
             raise SolrException(r, c)
         return simplejson.loads(c)
