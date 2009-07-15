@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import cgi
+import math
 import operator
 import urllib
 
@@ -22,7 +23,12 @@ def _serialize(v):
     if isinstance(v, basestring):
         return v
     elif hasattr(v, 'strftime'):
-        return v.strftime("%Y-%m-%dT%H:%M:%S.%%sZ") % v.microsecond
+        t = v.strftime("%Y-%m-%dT%H:%M:%S")
+        if hasattr(v, "microsecond"):
+            t += ".%s" % v.microsecond
+        else:
+            t += str(math.modf(v.second)[0])[1:]
+        t += "Z"
     else:
         return simplejson.dumps(v)
 
