@@ -22,7 +22,7 @@ def _serialize(v):
     if isinstance(v, basestring):
         return v
     elif hasattr(v, 'strftime'):
-        return v.strftime("%Y-%m-%dT%H:%M:%S")
+        return v.strftime("%Y-%m-%dT%H:%M:%S.%%sZ") % v.microsecond
     else:
         return simplejson.dumps(v)
 
