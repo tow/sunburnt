@@ -8,6 +8,7 @@ import urllib
 import httplib2
 from lxml.builder import ElementMaker
 from lxml import etree
+import pytz
 import simplejson
 
 h = httplib2.Http(".cache")
@@ -19,16 +20,30 @@ def force_utf8(s):
     else:
         return s.encode('utf-8')
 
+def _serialize_date(v):
+    """ Serialize a datetime object in the format required
+    by Solr. See http://wiki.apache.org/solr/IndexingDates
+    This will deal with both native python datetime objects
+    and mx.DateTime objects."""
+    # Python datetime objects may include timezone information
+    if hasattr(v, 'tzinfo') and v.tzinfo:
+        # but Solr requires UTC times.
+        v = v.astimezone(pytz.utc)
+    t = v.strftime("%Y-%m-%dT%H:%M:%S")
+    # Python datetime objects store microseconds as an attribute
+    if hasattr(v, "microsecond"):
+        t += ".%s" % v.microsecond
+    else:
+        # mx.DateTime objects have a fractional part to the second
+        t += str(math.modf(v.second)[0])[1:]
+    t += "Z"
+    return t
+
 def _serialize(v):
     if isinstance(v, basestring):
         return v
     elif hasattr(v, 'strftime'):
-        t = v.strftime("%Y-%m-%dT%H:%M:%S")
-        if hasattr(v, "microsecond"):
-            t += ".%s" % v.microsecond
-        else:
-            t += str(math.modf(v.second)[0])[1:]
-        t += "Z"
+        return _serialize_date(v)
     else:
         return simplejson.dumps(v)
 
@@ -120,6 +135,6 @@ class SolrConnection(object):
 
 import datetime
 s = SolrConnection("http://localhost:8983/solr")
-s.add({"key1":"value1", "key2":"value2", "key3":["value_A", "value_B"], "int":1, "date":datetime.datetime.now()})
+s.add({"nid":"sjhdfgkajshdg", "title":"title", "caption":"caption", "description":"description", "tags":["tag1", "tag2"], "last_modified":datetime.datetime.now()})
 s.commit()
-print s.select(q="solr")
+print s.search(q="title")
