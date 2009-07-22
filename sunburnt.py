@@ -6,13 +6,13 @@ import operator
 import urllib
 
 import httplib2
-from lxml.builder import ElementMaker
-from lxml import etree
+import lxml.builder
+import lxml.etree
 import pytz
 import simplejson
 
 h = httplib2.Http(".cache")
-E = ElementMaker()
+E = lxml.builder.ElementMaker()
 
 def force_utf8(s):
     if isinstance(s, str):
@@ -98,7 +98,7 @@ class SolrConnection(object):
         self.request = h.request
 
     def add(self, docs):
-        xml = etree.tostring(_make_update_doc(docs), encoding='utf-8')
+        xml = lxml.etree.tostring(_make_update_doc(docs), encoding='utf-8')
         self.update(xml)
 
     def search(self, **kwargs):
