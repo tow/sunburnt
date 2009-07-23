@@ -8,7 +8,7 @@ import simplejson
 
 h = httplib2.Http(".cache")
 
-from schema import SolrSchema, SolrError
+from schema import SolrSchema, SolrResults, SolrError
 
 
 def force_utf8(s):
@@ -16,33 +16,6 @@ def force_utf8(s):
         return s
     else:
         return s.encode('utf-8')
-
-
-
-class SolrResults(object):
-    response_items = ("numFound", "start", "docs", "facet_counts", "highlighting")
-    def __init__(self, schema, d):
-        self.schema = schema
-        if isinstance(d, basestring):
-            self.d = simplejson.loads(d)
-        else:
-            self.d = d
-        if self.d["responseHeader"]["status"] != 0:
-            raise ValueError("Response indicates an error")
-        for attr in self.response_items:
-            try:
-                setattr(self, attr, self.d["response"][attr])
-            except KeyError:
-                pass
-        self.docs = [self.deserialize_fields(doc)
-                     for doc in d["response"]["docs"]]
-
-    def deserialize_fields(self, doc):
-        return dict((k, self.schema.deserialize_values(k, v))
-                    for k, v in doc.items())
-
-    def __str__(self):
-        return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
 
 class SolrConnection(object):
