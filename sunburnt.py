@@ -77,17 +77,19 @@ class SolrResults(object):
     response_items = ("numFound", "start", "docs", "facet_counts", "highlighting")
     def __init__(self, d):
         if isinstance(d, basestring):
-            d = simplejson.loads(d)
-        if d["responseHeader"]["status"] != 0:
+            self.d = simplejson.loads(d)
+        else:
+            self.d = d
+        if self.d["responseHeader"]["status"] != 0:
             raise ValueError("Response indicates an error")
         for attr in self.response_items:
             try:
-                setattr(self, attr, d["response"][attr])
+                setattr(self, attr, self.d["response"][attr])
             except KeyError:
                 pass
 
     def __str__(self):
-        return "%(numFound)s results found, starting at #%(start)s" % self.__dict__
+        return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + simplejson.dumps(self.d, indent=1)
 
 
 class SolrConnection(object):
