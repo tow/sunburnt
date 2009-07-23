@@ -100,9 +100,9 @@ class SolrSchema(object):
             raise SolrError("No such field '%s' in current schema" % k)
 
     def deserialize_values(self, name, values):
-        if not hasattr(values, "__iter__"):
-            values = [values]
-        return [self.deserialize_value(name, value) for value in values]
+        if hasattr(values, "__iter__"):
+            return [self.deserialize_value(name, value) for value in values]
+        return self.deserialize_value(name, values)
 
     def make_update_fields(self, name, values):
         if not hasattr(values, "__iter__"):
