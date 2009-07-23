@@ -8,7 +8,7 @@ import simplejson
 
 h = httplib2.Http(".cache")
 
-from schema import SolrSchema, SolrException
+from schema import SolrSchema, SolrError
 
 
 def force_utf8(s):
@@ -57,7 +57,7 @@ class SolrConnection(object):
         r, c = self.request(self.update_url, method="POST", body=body,
                             headers=headers)
         if r.status != 200:
-            raise SolrException(r, c)
+            raise SolrError(r, c)
 
     def select(self, params):
         qs = urllib.urlencode(params)

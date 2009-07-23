@@ -14,7 +14,7 @@ DOC = E.doc
 FIELD = E.field
 
 
-class SolrException(Exception):
+class SolrError(Exception):
     pass
 
 
