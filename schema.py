@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import datetime
 import math
 import operator
 
@@ -23,6 +24,12 @@ class solr_date(object):
     objects and mx.DateTime objects, and will serialize to a format
     appropriate for Solr"""
     def __init__(self, v):
+        if isinstance(v, basestring):
+            self.from_str(v)
+        else:
+            self.from_date(v)
+
+    def from_date(self, v):
         # Python datetime objects may include timezone information
         if hasattr(v, 'tzinfo') and v.tzinfo:
             # but Solr requires UTC times.
@@ -33,6 +40,13 @@ class solr_date(object):
             self.microsecond = str(self.v.microsecond)
         else:
             self.microsecond = str(math.modf(self.v.second)[0])[1:]
+
+    def from_str(self, s):
+        self.v = datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+        self.v.replace(microsecond=1000000*float(s[19:-1]))
+
+    def __repr__(self):
+        return repr(self.v)
 
     def __str__(self):
         """ Serialize a datetime object in the format required
@@ -78,6 +92,17 @@ class SolrSchema(object):
             return str(self.fields[k](v))
         except KeyError:
             raise SolrError("No such field '%s' in current schema" % k)
+
+    def deserialize_value(self, k, v):
+        try:
+            return self.fields[k](v)
+        except KeyError:
+            raise SolrError("No such field '%s' in current schema" % k)
+
+    def deserialize_values(self, name, values):
+        if not hasattr(values, "__iter__"):
+            values = [values]
+        return [self.deserialize_value(name, value) for value in values]
 
     def make_update_fields(self, name, values):
         if not hasattr(values, "__iter__"):
