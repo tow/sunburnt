@@ -6,8 +6,12 @@ import operator
 
 import lxml.builder
 import lxml.etree
-import pytz
 import simplejson
+
+try:
+    import pytz
+except ImportError:
+    raise ImportWarning("pytz not found; unable to use any Solr DateFields")
 
 
 E = lxml.builder.ElementMaker()
