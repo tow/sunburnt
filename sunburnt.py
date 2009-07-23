@@ -99,19 +99,6 @@ class SolrConnection(object):
         self.select_url = self.url + "select/"
         self.request = h.request
 
-    def add(self, docs):
-        xml = lxml.etree.tostring(_make_update_doc(docs), encoding='utf-8')
-        self.update(xml)
-
-    def search(self, **kwargs):
-        params = kwargs.copy()
-        for k, v in kwargs.items():
-            if hasattr(v, "items"):
-                del params[k]
-                params.update(v)
-        params['wt'] = 'json'
-        return SolrResults(self.select(params))
-
     def commit(self):
         response = self.update("<commit/>")
 
@@ -135,8 +122,29 @@ class SolrConnection(object):
         return simplejson.loads(c)
 
 
+class SolrInterface(object):
+    def __init__(self, url):
+        self.conn = SolrConnection(url)
+
+    def add(self, docs):
+        xml = lxml.etree.tostring(_make_update_doc(docs), encoding='utf-8')
+        self.conn.update(xml)
+
+    def commit(self):
+        self.conn.commit()
+
+    def search(self, **kwargs):
+        params = kwargs.copy()
+        for k, v in kwargs.items():
+            if hasattr(v, "items"):
+                del params[k]
+                params.update(v)
+        params['wt'] = 'json'
+        return SolrResults(self.conn.select(params))
+
+
 import datetime
-s = SolrConnection("http://localhost:8983/solr")
+s = SolrInterface("http://localhost:8983/solr")
 s.add({"nid":"sjhdfgkajshdg", "title":"title", "caption":"caption", "description":"description", "tags":["tag1", "tag2"], "last_modified":datetime.datetime.now()})
 s.commit()
 print s.search(q="title")
