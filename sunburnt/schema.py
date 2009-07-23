@@ -42,7 +42,9 @@ class solr_date(object):
     def from_str(self, s):
         self.v = pytz.utc.localize(
             datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S"))
-        self.v = self.v.replace(microsecond=int(1000000*float(s[19:-1])))
+        microsecond_string = s[19:-1]
+        if microsecond_string:
+            self.v = self.v.replace(microsecond=int(1000000*float(s[19:-1])))
 
     def __repr__(self):
         return repr(self.v)
