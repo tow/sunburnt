@@ -101,6 +101,12 @@ class SolrSchema(object):
             return [self.deserialize_value(name, value) for value in values]
         return self.deserialize_value(name, values)
 
+    def make_update(self, docs):
+        return SolrUpdate(self, docs)
+
+    def parse_results(self, msg):
+        return SolrResults(self, msg)
+
 
 class SolrUpdate(object):
     ADD = E.add

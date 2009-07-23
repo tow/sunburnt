@@ -8,7 +8,7 @@ import simplejson
 
 h = httplib2.Http(".cache")
 
-from schema import SolrSchema, SolrResults, SolrUpdate, SolrError
+from schema import SolrSchema, SolrError
 
 
 class SolrConnection(object):
@@ -47,7 +47,7 @@ class SolrInterface(object):
         self.schema = SolrSchema(schemadoc)
 
     def add(self, docs):
-        update_message = SolrUpdate(self.schema, docs)
+        update_message = self.schema.make_update(docs)
         self.conn.update(str(update_message))
 
     def commit(self):
@@ -60,7 +60,7 @@ class SolrInterface(object):
                 del params[k]
                 params.update(v)
         params['wt'] = 'json'
-        return SolrResults(self.schema, self.conn.select(params))
+        return self.schema.parse_results(self.conn.select(params))
 
 
 import datetime
