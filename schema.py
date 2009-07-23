@@ -1,7 +1,45 @@
+from __future__ import absolute_import
+
+import math
+import operator
+
+import lxml.builder
 import lxml.etree
+import pytz
+
+
+E = lxml.builder.ElementMaker()
+ADD = E.add
+DOC = E.doc
+FIELD = E.field
+
+
+class SolrException(Exception):
+    pass
+
 
 class solr_date(object):
-    pass
+    """This class can be initialized from either native python datetime
+    objects and mx.DateTime objects, and will serialize to a format
+    appropriate for Solr"""
+    def __init__(self, v):
+        # Python datetime objects may include timezone information
+        if hasattr(v, 'tzinfo') and v.tzinfo:
+            # but Solr requires UTC times.
+            self.v = v.astimezone(pytz.utc)
+        else:
+            self.v = v
+        if hasattr(self.v, "microsecond"):
+            self.microsecond = str(self.v.microsecond)
+        else:
+            self.microsecond = str(math.modf(self.v.second)[0])[1:]
+
+    def __str__(self):
+        """ Serialize a datetime object in the format required
+        by Solr. See http://wiki.apache.org/solr/IndexingDates
+        """
+        return "%s.%sZ" % (self.v.strftime("%Y-%m-%dT%H:%M:%S"),
+                           self.microsecond)
 
 
 class SolrSchema(object):
@@ -34,3 +72,29 @@ class SolrSchema(object):
         return dict((field.attrib['name'],
                      field_types.get(field.attrib['type'], 'UNKNOWN'))
                     for field in schemadoc.xpath("/schema/fields/field"))
+
+    def serialize_value(self, k, v):
+        try:
+            return str(self.fields[k](v))
+        except KeyError:
+            raise SolrError("No such field '%s' in current schema" % k)
+
+    def make_update_fields(self, name, values):
+        if not hasattr(values, "__iter__"):
+            values = [values]
+        return [FIELD({'name':name}, self.serialize_value(name, value))
+                for value in values]
+
+    def make_update_doc(self, doc):
+        if not doc:
+            return DOC()
+        else:
+            return DOC(*reduce(operator.add,
+                               [self.make_update_fields(name, values)
+                                for name, values in doc.items()]))
+
+    def make_update_message(self, docs):
+        if hasattr(docs, "items"):
+            docs = [docs]
+        message_xml = ADD(*[self.make_update_doc(doc) for doc in docs])
+        return lxml.etree.tostring(message_xml, encoding='utf-8')

@@ -1,18 +1,15 @@
 from __future__ import absolute_import
 
 import cgi
-import math
-import operator
 import urllib
 
 import httplib2
-import lxml.builder
-import lxml.etree
-import pytz
 import simplejson
 
 h = httplib2.Http(".cache")
-E = lxml.builder.ElementMaker()
+
+from schema import SolrSchema, SolrException
+
 
 def force_utf8(s):
     if isinstance(s, str):
@@ -20,57 +17,6 @@ def force_utf8(s):
     else:
         return s.encode('utf-8')
 
-def _serialize_date(v):
-    """ Serialize a datetime object in the format required
-    by Solr. See http://wiki.apache.org/solr/IndexingDates
-    This will deal with both native python datetime objects
-    and mx.DateTime objects."""
-    # Python datetime objects may include timezone information
-    if hasattr(v, 'tzinfo') and v.tzinfo:
-        # but Solr requires UTC times.
-        v = v.astimezone(pytz.utc)
-    t = v.strftime("%Y-%m-%dT%H:%M:%S")
-    # Python datetime objects store microseconds as an attribute
-    if hasattr(v, "microsecond"):
-        t += ".%s" % v.microsecond
-    else:
-        # mx.DateTime objects have a fractional part to the second
-        t += str(math.modf(v.second)[0])[1:]
-    t += "Z"
-    return t
-
-def _serialize(v):
-    if isinstance(v, basestring):
-        return v
-    elif hasattr(v, 'strftime'):
-        return _serialize_date(v)
-    else:
-        return simplejson.dumps(v)
-
-
-ADD = E.add
-DOC = E.doc
-FIELD = E.field
-
-def _serialize_field(name, value):
-    if not hasattr(value, "__iter__"):
-        value = [value]
-    return [FIELD({'name':name}, _serialize(v)) for v in value]
-
-def _serialize_fields(doc):
-    if not doc:
-       return DOC()
-    return DOC(*reduce(operator.add,
-                       [_serialize_field(k, v) for k, v in doc.items()]))
-
-def _make_update_doc(docs):
-    if hasattr(docs, "items"):
-        docs = [docs]
-    return ADD(*[_serialize_fields(doc) for doc in docs])
-
-
-class SolrException(Exception):
-    pass
 
 
 class SolrResults(object):
@@ -123,11 +69,12 @@ class SolrConnection(object):
 
 
 class SolrInterface(object):
-    def __init__(self, url):
+    def __init__(self, url, schemadoc):
         self.conn = SolrConnection(url)
+        self.schema = SolrSchema(schemadoc)
 
     def add(self, docs):
-        xml = lxml.etree.tostring(_make_update_doc(docs), encoding='utf-8')
+        xml = self.schema.make_update_message(docs)
         self.conn.update(xml)
 
     def commit(self):
@@ -144,7 +91,8 @@ class SolrInterface(object):
 
 
 import datetime
-s = SolrInterface("http://localhost:8983/solr")
+s = SolrInterface("http://localhost:8983/solr",
+                  "/Users/tow/dl/solr/apache-solr-1.3.0/example/solr/conf/schema.xml")
 s.add({"nid":"sjhdfgkajshdg", "title":"title", "caption":"caption", "description":"description", "tags":["tag1", "tag2"], "last_modified":datetime.datetime.now()})
 s.commit()
 print s.search(q="title")
