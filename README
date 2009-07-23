@@ -1,0 +1,20 @@
+Sunburnt provides an interface for working with the Solr search engine.
+
+Requirements:
+
+  * httplib2
+  * lxml
+  * simplejson
+
+Strongly recommended
+
+  To use Solr DateFields, you must also have installed:
+
+  * pytz
+
+Optional
+
+  To run the tests, you'll also need:
+
+  * nose
+  * mx.DateTime
