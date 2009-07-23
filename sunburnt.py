@@ -11,13 +11,6 @@ h = httplib2.Http(".cache")
 from schema import SolrSchema, SolrResults, SolrUpdate, SolrError
 
 
-def force_utf8(s):
-    if isinstance(s, str):
-        return s
-    else:
-        return s.encode('utf-8')
-
-
 class SolrConnection(object):
     def __init__(self, url, h=h):
         self.url = url.rstrip("/") + "/"
@@ -32,7 +25,7 @@ class SolrConnection(object):
         response = self.update("<optimize/>")
 
     def update(self, update_doc):
-        body = force_utf8(update_doc)
+        body = update_doc
         headers = {"Content-Type":"text/xml; charset=utf-8"}
         r, c = self.request(self.update_url, method="POST", body=body,
                             headers=headers)
