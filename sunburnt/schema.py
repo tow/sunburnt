@@ -35,13 +35,14 @@ class solr_date(object):
         else:
             self.v = v
         if hasattr(self.v, "microsecond"):
-            self.microsecond = str(self.v.microsecond)
+            self.microsecond = self.v.microsecond
         else:
-            self.microsecond = str(math.modf(self.v.second)[0])[1:]
+            self.microsecond = int(1000000*math.modf(self.v.second)[0])
 
     def from_str(self, s):
-        self.v = datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
-        self.v.replace(microsecond=int(1000000*float(s[19:-1])))
+        self.v = pytz.utc.localize(
+            datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S"))
+        self.v = self.v.replace(microsecond=int(1000000*float(s[19:-1])))
 
     def __repr__(self):
         return repr(self.v)
@@ -51,7 +52,7 @@ class solr_date(object):
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
         return "%s.%sZ" % (self.v.strftime("%Y-%m-%dT%H:%M:%S"),
-                           self.microsecond)
+                           "%06d" % self.microsecond)
 
 
 class SolrSchema(object):
