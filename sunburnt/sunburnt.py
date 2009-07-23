@@ -6,9 +6,9 @@ import urllib
 import httplib2
 import simplejson
 
-h = httplib2.Http(".cache")
+from .schema import SolrSchema, SolrError
 
-from schema import SolrSchema, SolrError
+h = httplib2.Http(".cache")
 
 
 class SolrConnection(object):
@@ -61,11 +61,3 @@ class SolrInterface(object):
                 params.update(v)
         params['wt'] = 'json'
         return self.schema.parse_results(self.conn.select(params))
-
-
-import datetime
-s = SolrInterface("http://localhost:8983/solr",
-                  "/Users/tow/dl/solr/apache-solr-1.3.0/example/solr/conf/schema.xml")
-s.add({"nid":"sjhdfgkajshdg", "title":"title", "caption":"caption", "description":"description", "tags":["tag1", "tag2"], "last_modified":datetime.datetime.now()})
-s.commit()
-print s.search(q="title")
