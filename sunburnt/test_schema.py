@@ -30,7 +30,7 @@ samples_from_mxdatetimes = {
          datetime.datetime(2009, 07, 23, 3, 24, 34, 376, pytz.utc)],
     "2009-07-23T03:24:34.000000Z":
         [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34),
-         datetime.datetime(2009, 07, 23, 0, 24, 34, tzinfo=pytz.utc)],
+         datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
     }
 
 def check_solr_date_from_date(s, date, canonical_date):
@@ -40,4 +40,8 @@ def check_solr_date_from_date(s, date, canonical_date):
 
 def test_solr_date_from_pydatetimes():
     for k, v in samples_from_pydatetimes.items():
+        yield check_solr_date_from_date, k, v[0], v[1]
+
+def test_solr_date_from_mxdatetimes():
+    for k, v in samples_from_mxdatetimes.items():
         yield check_solr_date_from_date, k, v[0], v[1]
