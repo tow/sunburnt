@@ -18,17 +18,20 @@ solr_data_types = {
     'solr.DateField':solr_date
     }
 
-schemadoc = lxml.etree.parse("/Users/tow/dl/solr/apache-solr-1.3.0/example/solr/conf/schema.xml")
 
-field_types = {}
-for data_type, t in solr_data_types.items():
-    for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
-        field_types[field_type] = t
+def schema_parse(f):
+    schemadoc = lxml.etree.parse(f)
 
-print field_types
+    field_types = {}
+    for data_type, t in solr_data_types.items():
+        for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
+            field_types[field_type] = t
 
-schema_fields = {}
-for field in schemadoc.xpath("/schema/fields/field"):
-    schema_fields[field.attrib['name']] = field_types.get(field.attrib['type'], 'UNKNOWN')
+    schema_fields = {}
+    for field in schemadoc.xpath("/schema/fields/field"):
+        schema_fields[field.attrib['name']] = field_types.get(field.attrib['type'], 'UNKNOWN')
 
-print schema_fields
+    return schema_fields
+
+
+print schema_parse("/Users/tow/dl/solr/apache-solr-1.3.0/example/solr/conf/schema.xml")
