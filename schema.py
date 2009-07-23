@@ -40,7 +40,7 @@ class solr_date(object):
 
     def from_str(self, s):
         self.v = datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
-        self.v.replace(microsecond=1000000*float(s[19:-1]))
+        self.v.replace(microsecond=int(1000000*float(s[19:-1])))
 
     def __repr__(self):
         return repr(self.v)
