@@ -4,7 +4,6 @@ import cgi
 import urllib
 
 import httplib2
-import simplejson
 
 from .schema import SolrSchema, SolrError
 
@@ -38,7 +37,7 @@ class SolrConnection(object):
         r, c = self.request(url)
         if r.status != 200:
             raise SolrException(r, c)
-        return simplejson.loads(c)
+        return c
 
 
 class SolrInterface(object):

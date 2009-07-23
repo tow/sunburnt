@@ -7,6 +7,7 @@ import operator
 import lxml.builder
 import lxml.etree
 import pytz
+import simplejson
 
 
 E = lxml.builder.ElementMaker()
@@ -143,12 +144,9 @@ class SolrUpdate(object):
 
 class SolrResults(object):
     response_items = ("numFound", "start", "docs", "facet_counts", "highlighting")
-    def __init__(self, schema, d):
+    def __init__(self, schema, msg):
         self.schema = schema
-        if isinstance(d, basestring):
-            self.d = simplejson.loads(d)
-        else:
-            self.d = d
+        self.d = simplejson.loads(msg)
         if self.d["responseHeader"]["status"] != 0:
             raise ValueError("Response indicates an error")
         for attr in self.response_items:
@@ -157,7 +155,7 @@ class SolrResults(object):
             except KeyError:
                 pass
         self.docs = [self.deserialize_fields(doc)
-                     for doc in d["response"]["docs"]]
+                     for doc in self.d["response"]["docs"]]
 
     def deserialize_fields(self, doc):
         return dict((k, self.schema.deserialize_values(k, v))
