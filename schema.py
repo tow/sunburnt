@@ -10,9 +10,6 @@ import pytz
 
 
 E = lxml.builder.ElementMaker()
-ADD = E.add
-DOC = E.doc
-FIELD = E.field
 
 
 class SolrError(Exception):
@@ -104,25 +101,38 @@ class SolrSchema(object):
             return [self.deserialize_value(name, value) for value in values]
         return self.deserialize_value(name, values)
 
-    def make_update_fields(self, name, values):
+
+class SolrUpdate(object):
+    ADD = E.add
+    DOC = E.doc
+    FIELD = E.field
+
+    def __init__(self, schema, docs):
+        self.schema = schema
+        self.xml = self.add(docs)
+
+    def fields(self, name, values):
         if not hasattr(values, "__iter__"):
             values = [values]
-        return [FIELD({'name':name}, self.serialize_value(name, value))
+        return [self.FIELD({'name':name},
+                           self.schema.serialize_value(name, value))
                 for value in values]
 
-    def make_update_doc(self, doc):
+    def doc(self, doc):
         if not doc:
-            return DOC()
+            return self.DOC()
         else:
-            return DOC(*reduce(operator.add,
-                               [self.make_update_fields(name, values)
-                                for name, values in doc.items()]))
+            return self.DOC(*reduce(operator.add,
+                                    [self.fields(name, values)
+                                     for name, values in doc.items()]))
 
-    def make_update_message(self, docs):
+    def add(self, docs):
         if hasattr(docs, "items"):
             docs = [docs]
-        message_xml = ADD(*[self.make_update_doc(doc) for doc in docs])
-        return lxml.etree.tostring(message_xml, encoding='utf-8')
+        return self.ADD(*[self.doc(doc) for doc in docs])
+
+    def __str__(self):
+        return lxml.etree.tostring(self.xml, encoding='utf-8')
 
 
 class SolrResults(object):

@@ -8,7 +8,7 @@ import simplejson
 
 h = httplib2.Http(".cache")
 
-from schema import SolrSchema, SolrResults, SolrError
+from schema import SolrSchema, SolrResults, SolrUpdate, SolrError
 
 
 def force_utf8(s):
@@ -54,8 +54,8 @@ class SolrInterface(object):
         self.schema = SolrSchema(schemadoc)
 
     def add(self, docs):
-        xml = self.schema.make_update_message(docs)
-        self.conn.update(xml)
+        update_message = SolrUpdate(self.schema, docs)
+        self.conn.update(str(update_message))
 
     def commit(self):
         self.conn.commit()
