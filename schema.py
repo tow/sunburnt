@@ -27,18 +27,10 @@ class SolrSchema(object):
 
     def schema_parse(self, f):
         schemadoc = lxml.etree.parse(f)
-
         field_types = {}
         for data_type, t in self.solr_data_types.items():
             for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
                 field_types[field_type] = t
-        schema_fields = {}
-        for field in schemadoc.xpath("/schema/fields/field"):
-            schema_fields[field.attrib['name']] = field_types.get(field.attrib['type'], 'UNKNOWN')
-
-        return schema_fields
-
-
-s = SolrSchema("/Users/tow/dl/solr/apache-solr-1.3.0/example/solr/conf/schema.xml")
-
-print s.fields
+        return dict((field.attrib['name'],
+                     field_types.get(field.attrib['type'], 'UNKNOWN'))
+                    for field in schemadoc.xpath("/schema/fields/field"))
