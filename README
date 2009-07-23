@@ -8,7 +8,8 @@ Requirements:
 
 Strongly recommended
 
-  To use Solr DateFields, you must also have installed:
+  Solr DateFields must be in UTC. To ensure that timezones are handled correctly, you
+  must also have installed:
 
   * pytz
 

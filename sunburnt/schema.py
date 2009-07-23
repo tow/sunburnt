@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import datetime
 import math
 import operator
+import warnings
 
 import lxml.builder
 import lxml.etree
@@ -11,7 +12,10 @@ import simplejson
 try:
     import pytz
 except ImportError:
-    raise ImportWarning("pytz not found; unable to use any Solr DateFields")
+    warnings.warn(
+        "pytz not found; cannot do timezone conversions for Solr DateFields",
+        ImportWarning)
+    pytz = None
 
 
 E = lxml.builder.ElementMaker()
@@ -35,7 +39,10 @@ class solr_date(object):
         # Python datetime objects may include timezone information
         if hasattr(v, 'tzinfo') and v.tzinfo:
             # but Solr requires UTC times.
-            self.v = v.astimezone(pytz.utc)
+            if pytz:
+                self.v = v.astimezone(pytz.utc)
+            else:
+                raise EnvironmentError("pytz not available, cannot do timezone conversions")
         else:
             self.v = v
         if hasattr(self.v, "microsecond"):
@@ -44,8 +51,9 @@ class solr_date(object):
             self.microsecond = int(1000000*math.modf(self.v.second)[0])
 
     def from_str(self, s):
-        self.v = pytz.utc.localize(
-            datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S"))
+        self.v = datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+        if pytz:
+            self.v = pytz.utc.localize(self.v)
         microsecond_string = s[19:-1]
         if microsecond_string:
             self.v = self.v.replace(microsecond=int(1000000*float(s[19:-1])))
