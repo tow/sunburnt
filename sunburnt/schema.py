@@ -177,8 +177,11 @@ class SolrUpdate(object):
                                      for name, values in doc.items()]))
 
     def add(self, docs):
-        if hasattr(docs, "items"):
+        if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
             docs = [docs]
+        docs = [(doc if hasattr(doc, "items")
+                 else object_to_dict(doc, self.schema.fields.keys()))
+                for doc in docs]
         return self.ADD(*[self.doc(doc) for doc in docs])
 
     def __str__(self):
@@ -206,3 +209,11 @@ class SolrResults(object):
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
+
+
+def object_to_dict(o, names):
+    d = {}
+    for name in names:
+        if hasattr(o, name):
+            d[name] = getattr(o, name)
+    return d
