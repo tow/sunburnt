@@ -69,6 +69,13 @@ class solr_date(object):
                            "%06d" % self.microsecond)
 
 
+class SolrField(object):
+    def __init__(self, node, data_type):
+        self.name = node.attrib["name"]
+        self.multi_valued = node.attrib.get("multiValued") == "true"
+        self.type = data_type
+
+
 class SolrSchema(object):
     solr_data_types = {
         'solr.StrField':str,
@@ -96,24 +103,34 @@ class SolrSchema(object):
         for data_type, t in self.solr_data_types.items():
             for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
                 field_types[field_type] = t
-        return dict((field.attrib['name'],
-                     field_types.get(field.attrib['type'], 'UNKNOWN'))
-                    for field in schemadoc.xpath("/schema/fields/field"))
+        fields = {}
+        for field in schemadoc.xpath("/schema/fields/field"):
+            name = field.attrib['name']
+            data_type = field_types[field.attrib['type']]
+            fields[name] = SolrField(field, data_type)
+        return fields
 
     def serialize_value(self, k, v):
         try:
-            return str(self.fields[k](v))
+            return str(self.fields[k].type(v))
         except KeyError:
             raise SolrError("No such field '%s' in current schema" % k)
 
+    def serialize_values(self, k, values):
+        if not k in self.fields:
+            raise SolrError("No such field '%s' in current schema" % k)
+        if not self.fields[k].multi_valued:
+            raise SolrError("'%s' is not a multi-valued field" % k)
+        return [self.serialize_value(k, value) for value in values]
+
     def deserialize_value(self, k, v):
         try:
-            return self.fields[k](v)
+            return self.fields[k].type(v)
         except KeyError:
             raise SolrError("No such field '%s' in current schema" % k)
 
     def deserialize_values(self, name, values):
-        if hasattr(values, "__iter__"):
+        if self.fields[name].multi_valued:
             return [self.deserialize_value(name, value) for value in values]
         return self.deserialize_value(name, values)
 
@@ -134,11 +151,12 @@ class SolrUpdate(object):
         self.xml = self.add(docs)
 
     def fields(self, name, values):
-        if not hasattr(values, "__iter__"):
-            values = [values]
-        return [self.FIELD({'name':name},
-                           self.schema.serialize_value(name, value))
-                for value in values]
+        if hasattr(values, "__iter__"):
+            return [self.FIELD({'name':name}, value)
+                    for value in self.schema.serialize_values(name, values)]
+        else:
+            return [self.FIELD({'name':name},
+                           self.schema.serialize_value(name, values))]
 
     def doc(self, doc):
         if not doc:
