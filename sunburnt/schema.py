@@ -164,12 +164,11 @@ class SolrUpdate(object):
                            self.schema.serialize_value(name, values))]
 
     def doc(self, doc):
-        names = doc.keys()
-        missing_fields = self.schema.missing_fields(names)
+        missing_fields = self.schema.missing_fields(doc.keys())
         if missing_fields:
             raise SolrError("These required fields are unspecified:\n %s" %
                             missing_fields)
-        if not names:
+        if not doc:
             return self.DOC()
         else:
             return self.DOC(*reduce(operator.add,
