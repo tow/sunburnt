@@ -73,6 +73,7 @@ class SolrField(object):
     def __init__(self, node, data_type):
         self.name = node.attrib["name"]
         self.multi_valued = node.attrib.get("multiValued") == "true"
+        self.required = node.attrib.get("required") == "true"
         self.type = data_type
 
 
@@ -109,6 +110,10 @@ class SolrSchema(object):
             data_type = field_types[field.attrib['type']]
             fields[name] = SolrField(field, data_type)
         return fields
+
+    def missing_fields(self, field_names):
+        return [name for name in set(self.fields.keys()) - set(field_names)
+                if self.fields[name].required]
 
     def serialize_value(self, k, v):
         try:
@@ -159,7 +164,12 @@ class SolrUpdate(object):
                            self.schema.serialize_value(name, values))]
 
     def doc(self, doc):
-        if not doc:
+        names = doc.keys()
+        missing_fields = self.schema.missing_fields(names)
+        if missing_fields:
+            raise SolrError("These required fields are unspecified:\n %s" %
+                            missing_fields)
+        if not names:
             return self.DOC()
         else:
             return self.DOC(*reduce(operator.add,
