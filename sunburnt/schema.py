@@ -212,8 +212,5 @@ class SolrResults(object):
 
 
 def object_to_dict(o, names):
-    d = {}
-    for name in names:
-        if hasattr(o, name):
-            d[name] = getattr(o, name)
-    return d
+    return dict((name, getattr(o, name)) for name in names
+                 if hasattr(o, name))
