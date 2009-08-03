@@ -79,8 +79,8 @@ class SolrField(object):
 
 class SolrSchema(object):
     solr_data_types = {
-        'solr.StrField':str,
-        'solr.TextField':str,
+        'solr.StrField':unicode,
+        'solr.TextField':unicode,
         'solr.BoolField':bool,
         'solr.IntField':int,
         'solr.SortableIntField':int,
@@ -117,9 +117,12 @@ class SolrSchema(object):
 
     def serialize_value(self, k, v):
         try:
-            return str(self.fields[k].type(v))
+            value = self.fields[k].type(v)
         except KeyError:
             raise SolrError("No such field '%s' in current schema" % k)
+        if not isinstance(value, unicode):
+            value = unicode(value)
+        return value
 
     def serialize_values(self, k, values):
         if not k in self.fields:
