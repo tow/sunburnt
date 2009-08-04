@@ -198,8 +198,7 @@ class SolrFacetCounts(object):
 
     @classmethod
     def from_response(cls, response):
-        facet_counts_dict = dict(response["facet_counts"]) \
-            if "facet_counts" in response else {}
+        facet_counts_dict = dict(response.get("facet_counts", {}))
         return SolrFacetCounts(**facet_counts_dict)
 
 
