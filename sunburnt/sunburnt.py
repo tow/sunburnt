@@ -59,3 +59,32 @@ class SolrInterface(object):
                 del params[k]
                 params.update(v)
         return self.schema.parse_results(self.conn.select(params))
+
+    def query(self, phrase=None):
+        return SolrQuery(self, phrase)
+
+
+class SolrQuery(object):
+    def __init__(self, interface, phrase):
+        self.interface = interface
+        self.schema = interface.schema
+        self.phrase = phrase
+        self.filters = []
+
+    def filter(self, **kwargs):
+        for k, v in kwargs.items():
+            try:
+                name, rel = k.split("__")
+            except ValueError:
+                name, rel = k, 'eq'
+            self.filters.append((name, rel, v))
+            return self
+
+    def execute(self):
+        return self.interface.search(q=str(self))
+
+    def __str__(self):
+        s = [self.phrase] if self.phrase else []
+        for name, rel, value in self.filters:
+            s.append(" %s:%s" % (name, value))
+        return ''.join(s)

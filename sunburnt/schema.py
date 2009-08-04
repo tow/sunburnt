@@ -193,7 +193,7 @@ class SolrFacetCounts(object):
     members= ["facet_dates", "facet_fields", "facet_queries"]
     def __init__(self, **kwargs):
         for member in self.members:
-            setattr(self, member, kwargs[member])
+            setattr(self, member, kwargs.get(member, ()))
         self.facet_fields = dict(self.facet_fields)
 
     @classmethod
