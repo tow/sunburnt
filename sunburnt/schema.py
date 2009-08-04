@@ -190,18 +190,31 @@ class SolrUpdate(object):
         return lxml.etree.tostring(self.xml, encoding='utf-8')
 
 
+class SolrFacetCounts(object):
+    members= ["facet_dates", "facet_fields", "facet_queries"]
+    def __init__(self, **kwargs):
+        for member in self.members:
+            setattr(self, member, kwargs[member])
+
+    @classmethod
+    def from_response(cls, response):
+        facet_counts_dict = response["facet_counts"] \
+            if "facet_counts" in response else {}
+        return SolrFacetCounts(**facet_counts_dict)
+
+
 class SolrResults(object):
-    response_items = ("numFound", "start", "docs", "facet_counts", "highlighting")
     def __init__(self, schema, msg):
         self.schema = schema
         self.d = simplejson.loads(msg)
-        if self.d["responseHeader"]["status"] != 0:
-            raise ValueError("Response indicates an error")
-        for attr in self.response_items:
+        for attr in ["QTime", "params", "status"]:
             try:
-                setattr(self, attr, self.d["response"][attr])
+                setattr(self, attr, self.d["responseHeader"][attr])
             except KeyError:
                 pass
+        if self.status != 0:
+            raise ValueError("Response indicates an error")
+        self.facet_counts = SolrFacetCounts.from_response(self.d)
         self.docs = [self.deserialize_fields(doc)
                      for doc in self.d["response"]["docs"]]
 
