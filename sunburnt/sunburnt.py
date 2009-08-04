@@ -129,6 +129,15 @@ class SolrQuery(object):
             self.options["f.%s.facet.mincount" % field] = mincount
         return self
 
+    def highlight(self, fields=None):
+        self.options["hl"] = "true"
+        if fields:
+            if isinstance(fields, basestring):
+                fields = [fields]
+            self.options["hl.fl"] = ','.join(fields)
+            # what if fields has a comma in it?
+        return self
+
     def execute(self):
         q = serialize_search(**self.search['query'])
         if q:

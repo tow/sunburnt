@@ -217,6 +217,8 @@ class SolrResults(object):
         self.start = result.attrib['start']
         self.docs = [value_from_node(n) for n in result.xpath("doc")]
         self.facet_counts = SolrFacetCounts.from_response(details)
+        self.highlighting = dict((k, dict(v))
+                                 for k, v in details.get("highlighting", ()))
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
