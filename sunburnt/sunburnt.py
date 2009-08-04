@@ -36,7 +36,7 @@ class SolrConnection(object):
         url = "%s?%s" % (self.select_url, qs)
         r, c = self.request(url)
         if r.status != 200:
-            raise SolrException(r, c)
+            raise SolrError(r, c)
         return c
 
 
