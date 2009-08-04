@@ -58,5 +58,4 @@ class SolrInterface(object):
             if hasattr(v, "items"):
                 del params[k]
                 params.update(v)
-        params['wt'] = 'json'
         return self.schema.parse_results(self.conn.select(params))

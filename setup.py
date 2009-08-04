@@ -9,5 +9,5 @@ distutils.core.setup(
     author='Toby White',
     author_email='toby.o.h.white@gmail.com',
     packages=['sunburnt'],
-    requires=['httplib2', 'lxml', 'pytz', 'simplejson']
+    requires=['httplib2', 'lxml', 'pytz']
     )

@@ -7,7 +7,6 @@ import warnings
 
 import lxml.builder
 import lxml.etree
-import simplejson
 
 try:
     import pytz
@@ -195,32 +194,30 @@ class SolrFacetCounts(object):
     def __init__(self, **kwargs):
         for member in self.members:
             setattr(self, member, kwargs[member])
+        self.facet_fields = dict(self.facet_fields)
 
     @classmethod
     def from_response(cls, response):
-        facet_counts_dict = response["facet_counts"] \
+        facet_counts_dict = dict(response["facet_counts"]) \
             if "facet_counts" in response else {}
         return SolrFacetCounts(**facet_counts_dict)
 
 
 class SolrResults(object):
-    def __init__(self, schema, msg):
+    def __init__(self, schema, xmlmsg):
         self.schema = schema
-        self.d = simplejson.loads(msg)
+        doc = lxml.etree.fromstring(xmlmsg)
+        details = dict(value_from_node(n) for n in doc.xpath("/response/lst"))
+        details['responseHeader'] = dict(details['responseHeader'])
         for attr in ["QTime", "params", "status"]:
-            try:
-                setattr(self, attr, self.d["responseHeader"][attr])
-            except KeyError:
-                pass
+            setattr(self, attr, details['responseHeader'].get(attr))
         if self.status != 0:
             raise ValueError("Response indicates an error")
-        self.facet_counts = SolrFacetCounts.from_response(self.d)
-        self.docs = [self.deserialize_fields(doc)
-                     for doc in self.d["response"]["docs"]]
-
-    def deserialize_fields(self, doc):
-        return dict((k, self.schema.deserialize_values(k, v))
-                    for k, v in doc.items())
+        result = doc.xpath("/response/result")[0]
+        self.numFound = result.attrib['numFound']
+        self.start = result.attrib['start']
+        self.docs = [value_from_node(n) for n in result.xpath("doc")]
+        self.facet_counts = SolrFacetCounts.from_response(details)
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
@@ -229,3 +226,28 @@ class SolrResults(object):
 def object_to_dict(o, names):
     return dict((name, getattr(o, name)) for name in names
                  if hasattr(o, name))
+
+def value_from_node(node):
+    name = node.attrib.get('name')
+    if node.tag in ('lst', 'arr'):
+        value = [value_from_node(n) for n in node.getchildren()]
+    if node.tag in 'doc':
+        value = dict(value_from_node(n) for n in node.getchildren())
+    elif node.tag == 'null':
+        value = None
+    elif node.tag in ('str', 'byte'):
+        value = node.text
+    elif node.tag in ('short', 'int'):
+        value = int(node.text)
+    elif node.tag == 'long':
+        value = long(node.text)
+    elif node.tag == 'bool':
+        value = True if node.text == "true" else False
+    elif node.tag in ('float', 'double'):
+        value = float(node.text)
+    elif node.tag == 'date':
+        value = solr_date(node.text)
+    if name is not None:
+        return name, value
+    else:
+        return value
