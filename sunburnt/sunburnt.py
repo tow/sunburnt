@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import cgi
+import collections
 import re
 import urllib
 
@@ -61,28 +62,61 @@ class SolrInterface(object):
                 params.update(v)
         return self.schema.parse_results(self.conn.select(params))
 
-    def query(self, phrase=None):
-        return SolrQuery(self, phrase)
+    def query(self, *args, **kwargs):
+        q = SolrQuery(self)
+        return q.query(*args, **kwargs)
 
 
 class SolrQuery(object):
-    def __init__(self, interface, phrase):
+    default_term_re = re.compile(r'^\w+$')
+
+    def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.phrase = phrase
-        self.filters = []
+        self.search = {'query':
+                          {'terms':collections.defaultdict(list),
+                           'phrases':collections.defaultdict(list)},
+                      'filter':
+                          {'terms':collections.defaultdict(list),
+                           'phrases':collections.defaultdict(list)}}
         self.options = {}
 
-    def filter(self, **kwargs):
+    def update_search(self, q, t, k, v):
+        if k and k not in self.schema.fields:
+            raise ValueError("%s is not a valid field name" % k)
+        self.search[q][t][k].append(v)
+        return self
+
+    def query_by_term(self, field_name=None, term=""):
+        return self.update_search('query', 'term', field_name, term)
+
+    def query_by_phrase(self, field_name=None, phrase=""):
+        return self.update_search('query', 'phrase', field_name, phrase)
+
+    def filter_by_term(self, field_name=None, term=""):
+        return self.update_search('filter', 'term', field_name, term)
+
+    def filter_by_phrase(self, field_name=None, term=""):
+        return self.update_search('filter', 'phrase', field_name, phrase)
+
+    def query(self, *args, **kwargs):
+        for arg in args:
+            self.update_search('query', self.term_or_phrase(arg), None, arg)
+        return self.update_q('query', kwargs)
+
+    def filter(self, *args, **kwargs):
+        for arg in args:
+            self.update_search('filter', self.term_or_phrase(arg), None, arg)
+        return self.update_q('filter', kwargs)
+
+    def update_q(self, q, kwargs):
         for k, v in kwargs.items():
             try:
                 name, rel = k.split("__")
             except ValueError:
                 name, rel = k, 'eq'
-            if name not in self.schema.fields:
-                raise ValueError("%s is not a valid field name" % name)
-            self.filters.append((name, rel, v))
-            return self
+            self.update_search(q, self.term_or_phrase(v), name, v)
+        return self
 
     def facet_by(self, field, limit=None, mincount=None):
         if field not in self.schema.fields:
@@ -96,15 +130,33 @@ class SolrQuery(object):
         return self
 
     def execute(self):
-        self.options["q"] = lucenequerysyntax_escape(str(self))
+        q = serialize_search(**self.search['query'])
+        if q:
+            self.options["q"] = q
+        qf = serialize_search(**self.search['filter'])
+        if qf:
+            self.options["qf"] = qf
         return self.interface.search(**self.options)
 
-    def __str__(self):
-        s = [self.phrase] if self.phrase else []
-        for name, rel, value in self.filters:
-            s.append(" %s:%s" % (name, value))
-        return ''.join(s)
+    def term_or_phrase(self, arg):
+        return 'terms' if self.default_term_re.match(arg) else 'phrases'
 
+
+def serialize_search(terms, phrases):
+    s = []
+    for name in terms:
+        if name:
+            s += ['%s:%s' % (name, lqs_escape(value))
+                  for value in terms[name]]
+        else:
+            s += [lqs_escape(value) for value in terms[name]]
+    for name in phrases:
+        if name:
+            s += ['%s:"%s"' % (name, value)
+                  for value in phrases[name]]
+        else:
+            s += ['"%s"' % value for value in phrases[name]]
+    return ' '.join(s)
 
 def utf8_urlencode(params):
     utf8_params = {}
@@ -117,5 +169,5 @@ def utf8_urlencode(params):
     return urllib.urlencode(utf8_params)
 
 lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
-def lucenequerysyntax_escape(s):
+def lqs_escape(s):
     return lucene_special_chars.sub(r'\\\1', s)
