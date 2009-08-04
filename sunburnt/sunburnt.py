@@ -70,6 +70,7 @@ class SolrQuery(object):
         self.schema = interface.schema
         self.phrase = phrase
         self.filters = []
+        self.options = {}
 
     def filter(self, **kwargs):
         for k, v in kwargs.items():
@@ -80,8 +81,18 @@ class SolrQuery(object):
             self.filters.append((name, rel, v))
             return self
 
+    def facet_by(self, field, limit=None, mincount=None):
+        self.options.update({"facet":"true",
+                             "facet.field":field})
+        if limit:
+            self.options["f.%s.facet.limit" % field] = limit
+        if mincount:
+            self.options["f.%s.facet.mincount" % field] = mincount
+        return self
+
     def execute(self):
-        return self.interface.search(q=str(self))
+        self.options["q"] = str(self)
+        return self.interface.search(**self.options)
 
     def __str__(self):
         s = [self.phrase] if self.phrase else []
