@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import cgi
+import re
 import urllib
 
 import httplib2
@@ -32,7 +33,7 @@ class SolrConnection(object):
             raise SolrError(r, c)
 
     def select(self, params):
-        qs = urllib.urlencode(params)
+        qs = utf8_urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         r, c = self.request(url)
         if r.status != 200:
@@ -95,7 +96,7 @@ class SolrQuery(object):
         return self
 
     def execute(self):
-        self.options["q"] = str(self)
+        self.options["q"] = lucenequerysyntax_escape(str(self))
         return self.interface.search(**self.options)
 
     def __str__(self):
@@ -103,3 +104,18 @@ class SolrQuery(object):
         for name, rel, value in self.filters:
             s.append(" %s:%s" % (name, value))
         return ''.join(s)
+
+
+def utf8_urlencode(params):
+    utf8_params = {}
+    for k, v in params.items():
+        if isinstance(k, unicode):
+            k = k.encode('utf-8')
+        if isinstance(v, unicode):
+            v = v.encode('utf-8')
+        utf8_params[k] = v
+    return urllib.urlencode(utf8_params)
+
+lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
+def lucenequerysyntax_escape(s):
+    return lucene_special_chars.sub(r'\\\1', s)
