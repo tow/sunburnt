@@ -129,13 +129,19 @@ class SolrQuery(object):
             self.options["f.%s.facet.mincount" % field] = mincount
         return self
 
-    def highlight(self, fields=None):
+    def highlight(self, fields=None, snippets=None, fragsize=None):
         self.options["hl"] = "true"
         if fields:
             if isinstance(fields, basestring):
                 fields = [fields]
             self.options["hl.fl"] = ','.join(fields)
             # what if fields has a comma in it?
+        if snippets is not None:
+            for field in fields:
+                self.options["f.%s.hl.snippets" % field] = snippets
+        if fragsize is not None:
+            for field in fields:
+                self.options["f.%s.hl.fragsize" % field] = fragsize
         return self
 
     def execute(self):
