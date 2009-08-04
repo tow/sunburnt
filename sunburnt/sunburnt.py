@@ -78,10 +78,14 @@ class SolrQuery(object):
                 name, rel = k.split("__")
             except ValueError:
                 name, rel = k, 'eq'
+            if name not in self.schema.fields:
+                raise ValueError("%s is not a valid field name" % name)
             self.filters.append((name, rel, v))
             return self
 
     def facet_by(self, field, limit=None, mincount=None):
+        if field not in self.schema.fields:
+            raise ValueError("%s is not a valid field name" % field)
         self.options.update({"facet":"true",
                              "facet.field":field})
         if limit:
