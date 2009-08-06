@@ -95,7 +95,7 @@ class SolrSchema(object):
     def __init__(self, f):
         """initialize a schema object from a
         filename or file-like object."""
-        self.fields = self.schema_parse(f)
+        self.fields, self.default_field = self.schema_parse(f)
 
     def schema_parse(self, f):
         schemadoc = lxml.etree.parse(f)
@@ -108,7 +108,9 @@ class SolrSchema(object):
             name = field.attrib['name']
             data_type = field_types[field.attrib['type']]
             fields[name] = SolrField(field, data_type)
-        return fields
+        default = schemadoc.xpath("/schema/defaultSearchField")
+        default_field = default[0].text if default else None
+        return fields, default_field
 
     def missing_fields(self, field_names):
         return [name for name in set(self.fields.keys()) - set(field_names)
