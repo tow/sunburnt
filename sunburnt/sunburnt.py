@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import cgi
+from itertools import islice
 import urllib
 
 import httplib2
@@ -46,9 +47,12 @@ class SolrInterface(object):
         self.conn = SolrConnection(url)
         self.schema = SolrSchema(schemadoc)
 
-    def add(self, docs):
-        update_message = self.schema.make_update(docs)
-        self.conn.update(str(update_message))
+    def add(self, docs, chunk=100):
+        # to avoid making messages too large, we break the message every
+        # chunk docs.
+        for doc_chunk in grouper(docs, chunk):
+            update_message = self.schema.make_update(doc_chunk)
+            self.conn.update(str(update_message))
 
     def commit(self):
         self.conn.commit()
@@ -76,3 +80,11 @@ def utf8_urlencode(params):
             v = v.encode('utf-8')
         utf8_params[k] = v
     return urllib.urlencode(utf8_params)
+
+def grouper(iterable, n):
+    "grouper('ABCDEFG', 3) --> [['ABC'], ['DEF'], ['G']]"
+    i = iter(iterable)
+    g = list(islice(i, 0, n))
+    while g:
+        yield g
+        g = list(islice(i, 0, n))
