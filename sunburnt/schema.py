@@ -200,11 +200,10 @@ class SolrDelete(object):
     DELETE = E.delete
     ID = E.id
     QUERY = E.query
-    def __init__(self, schema, docs=None, query=None):
+    def __init__(self, schema, docs=None, queries=None):
         self.schema = schema
         deletions = self.delete_docs(docs)
-        if query:
-            deletions.append(self.delete_query(query))
+        deletions.append(self.delete_queries(queries))
         self.xml = self.DELETE(*deletions)
 
     def delete_docs(self, docs):
@@ -220,8 +219,10 @@ class SolrDelete(object):
                 deletions.append(self.ID(doc[self.schema.unique_key]))
         return deletions
 
-    def delete_query(self, query):
-        return self.QUERY(query)
+    def delete_queries(self, queries):
+        if isinstance(queries, basestring):
+            queries = [queries]
+        return [self.QUERY(query) for query in queries]
 
     def __str__(self):
         return lxml.etree.tostring(self.xml, encoding='utf-8')
