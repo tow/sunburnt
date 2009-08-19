@@ -20,16 +20,18 @@ class SolrConnection(object):
         self.request = h.request
 
     def commit(self, wait_flush=True, wait_searcher=True):
-        wait_flush = "true" if wait_flush else "false"
-        wait_searcher = "true" if wait_searcher else "false"
-        response = self.update('<commit waitFlush="%s" waitSearcher="%s"/>' %
-                               (wait_flush, wait_searcher))
+        response = self.commit_or_optimize("commit",
+                                           wait_flush, wait_searcher)
 
-    def optimize(self):
+    def optimize(self, wait_flush=True, wait_searcher=True):
+        response = self.commit_or_optimize("optimize",
+                                           wait_flush, wait_searcher)
+
+    def commit_or_optimize(self, verb, wait_flush, wait_searcher):
         wait_flush = "true" if wait_flush else "false"
         wait_searcher = "true" if wait_searcher else "false"
-        response = self.update('<optimize waitFlush="%s" waitSearcher="%s"/>' %
-                               (wait_flush, wait_searcher))
+        response = self.update('<%s waitFlush="%s" waitSearcher="%s"/>' %
+                               (verb, wait_flush, wait_searcher))
 
     def rollback(self):
         response = self.update("<rollback/>")
