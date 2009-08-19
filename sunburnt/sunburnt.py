@@ -19,11 +19,17 @@ class SolrConnection(object):
         self.select_url = self.url + "select/"
         self.request = h.request
 
-    def commit(self):
-        response = self.update("<commit/>")
+    def commit(self, wait_flush=True, wait_searcher=True):
+        wait_flush = "true" if wait_flush else "false"
+        wait_searcher = "true" if wait_searcher else "false"
+        response = self.update('<commit waitFlush="%s" waitSearcher="%s"/>' %
+                               (wait_flush, wait_searcher))
 
     def optimize(self):
-        response = self.update("<optimize/>")
+        wait_flush = "true" if wait_flush else "false"
+        wait_searcher = "true" if wait_searcher else "false"
+        response = self.update('<optimize waitFlush="%s" waitSearcher="%s"/>' %
+                               (wait_flush, wait_searcher))
 
     def update(self, update_doc):
         body = update_doc
@@ -60,11 +66,11 @@ class SolrInterface(object):
         delete_message = self.schema.make_delete(docs, query)
         self.conn.update(str(delete_message))
 
-    def commit(self):
-        self.conn.commit()
+    def commit(self, *args, **kwargs):
+        self.conn.commit(*args, **kwargs)
 
-    def optimize(self):
-        self.conn.optimize()
+    def optimize(self, *args, **kwargs):
+        self.conn.optimize(*args, **kwargs)
 
     def search(self, **kwargs):
         params = kwargs.copy()
