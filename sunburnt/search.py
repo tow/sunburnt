@@ -52,7 +52,11 @@ class SolrSearch(object):
                 name, rel = k.split("__")
             except ValueError:
                 name, rel = k, 'eq'
-            self.update_search(q, self.term_or_phrase(v), name, v)
+            if self.schema.fields[name].type == unicode:
+                search_type = self.term_or_phrase(v)
+            else:
+                search_type = "terms"
+            self.update_search(q, search_type, name, v)
         return self
 
     def facet_by(self, field, limit=None, mincount=None):
@@ -117,4 +121,7 @@ def serialize_search(terms, phrases):
 
 lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
 def lqs_escape(s):
-    return lucene_special_chars.sub(r'\\\1', s)
+    if isinstance(s, unicode):
+        return lucene_special_chars.sub(r'\\\1', s)
+    else:
+        return s
