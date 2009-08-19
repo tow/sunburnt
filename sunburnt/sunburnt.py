@@ -57,6 +57,9 @@ class SolrInterface(object):
     def commit(self):
         self.conn.commit()
 
+    def optimize(self):
+        self.conn.optimize()
+
     def search(self, **kwargs):
         params = kwargs.copy()
         for k, v in kwargs.items():
