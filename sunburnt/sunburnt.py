@@ -31,6 +31,9 @@ class SolrConnection(object):
         response = self.update('<optimize waitFlush="%s" waitSearcher="%s"/>' %
                                (wait_flush, wait_searcher))
 
+    def rollback(self):
+        response = self.update("<rollback/>")
+
     def update(self, update_doc):
         body = update_doc
         headers = {"Content-Type":"text/xml; charset=utf-8"}
@@ -71,6 +74,9 @@ class SolrInterface(object):
 
     def optimize(self, *args, **kwargs):
         self.conn.optimize(*args, **kwargs)
+
+    def rollback(self):
+        self.conn.rollback()
 
     def search(self, **kwargs):
         params = kwargs.copy()
