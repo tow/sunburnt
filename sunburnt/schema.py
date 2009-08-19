@@ -148,6 +148,9 @@ class SolrSchema(object):
     def make_update(self, docs):
         return SolrUpdate(self, docs)
 
+    def make_delete(self, docs, query):
+        return SolrDelete(self, docs, query)
+
     def parse_results(self, msg):
         return SolrResults(self, msg)
 
@@ -188,6 +191,37 @@ class SolrUpdate(object):
                  else object_to_dict(doc, self.schema.fields.keys()))
                 for doc in docs]
         return self.ADD(*[self.doc(doc) for doc in docs])
+
+    def __str__(self):
+        return lxml.etree.tostring(self.xml, encoding='utf-8')
+
+
+class SolrDelete(object):
+    DELETE = E.delete
+    ID = E.id
+    QUERY = E.query
+    def __init__(self, schema, docs=None, query=None):
+        self.schema = schema
+        deletions = self.delete_docs(docs)
+        if query:
+            deletions.append(self.delete_query(query))
+        self.xml = self.DELETE(*deletions)
+
+    def delete_docs(self, docs):
+        if docs is None:
+            docs = []
+        deletions = []
+        for doc in docs:
+            if isinstance(doc, basestring):
+                deletions.append(self.ID(doc))
+            else:
+                doc = doc if hasattr(doc, "items") \
+                    else object_to_dict(doc, self.schema.fields.keys())
+                deletions.append(self.ID(doc[self.schema.unique_key]))
+        return deletions
+
+    def delete_query(self, query):
+        return self.QUERY(query)
 
     def __str__(self):
         return lxml.etree.tostring(self.xml, encoding='utf-8')

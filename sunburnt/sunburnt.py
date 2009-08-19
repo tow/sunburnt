@@ -54,6 +54,12 @@ class SolrInterface(object):
             update_message = self.schema.make_update(doc_chunk)
             self.conn.update(str(update_message))
 
+    def delete(self, docs=None, query=None):
+        if not docs and not query:
+            raise SolrError("No docs or query specified for deletion")
+        delete_message = self.schema.make_delete(docs, query)
+        self.conn.update(str(delete_message))
+
     def commit(self):
         self.conn.commit()
 
