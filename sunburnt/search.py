@@ -81,6 +81,11 @@ class SolrSearch(object):
                 self.options["f.%s.hl.fragsize" % field] = fragsize
         return self
 
+    def paginate(self, start=1, rows=10):
+        self.options["start"] = start
+        self.options["rows"] = rows
+        return self
+
     def execute(self):
         q = serialize_search(**self.search['query'])
         if q:
