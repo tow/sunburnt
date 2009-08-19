@@ -225,6 +225,11 @@ class SolrResults(object):
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
+    def __len__(self):
+        return len(self.docs)
+
+    def __getitem__(self, key):
+        return self.docs[key]
 
 def object_to_dict(o, names):
     return dict((name, getattr(o, name)) for name in names
