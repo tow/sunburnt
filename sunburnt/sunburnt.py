@@ -68,7 +68,10 @@ class SolrInterface(object):
 
     def query(self, *args, **kwargs):
         q = SolrSearch(self)
-        return q.query(*args, **kwargs)
+        if len(args) + len(kwargs) > 0:
+            return q.query(*args, **kwargs)
+        else:
+            return q
 
 
 def utf8_urlencode(params):
