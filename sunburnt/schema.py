@@ -203,13 +203,15 @@ class SolrDelete(object):
     def __init__(self, schema, docs=None, queries=None):
         self.schema = schema
         deletions = self.delete_docs(docs)
-        deletions.append(self.delete_queries(queries))
+        deletions += self.delete_queries(queries)
         self.xml = self.DELETE(*deletions)
 
     def delete_docs(self, docs):
         if docs is None:
             docs = []
         deletions = []
+        if not hasattr(docs, "__iter__"):
+            docs = [docs]
         for doc in docs:
             if isinstance(doc, basestring):
                 deletions.append(self.ID(doc))
@@ -220,6 +222,8 @@ class SolrDelete(object):
         return deletions
 
     def delete_queries(self, queries):
+        if queries is None:
+            return []
         if isinstance(queries, basestring):
             queries = [queries]
         return [self.QUERY(query) for query in queries]
