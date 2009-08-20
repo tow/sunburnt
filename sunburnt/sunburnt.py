@@ -104,6 +104,8 @@ def utf8_urlencode(params):
             k = k.encode('utf-8')
         if isinstance(v, unicode):
             v = v.encode('utf-8')
+        elif isinstance(v, bool):
+            v = "true" if v else "false"
         utf8_params[k] = v
     return urllib.urlencode(utf8_params)
 
