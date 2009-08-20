@@ -249,28 +249,49 @@ class SolrResults(object):
     def __init__(self, schema, xmlmsg):
         self.schema = schema
         doc = lxml.etree.fromstring(xmlmsg)
-        details = dict(value_from_node(n) for n in doc.xpath("/response/lst"))
+        details = dict(value_from_node(n) for n in
+                       doc.xpath("/response/lst[@name!='moreLikeThis']"))
         details['responseHeader'] = dict(details['responseHeader'])
         for attr in ["QTime", "params", "status"]:
             setattr(self, attr, details['responseHeader'].get(attr))
         if self.status != 0:
             raise ValueError("Response indicates an error")
-        result = doc.xpath("/response/result")[0]
-        self.numFound = result.attrib['numFound']
-        self.start = result.attrib['start']
-        self.docs = [value_from_node(n) for n in result.xpath("doc")]
+        result_node = doc.xpath("/response/result")[0]
+        self.result = SolrResult(result_node)
         self.facet_counts = SolrFacetCounts.from_response(details)
         self.highlighting = dict((k, dict(v))
                                  for k, v in details.get("highlighting", ()))
+        more_like_these_nodes = \
+            doc.xpath("/response/lst[@name='moreLikeThis']/result")
+        more_like_these_results = [SolrResult(node)
+                                  for node in more_like_these_nodes]
+        self.more_like_these = dict((n.name, n)
+                                         for n in more_like_these_results)
+        if len(self.more_like_these) == 1:
+            self.more_like_this = self.more_like_these.values()[0]
+        else:
+            self.more_like_this = None
+
+    def __str__(self):
+        return str(self.result)
+
+    def __len__(self):
+        return len(self.result.docs)
+
+    def __getitem__(self, key):
+        return self.result.docs[key]
+
+
+class SolrResult(object):
+    def __init__(self, node):
+        self.name = node.attrib['name']
+        self.numFound = node.attrib['numFound']
+        self.start = node.attrib['start']
+        self.docs = [value_from_node(n) for n in node.xpath("doc")]
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
-    def __len__(self):
-        return len(self.docs)
-
-    def __getitem__(self, key):
-        return self.docs[key]
 
 def object_to_dict(o, names):
     return dict((name, getattr(o, name)) for name in names
