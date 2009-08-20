@@ -59,9 +59,16 @@ class SolrSearch(object):
             self.update_search(q, search_type, name, v)
         return self
 
+    def _check_fields(self, fields):
+        if isinstance(fields, basestring):
+            fields = [fields]
+        for field in fields:
+            if field not in self.schema.fields:
+                raise ValueError("Field '%s' not defined in schema")
+        return fields
+
     def facet_by(self, field, limit=None, mincount=None):
-        if field not in self.schema.fields:
-            raise ValueError("%s is not a valid field name" % field)
+        self._check_fields(field)
         self.options.update({"facet":"true",
                              "facet.field":field})
         if limit:
@@ -73,8 +80,7 @@ class SolrSearch(object):
     def highlight(self, fields=None, snippets=None, fragsize=None):
         self.options["hl"] = "true"
         if fields:
-            if isinstance(fields, basestring):
-                fields = [fields]
+            fields = self._check_fields(fields)
             self.options["hl.fl"] = ','.join(fields)
             # what if fields has a comma in it?
         if snippets is not None:
@@ -83,6 +89,14 @@ class SolrSearch(object):
         if fragsize is not None:
             for field in fields:
                 self.options["f.%s.hl.fragsize" % field] = fragsize
+        return self
+
+    def mlt(self, fields, **kwargs):
+        self.options["mlt"] = "true"
+        fields = self._check_fields(fields)
+        self.options["mlt.fl"] = ",".join(fields)
+        mlt_options = MoreLikeThisOptions(self.schema)
+        self.options.update(mlt_options(**kwargs))
         return self
 
     def paginate(self, start=1, rows=10):
@@ -101,6 +115,33 @@ class SolrSearch(object):
 
     def term_or_phrase(self, arg):
         return 'terms' if self.default_term_re.match(arg) else 'phrases'
+
+
+class MoreLikeThisOptions(object):
+    opts = {"count":int,
+            "mintf":float,
+            "mindf":float,
+            "minwl":int,
+            "maxwl":int,
+            "maxqt":int,
+            "maxntp":int,
+            }
+    def __init__(self, schema):
+        self.schema = schema
+
+    def __call__(self, **kwargs):
+        options = {}
+        for opt_name, opt_value in kwargs.items():
+            try:
+                opt_type = self.opts[opt_name]
+            except IndexError:
+                raise SolrError("Invalid MLT option %s" % opt_name)
+            try:
+                options["mlt.%s" % opt_name] = opt_type(opt_value)
+            except (ValueError, TypeError):
+                raise SolrError("'mlt.%s' should be an '%s'"%
+                                (opt_name, opt_type.__name__))
+        return options
 
 
 def serialize_search(terms, phrases):
