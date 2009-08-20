@@ -91,10 +91,24 @@ class SolrSearch(object):
                 self.options["f.%s.hl.fragsize" % field] = fragsize
         return self
 
-    def mlt(self, fields, **kwargs):
+    def mlt(self, fields, query_fields=None, **kwargs):
         self.options["mlt"] = "true"
         fields = self._check_fields(fields)
         self.options["mlt.fl"] = ",".join(fields)
+        if query_fields is not None:
+            qf_arg = []
+            for k, v in query_fields.items():
+                if k not in fields:
+                    raise SolrError("'%s' specified in query_fields but not fields")
+                if v is None:
+                    qf_arg.append(k)
+                else:
+                    try:
+                        v = float(v)
+                    except ValueError:
+                        raise SolrError("'%s' has non-numerical boost value")
+                    qf_arg.append("%s^%s" % (k, v))
+            self.options["mlt.qf"] = " ".join(qf_arg)
         mlt_options = MoreLikeThisOptions(self.schema)
         self.options.update(mlt_options(**kwargs))
         return self
@@ -125,6 +139,7 @@ class MoreLikeThisOptions(object):
             "maxwl":int,
             "maxqt":int,
             "maxntp":int,
+            "boost":bool,
             }
     def __init__(self, schema):
         self.schema = schema
