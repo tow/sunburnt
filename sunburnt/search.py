@@ -77,7 +77,7 @@ class SolrSearch(object):
                                  % (name, rel))
         try:
             if rel.startswith('range'):
-                value = (field_type(v) for v in value)
+                value = sorted(field_type(v) for v in value)
             else:
                 value = field_type(value)
         except (ValueError, TypeError):
