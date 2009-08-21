@@ -44,10 +44,6 @@ class solr_date(object):
                 raise EnvironmentError("pytz not available, cannot do timezone conversions")
         else:
             self.v = v
-        if hasattr(self.v, "microsecond"):
-            self.microsecond = self.v.microsecond
-        else:
-            self.microsecond = int(1000000*math.modf(self.v.second)[0])
 
     def from_str(self, s):
         self.v = datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
@@ -56,6 +52,13 @@ class solr_date(object):
         microsecond_string = s[19:-1]
         if microsecond_string:
             self.v = self.v.replace(microsecond=int(1000000*float(s[19:-1])))
+
+    @property
+    def microsecond(self):
+        if hasattr(self.v, "microsecond"):
+            return self.v.microsecond
+        else:
+            return int(1000000*math.modf(self.v.second)[0])
 
     def __repr__(self):
         return repr(self.v)
