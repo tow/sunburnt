@@ -296,7 +296,7 @@ class SolrResult(object):
 
 def object_to_dict(o, names):
     return dict((name, getattr(o, name)) for name in names
-                 if hasattr(o, name))
+                 if (hasattr(o, name) and getattr(o, name) is not None))
 
 def value_from_node(node):
     name = node.attrib.get('name')
