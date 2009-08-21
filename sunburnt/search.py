@@ -90,7 +90,7 @@ class SolrSearch(object):
             fields = [fields]
         for field in fields:
             if field not in self.schema.fields:
-                raise ValueError("Field '%s' not defined in schema")
+                raise ValueError("Field '%s' not defined in schema" % field)
         return fields
 
     def facet_by(self, field, limit=None, mincount=None):
