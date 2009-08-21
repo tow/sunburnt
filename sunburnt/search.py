@@ -16,6 +16,7 @@ class SolrSearch(object):
                       'filter':
                           {'terms':collections.defaultdict(list),
                            'phrases':collections.defaultdict(list)}}
+        self.range_queries = []
         self.options = {}
 
     def update_search(self, q, t, k, v):
@@ -52,12 +53,37 @@ class SolrSearch(object):
                 name, rel = k.split("__")
             except ValueError:
                 name, rel = k, 'eq'
-            if self.schema.fields[name].type == unicode:
-                search_type = self.term_or_phrase(v)
+            self._check_fields(name)
+            field_type  = self.schema.fields[name].type
+            if rel == 'eq':
+                if field_type is unicode:
+                    search_type = self.term_or_phrase(v)
+                else:
+                    search_type = "terms"
+                self.update_search(q, search_type, name, v)
             else:
-                search_type = "terms"
-            self.update_search(q, search_type, name, v)
+                self._range_query(name, rel, v)
         return self
+
+    def _range_query(self, name, rel, value):
+        field_type  = self.schema.fields[name].type
+        if field_type is bool:
+            raise ValueError("Cannot do a '%s' query on a bool field" % rel)
+        if rel.startswith('range'):
+            try:
+                assert len(value) == 2
+            except (AssertionError, TypeError):
+                raise ValueError("'%s__%s' argument must be a length-2 iterable"
+                                 % (name, rel))
+        try:
+            if rel.startswith('range'):
+                value = (field_type(v) for v in value)
+            else:
+                value = field_type(value)
+        except (ValueError, TypeError):
+                raise ValueError("'%s__%s' arguments of the wrong type"
+                                 % (name, rel))
+        self.range_queries.append((name, rel, value))
 
     def _check_fields(self, fields):
         if isinstance(fields, basestring):
@@ -119,7 +145,8 @@ class SolrSearch(object):
         return self
 
     def execute(self):
-        q = serialize_search(**self.search['query'])
+        q = serialize_search(**self.search['query']) +\
+            serialize_range_queries(self.range_queries)
         if q:
             self.options["q"] = q
         qf = serialize_search(**self.search['filter'])
@@ -174,6 +201,24 @@ def serialize_search(terms, phrases):
         else:
             s += ['"%s"' % value for value in phrases[name]]
     return ' '.join(s)
+
+_range_query_templates = {
+    "lt": "* TO %s",
+    "gt": "%s TO *",
+    "ra": "%s TO %s",
+}
+
+def serialize_range_queries(queries):
+    s = []
+    for name, rel, value in queries:
+        if rel in ('lte', 'gte', 'range'):
+            left, right = "[", "]"
+        else:
+            left, right = "{", "}"
+        range = _range_query_templates[rel[:2]] % value
+        s.append("%(name)s:%(left)s%(range)s%(right)s" % vars())
+    return ' '.join(s)
+
 
 lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
 def lqs_escape(s):
