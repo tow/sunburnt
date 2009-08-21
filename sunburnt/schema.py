@@ -8,6 +8,8 @@ import warnings
 import lxml.builder
 import lxml.etree
 
+from . import dates
+
 try:
     import pytz
 except ImportError:
@@ -46,12 +48,8 @@ class solr_date(object):
             self.v = v
 
     def from_str(self, s):
-        self.v = datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
-        if pytz:
-            self.v = pytz.utc.localize(self.v)
-        microsecond_string = s[19:-1]
-        if microsecond_string:
-            self.v = self.v.replace(microsecond=int(1000000*float(s[19:-1])))
+        v = dates.datetime_from_w3_datestring(s)
+        self.from_date(v)
 
     @property
     def microsecond(self):
