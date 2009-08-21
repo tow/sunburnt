@@ -7,14 +7,16 @@ Requirements:
 
 Strongly recommended
 
-  Solr DateFields must be in UTC. To ensure that timezones are handled correctly, you
-  must also have installed:
+  * mx.DateTime
+
+  Sunburnt will happily deal with dates stored either as Python datetime objects, or as mx.DateTime objects. The latter are preferable, having better semantics and a wider representation range. They will be used if present, otherwise sunburnt will fall back to Python datetime objects.
 
   * pytz
+
+  Solr DateFields must be in UTC. If using native Python datetime objects, you should also have pytz installed to guarantee correct timezone handling.
 
 Optional
 
   To run the tests, you'll also need:
 
   * nose
-  * mx.DateTime
