@@ -86,7 +86,6 @@ class SolrInterface(object):
             if hasattr(v, "items"):
                 del params[k]
                 params.update(v)
-        print self.conn.select(params)
         return self.schema.parse_results(self.conn.select(params))
 
     def query(self, *args, **kwargs):
