@@ -145,8 +145,8 @@ class SolrSearch(object):
         return self
 
     def execute(self):
-        q = serialize_search(**self.search['query']) +\
-            serialize_range_queries(self.range_queries)
+        q = "%s %s" % (serialize_search(**self.search['query']),
+                       serialize_range_queries(self.range_queries))
         if q:
             self.options["q"] = q
         qf = serialize_search(**self.search['filter'])
