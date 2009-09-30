@@ -131,7 +131,12 @@ class SolrSchema(object):
         except KeyError:
             raise SolrError("No such field '%s' in current schema" % k)
         if not isinstance(value, unicode):
-            value = unicode(value)
+            if value is True:
+                value = u'true'
+            elif value is False:
+                value = u'false'
+            else:
+                value = unicode(value)
         return value
 
     def serialize_values(self, k, values):
