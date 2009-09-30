@@ -106,8 +106,14 @@ class SolrSchema(object):
                 field_types[field_type] = t
         fields = {}
         for field in schemadoc.xpath("/schema/fields/field"):
-            name = field.attrib['name']
-            data_type = field_types[field.attrib['type']]
+            try:
+                name, type = field.attrib['name'], field.attrib['type']
+            except KeyError, e:
+                raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.message)
+            try:
+                data_type = field_types[type]
+            except KeyError, e:
+                raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
             fields[name] = SolrField(field, data_type)
         default_field = schemadoc.xpath("/schema/defaultSearchField")
         default_field = default_field[0].text if default_field else None
