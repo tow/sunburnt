@@ -146,17 +146,6 @@ class SolrSchema(object):
             raise SolrError("'%s' is not a multi-valued field" % k)
         return [self.serialize_value(k, value) for value in values]
 
-    def deserialize_value(self, k, v):
-        try:
-            return self.fields[k].type(v)
-        except KeyError:
-            raise SolrError("No such field '%s' in current schema" % k)
-
-    def deserialize_values(self, name, values):
-        if self.fields[name].multi_valued:
-            return [self.deserialize_value(name, value) for value in values]
-        return self.deserialize_value(name, values)
-
     def make_update(self, docs):
         return SolrUpdate(self, docs)
 
