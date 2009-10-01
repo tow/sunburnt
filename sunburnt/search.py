@@ -59,6 +59,11 @@ class SolrSearch(object):
                 if field_type is unicode:
                     search_type = self.term_or_phrase(v)
                 else:
+                    try:
+                        v = field_type(v)
+                    except TypeError:
+                        raise SolrError("Invalid value %s for field %s"
+                                        % (v, name))
                     search_type = "terms"
                 self.update_search(q, search_type, name, v)
             else:
