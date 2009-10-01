@@ -181,7 +181,6 @@ broken_schemata = {
 "kjhgjhg"
 }
 
-
 def check_broken_schemata(n, s):
     try:
         SolrSchema(StringIO.StringIO(s))
@@ -196,9 +195,12 @@ def test_broken_schemata():
 
 
 class D(object):
-    def __init__(self, int_field, text_field):
+    def __init__(self, int_field, text_field=None, my_arse=None):
         self.int_field = int_field
-        self.text_field = text_field
+        if text_field:
+            self.text_field = text_field
+        if my_arse:
+            self.my_arse = my_arse
 
 
 update_docs = [
@@ -223,6 +225,10 @@ update_docs = [
     # Mixed list of objects & dictionaries
     ([D(1, "a"), {"int_field":2, "text_field":"b"}],
      """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc><doc><field name="int_field">2</field><field name="text_field">b</field></doc></add>"""),
+
+    # object containing key to be ignored
+    (D(1, "a", True),
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc></add>"""),
     ]
 
 def check_update_serialization(s, obj, xml_string):
@@ -232,3 +238,25 @@ def test_update_serialization():
     s = SolrSchema(StringIO.StringIO(good_schema))
     for obj, xml_string in update_docs:
         yield check_update_serialization, s, obj, xml_string
+
+bad_updates = [
+    # Dictionary containing bad field name
+    {"int_field":1, "text_field":"a", "my_arse":True},
+    # Dictionary missing required field name
+    {"int_field":1},
+    # Object missing required field_name
+    D(1),
+    ]
+
+def check_broken_updates(s, obj):
+    try:
+        SolrUpdate(s, obj)
+    except SolrError:
+        pass
+    else:
+        assert False
+
+def test_bad_updates():
+    s = SolrSchema(StringIO.StringIO(good_schema))
+    for obj in bad_updates:
+        yield check_broken_updates, s, obj
