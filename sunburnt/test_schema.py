@@ -87,41 +87,40 @@ schema = \
 class TestReadingSchema(object):
     def setUp(self):
         self.schema = StringIO.StringIO(schema)
+        self.s = SolrSchema(self.schema)
 
     def test_read_schema(self):
         """ Test that we can read in a schema correctly,
         that we get the right set of fields, the right
         default field, and the right unique key"""
-        s = SolrSchema(self.schema)
-        assert sorted(s.fields.keys()) == ['boolean_field', 'int_field', 'text_field']
-        assert s.default_field == 'text_field'
-        assert s.unique_key == 'int_field'
+        assert set(self.s.fields.keys()) \
+            == set(['boolean_field', 'int_field', 'text_field'])
+        assert self.s.default_field == 'text_field'
+        assert self.s.unique_key == 'int_field'
 
     def test_serialize_dict(self):
         """ Test that each of the fields will serialize the relevant
         datatype appropriately."""
-        s = SolrSchema(self.schema)
         for k, v, v2 in (('int_field', 1, u'1'),
                          ('text_field', 'text', u'text'),
                          ('text_field', u'text', u'text'),
                          ('boolean_field', True, u'true')):
-                             assert s.serialize_value(k, v) == v2
+                             assert self.s.serialize_value(k, v) == v2
 
     def test_serialize_value_fails(self):
-        s = SolrSchema(self.schema)
         try:
-            s.serialize_value('my_arse', 3)
+            self.s.serialize_value('my_arse', 3)
         except SolrError:
             pass
         else:
             assert False
 
     def test_missing_fields(self):
-        s = SolrSchema(self.schema)
-        assert set(s.missing_fields([])) == set(['int_field', 'text_field'])
-        assert set(s.missing_fields(['boolean_field'])) \
+        assert set(self.s.missing_fields([])) \
             == set(['int_field', 'text_field'])
-        assert set(s.missing_fields(['int_field'])) == set(['text_field'])
+        assert set(self.s.missing_fields(['boolean_field'])) \
+            == set(['int_field', 'text_field'])
+        assert set(self.s.missing_fields(['int_field'])) == set(['text_field'])
 
 
 broken_schemata = {
