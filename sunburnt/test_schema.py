@@ -107,6 +107,14 @@ class TestReadingSchema(object):
                          ('boolean_field', True, u'true')):
                              assert s.serialize_value(k, v) == v2
 
+    def test_missing_fields(self):
+        s = SolrSchema(self.schema)
+        assert set(s.missing_fields([])) == set(['int_field', 'text_field'])
+        assert set(s.missing_fields(['boolean_field'])) \
+            == set(['int_field', 'text_field'])
+        assert set(s.missing_fields(['int_field'])) == set(['text_field'])
+
+
 broken_schemata = {
 "missing_name":
 """
