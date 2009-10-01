@@ -299,3 +299,19 @@ def test_delete_docs():
     s = SolrSchema(StringIO.StringIO(good_schema))
     for doc, xml_string in delete_docs:
         yield check_delete_docs, s, doc, xml_string
+
+
+delete_queries = [
+    ("search",
+     """<delete><query>search</query></delete>"""),
+    (["search1", "search2"],
+     """<delete><query>search1</query><query>search2</query></delete>"""),
+    ]
+
+def check_delete_queries(s, query, xml_string):
+    assert str(SolrDelete(s, queries=query)) == xml_string
+
+def test_delete_queries():
+    s = SolrSchema(StringIO.StringIO(good_schema))
+    for query, xml_string in delete_queries:
+        yield check_delete_queries, s, query, xml_string
