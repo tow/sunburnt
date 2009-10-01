@@ -6,7 +6,7 @@ import datetime
 import mx.DateTime
 import pytz
 
-from .schema import solr_date, SolrSchema, SolrError
+from .schema import solr_date, SolrSchema, SolrError, SolrUpdate
 
 not_utc = pytz.timezone('Etc/GMT-3')
 
@@ -193,3 +193,42 @@ def check_broken_schemata(n, s):
 def test_broken_schemata():
     for k, v in broken_schemata.items():
         yield check_broken_schemata, k, v
+
+
+class D(object):
+    def __init__(self, int_field, text_field):
+        self.int_field = int_field
+        self.text_field = text_field
+
+
+update_docs = [
+    # One single dictionary, not making use of multivalued field
+    ({"int_field":1, "text_field":"a"},
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc></add>"""),
+    # One single dictionary, with multivalued field
+    ({"int_field":1, "text_field":["a", "b"]},
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field><field name="text_field">b</field></doc></add>"""),
+    # List of dictionaries
+    ([{"int_field":1, "text_field":"a"}, {"int_field":2, "text_field":"b"}],
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc><doc><field name="int_field">2</field><field name="text_field">b</field></doc></add>"""),
+    # One single object, not making use of multivalued fields
+    (D(1, "a"),
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc></add>"""),
+    # One single object, with multivalued field
+    (D(1, ["a", "b"]),
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field><field name="text_field">b</field></doc></add>"""),
+    # List of objects
+    ([D(1, "a"), D(2, "b")],
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc><doc><field name="int_field">2</field><field name="text_field">b</field></doc></add>"""),
+    # Mixed list of objects & dictionaries
+    ([D(1, "a"), {"int_field":2, "text_field":"b"}],
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc><doc><field name="int_field">2</field><field name="text_field">b</field></doc></add>"""),
+    ]
+
+def check_update_serialization(s, obj, xml_string):
+    assert str(SolrUpdate(s, obj)) == xml_string
+
+def test_update_serialization():
+    s = SolrSchema(StringIO.StringIO(good_schema))
+    for obj, xml_string in update_docs:
+        yield check_update_serialization, s, obj, xml_string
