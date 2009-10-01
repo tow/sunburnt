@@ -149,6 +149,12 @@ class SolrSchema(object):
             raise SolrError("'%s' is not a multi-valued field" % k)
         return [self.serialize_value(k, value) for value in values]
 
+    def get_id_of_doc(self, doc):
+        if self.unique_key not in doc:
+            raise SolrError("doc doesn't contain unique_key %s" % self.unique_key)
+        id = doc[self.unique_key]
+        return self.serialize_value(self.unique_key, id)
+
     def make_update(self, docs):
         return SolrUpdate(self, docs)
 
@@ -214,7 +220,7 @@ class SolrDelete(object):
         if docs is None:
             docs = []
         deletions = []
-        if not hasattr(docs, "__iter__"):
+        if not hasattr(docs, "__iter__") or hasattr(docs, "items"):
             docs = [docs]
         for doc in docs:
             if isinstance(doc, basestring):
@@ -222,7 +228,7 @@ class SolrDelete(object):
             else:
                 doc = doc if hasattr(doc, "items") \
                     else object_to_dict(doc, self.schema.fields.keys())
-                deletions.append(self.ID(doc[self.schema.unique_key]))
+                deletions.append(self.ID(self.schema.get_id_of_doc(doc)))
         return deletions
 
     def delete_queries(self, queries):

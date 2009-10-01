@@ -6,7 +6,7 @@ import datetime
 import mx.DateTime
 import pytz
 
-from .schema import solr_date, SolrSchema, SolrError, SolrUpdate
+from .schema import solr_date, SolrSchema, SolrError, SolrUpdate, SolrDelete
 
 not_utc = pytz.timezone('Etc/GMT-3')
 
@@ -260,3 +260,36 @@ def test_bad_updates():
     s = SolrSchema(StringIO.StringIO(good_schema))
     for obj in bad_updates:
         yield check_broken_updates, s, obj
+
+
+delete_docs = [
+    # One single id
+    ("1",
+     """<delete><id>1</id></delete>"""),
+    # List of ids
+    (["1", "2", "3"],
+     """<delete><id>1</id><id>2</id><id>3</id></delete>"""),
+    # Dictionary
+    ({"int_field":1, "text_field":"a"},
+     """<delete><id>1</id></delete>"""),
+    # List of dictionaries
+    ([{"int_field":1, "text_field":"a"}, {"int_field":2, "text_field":"b"}],
+     """<delete><id>1</id><id>2</id></delete>"""),
+    # Object
+    (D(1, "a"),
+     """<delete><id>1</id></delete>"""),
+    # List of objects
+    ([D(1, "a"), D(2, "b")],
+     """<delete><id>1</id><id>2</id></delete>"""),
+    # Mixed ids, dicts, and objects
+    (["0", {"int_field":1, "text_field":"a"}, D(2, "b")],
+     """<delete><id>0</id><id>1</id><id>2</id></delete>"""),
+    ]
+
+def check_delete_docs(s, doc, xml_string):
+    assert str(SolrDelete(s, docs=doc)) == xml_string
+
+def test_delete_docs():
+    s = SolrSchema(StringIO.StringIO(good_schema))
+    for doc, xml_string in delete_docs:
+        yield check_delete_docs, s, doc, xml_string
