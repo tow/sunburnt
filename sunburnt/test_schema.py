@@ -107,6 +107,15 @@ class TestReadingSchema(object):
                          ('boolean_field', True, u'true')):
                              assert s.serialize_value(k, v) == v2
 
+    def test_serialize_value_fails(self):
+        s = SolrSchema(self.schema)
+        try:
+            s.serialize_value('my_arse', 3)
+        except SolrError:
+            pass
+        else:
+            assert False
+
     def test_missing_fields(self):
         s = SolrSchema(self.schema)
         assert set(s.missing_fields([])) == set(['int_field', 'text_field'])
