@@ -223,8 +223,10 @@ class SolrDelete(object):
         if not hasattr(docs, "__iter__") or hasattr(docs, "items"):
             docs = [docs]
         for doc in docs:
-            if isinstance(doc, basestring):
-                deletions.append(self.ID(doc))
+            # Really this next should check the expected type of unique key
+            if isinstance(doc, (basestring, int, long, float)):
+                v = self.schema.serialize_value(self.schema.unique_key, doc)
+                deletions.append(self.ID(v))
             else:
                 doc = doc if hasattr(doc, "items") \
                     else object_to_dict(doc, self.schema.fields.keys())

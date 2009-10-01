@@ -263,11 +263,17 @@ def test_bad_updates():
 
 
 delete_docs = [
-    # One single id
+    # One single string for id
     ("1",
      """<delete><id>1</id></delete>"""),
-    # List of ids
+    # One single int as id
+    (1,
+     """<delete><id>1</id></delete>"""),
+    # List of string ids
     (["1", "2", "3"],
+     """<delete><id>1</id><id>2</id><id>3</id></delete>"""),
+    # Mixed list of string and int ids
+    (["1", 2, "3"],
      """<delete><id>1</id><id>2</id><id>3</id></delete>"""),
     # Dictionary
     ({"int_field":1, "text_field":"a"},
@@ -281,9 +287,9 @@ delete_docs = [
     # List of objects
     ([D(1, "a"), D(2, "b")],
      """<delete><id>1</id><id>2</id></delete>"""),
-    # Mixed ids, dicts, and objects
-    (["0", {"int_field":1, "text_field":"a"}, D(2, "b")],
-     """<delete><id>0</id><id>1</id><id>2</id></delete>"""),
+    # Mixed string & int ids, dicts, and objects
+    (["0", {"int_field":1, "text_field":"a"}, D(2, "b"), 3],
+     """<delete><id>0</id><id>1</id><id>2</id><id>3</id></delete>"""),
     ]
 
 def check_delete_docs(s, doc, xml_string):
