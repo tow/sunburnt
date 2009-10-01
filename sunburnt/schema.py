@@ -217,6 +217,8 @@ class SolrDelete(object):
         self.xml = self.DELETE(*deletions)
 
     def delete_docs(self, docs):
+        if not self.schema.unique_key:
+            raise SolrError("This schema has no unique key - you can only delete by query")
         if docs is None:
             docs = []
         deletions = []
