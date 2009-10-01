@@ -66,7 +66,7 @@ def test_solr_date_from_strings():
         yield check_solr_date_from_string, k, v
 
 
-schema = \
+good_schema = \
 """
 <schema name="timetric" version="1.1">
   <types>
@@ -86,7 +86,7 @@ schema = \
 
 class TestReadingSchema(object):
     def setUp(self):
-        self.schema = StringIO.StringIO(schema)
+        self.schema = StringIO.StringIO(good_schema)
         self.s = SolrSchema(self.schema)
 
     def test_read_schema(self):
