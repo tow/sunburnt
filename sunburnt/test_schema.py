@@ -76,7 +76,7 @@ schema = \
   </types>
   <fields>
     <field name="int_field" required="true" type="sint"/>
-    <field name="text_field" required="true" type="string"/>
+    <field name="text_field" required="true" type="string" multiValued="true"/>
     <field name="boolean_field" required="false" type="boolean"/>
   </fields>
   <defaultSearchField>text_field</defaultSearchField>
@@ -121,6 +121,26 @@ class TestReadingSchema(object):
         assert set(self.s.missing_fields(['boolean_field'])) \
             == set(['int_field', 'text_field'])
         assert set(self.s.missing_fields(['int_field'])) == set(['text_field'])
+
+    def test_serialize_values(self):
+        assert self.s.serialize_values('text_field', ["a", "b", "c"]) \
+            == [u"a", u"b", u"c"]
+
+    def test_serialize_values_fails_with_bad_field_name(self):
+        try:
+            self.s.serialize_values('text_field2', ["a", "b", "c"])
+        except SolrError:
+            pass
+        else:
+            assert False
+
+    def test_serialize_values_fails_when_not_multivalued(self):
+        try:
+            self.s.serialize_values('int_field', ["a", "b", "c"])
+        except SolrError:
+            pass
+        else:
+            assert False
 
 
 broken_schemata = {
