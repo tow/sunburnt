@@ -34,7 +34,7 @@ class SolrSearch(object):
     def filter_by_term(self, field_name=None, term=""):
         return self.update_search('filter', 'terms', field_name, term)
 
-    def filter_by_phrase(self, field_name=None, term=""):
+    def filter_by_phrase(self, field_name=None, phrase=""):
         return self.update_search('filter', 'phrases', field_name, phrase)
 
     def query(self, *args, **kwargs):
