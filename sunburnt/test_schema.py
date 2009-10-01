@@ -6,7 +6,7 @@ import datetime
 import mx.DateTime
 import pytz
 
-from .schema import solr_date, SolrSchema
+from .schema import solr_date, SolrSchema, SolrError
 
 not_utc = pytz.timezone('Etc/GMT-3')
 
@@ -106,3 +106,52 @@ class TestReadingSchema(object):
                          ('text_field', u'text', u'text'),
                          ('boolean_field', True, u'true')):
                              assert s.serialize_value(k, v) == v2
+
+broken_schemata = {
+"missing_name":
+"""
+<schema name="timetric" version="1.1">
+  <types>
+    <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true"/>
+  </types>
+  <fields>
+    <field required="true" type="sint"/>
+  </fields>
+ </schema>
+""",
+"missing_type":
+"""
+<schema name="timetric" version="1.1">
+  <types>
+    <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true"/>
+  </types>
+  <fields>
+    <field name="int_field" required="true"/>
+  </fields>
+ </schema>
+""",
+"misnamed_type":
+"""
+<schema name="timetric" version="1.1">
+  <types>
+    <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true"/>
+  </types>
+  <fields>
+    <field name="int_field" required="true" type="sint2"/>
+  </fields>
+ </schema>
+""",
+}
+
+
+def check_broken_schemata(n, s):
+    try:
+        SolrSchema(StringIO.StringIO(s))
+    except SolrError:
+        pass
+    else:
+        assert False
+
+def test_broken_schemata():
+    for k, v in broken_schemata.items():
+        yield check_broken_schemata, k, v
