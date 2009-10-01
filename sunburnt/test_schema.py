@@ -177,6 +177,8 @@ broken_schemata = {
   </fields>
  </schema>
 """,
+"invalid XML":
+"kjhgjhg"
 }
 
 

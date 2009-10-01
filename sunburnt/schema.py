@@ -99,7 +99,10 @@ class SolrSchema(object):
         self.fields, self.default_field, self.unique_key = self.schema_parse(f)
 
     def schema_parse(self, f):
-        schemadoc = lxml.etree.parse(f)
+        try:
+            schemadoc = lxml.etree.parse(f)
+        except lxml.etree.XMLSyntaxError, e:
+            raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
         field_types = {}
         for data_type, t in self.solr_data_types.items():
             for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
