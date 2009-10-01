@@ -11,11 +11,11 @@ class SolrSearch(object):
         self.interface = interface
         self.schema = interface.schema
         self.search = {'query':
-                          {'terms':collections.defaultdict(list),
-                           'phrases':collections.defaultdict(list)},
+                          {'terms':collections.defaultdict(set),
+                           'phrases':collections.defaultdict(set)},
                       'filter':
-                          {'terms':collections.defaultdict(list),
-                           'phrases':collections.defaultdict(list)}}
+                          {'terms':collections.defaultdict(set),
+                           'phrases':collections.defaultdict(set)}}
         self.range_queries = []
         self.options = {}
 
