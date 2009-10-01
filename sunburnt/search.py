@@ -22,20 +22,20 @@ class SolrSearch(object):
     def update_search(self, q, t, k, v):
         if k and k not in self.schema.fields:
             raise ValueError("%s is not a valid field name" % k)
-        self.search[q][t][k].append(v)
+        self.search[q][t][k].add(v)
         return self
 
     def query_by_term(self, field_name=None, term=""):
-        return self.update_search('query', 'term', field_name, term)
+        return self.update_search('query', 'terms', field_name, term)
 
     def query_by_phrase(self, field_name=None, phrase=""):
-        return self.update_search('query', 'phrase', field_name, phrase)
+        return self.update_search('query', 'phrases', field_name, phrase)
 
     def filter_by_term(self, field_name=None, term=""):
-        return self.update_search('filter', 'term', field_name, term)
+        return self.update_search('filter', 'terms', field_name, term)
 
     def filter_by_phrase(self, field_name=None, term=""):
-        return self.update_search('filter', 'phrase', field_name, phrase)
+        return self.update_search('filter', 'phrases', field_name, phrase)
 
     def query(self, *args, **kwargs):
         for arg in args:
