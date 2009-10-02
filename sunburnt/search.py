@@ -21,29 +21,42 @@ class LuceneQuery(object):
     def serialize_term_queries(self):
         s = []
         for name, value_set in sorted(self.terms.items()):
+            _name = name or self.schema.default_field
+            field_type = self.schema.fields[_name]
+            if field_type is unicode:
+                serializer = lambda v: self.__lqs_escape(v)
+            else:
+                serializer = lambda v: self.schema.serialize_value(_name, v)
             if name:
-                s += [u'%s:%s' % (name, self.__lqs_escape(value))
+                s += [u'%s:%s' % (name, serializer(value))
                       for value in sorted(value_set)]
             else:
-                s += [self.__lqs_escape(value) for value in sorted(value_set)]
+                s += [serializer(value) for value in sorted(value_set)]
         return ' '.join(s)
 
     lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
     def __lqs_escape(self, s):
-        if isinstance(s, unicode):
-            return self.lucene_special_chars.sub(r'\\\1', s)
-        else:
-            return s
+        return self.lucene_special_chars.sub(r'\\\1', s)
 
     def serialize_phrase_queries(self):
         s = []
         for name, value_set in sorted(self.phrases.items()):
+            _name = name or self.schema.default_field
+            field_type = self.schema.fields[_name]
+            if field_type is unicode:
+                serializer = lambda v: self.__phrase_escape(v)
+            else:
+                serializer = lambda v: self.schema.serialize_value(_name, v)
             if name:
-                s += [u'%s:"%s"' % (name, value)
+                s += [u'%s:"%s"' % (name, serializer(value))
                       for value in sorted(value_set)]
             else:
-                s += [u'"%s"' % value for value in sorted(value_set)]
+                s += ['"%s"' % serializer(value) for value in sorted(value_set)]
         return ' '.join(s)
+
+    phrase_special_chars = re.compile(r'"')
+    def __phrase_escape(self, s):
+        return self.phrase_special_chars.sub(r'\\\1', s)
 
     def serialize_range_queries(self):
         s = []
