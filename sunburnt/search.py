@@ -5,13 +5,19 @@ import re
 
 
 class TermsAndPhrases(object):
+    default_term_re = re.compile(r'^\w+$')
+    range_query_templates = {
+        "lt": "* TO %s",
+        "gt": "%s TO *",
+        "ra": "%s TO %s",
+    }
     def __init__(self, schema):
         self.schema = schema
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
         self.ranges = []
 
-    def __unicode__(self):
+    def serialize_term_queries(self):
         s = []
         for name, value_set in self.terms.items():
             if name:
@@ -19,6 +25,10 @@ class TermsAndPhrases(object):
                       for value in value_set]
             else:
                 s += [lqs_escape(value) for value in value_set]
+        return ' '.join(s)
+
+    def serialize_phrase_queries(self):
+        s = []
         for name, value_set in self.phrases.items():
             if name:
                 s += [u'%s:"%s"' % (name, value)
@@ -27,16 +37,56 @@ class TermsAndPhrases(object):
                 s += [u'"%s"' % value for value in value_set]
         return ' '.join(s)
 
+    def serialize_range_queries(self):
+        s = []
+        for name, rel, value in self.ranges:
+            if rel in ('lte', 'gte', 'range'):
+                left, right = "[", "]"
+            else:
+                left, right = "{", "}"
+            range = self.range_query_templates[rel[:2]] % value
+            s.append("%(name)s:%(left)s%(range)s%(right)s" % vars())
+        return ' '.join(s)
+
+    def __unicode__(self):
+        u = [self.serialize_term_queries(),
+             self.serialize_phrase_queries(),
+             self.serialize_range_queries()]
+        return ' '.join(s for s in u if s)
+
     def __nonzero__(self):
-        return bool(self.terms) or bool(self.phrases)
+        return bool(self.terms) or bool(self.phrases) or bool(self.ranges)
+
+    def add(self, kwargs, terms_or_phrases=None):
+        for k, v in kwargs.items():
+            try:
+                field_name, rel = k.split("__")
+            except ValueError:
+                field_name, rel = k, 'eq'
+            if field_name not in self.schema.fields:
+                raise ValueError("%s is not a valid field name" % k)
+            field_type = self.schema.fields[field_name].type
+            if rel == 'eq':
+                if field_type is unicode:
+                    search_type = terms_or_phrases or self.term_or_phrase(v)
+                else:
+                    try:
+                        v = field_type(v)
+                    except TypeError:
+                        raise SolrError("Invalid value %s for field %s"
+                                        % (v, name))
+                    search_type = "terms"
+                self.add_exact(search_type, field_name, v)
+            else:
+                self.add_range(field_name, rel, v)
 
     def add_exact(self, term_or_phrase, field_name, value):
         if field_name and field_name not in self.schema.fields:
             raise ValueError("%s is not a valid field name" % k)
         getattr(self, term_or_phrase)[field_name].add(value)
 
-    def add_range(self, name, rel, value):
-        field_type  = self.schema.fields[name].type
+    def add_range(self, field_name, rel, value):
+        field_type = self.schema.fields[field_name].type
         if field_type is bool:
             raise ValueError("Cannot do a '%s' query on a bool field" % rel)
         if rel.startswith('range'):
@@ -44,7 +94,7 @@ class TermsAndPhrases(object):
                 assert len(value) == 2
             except (AssertionError, TypeError):
                 raise ValueError("'%s__%s' argument must be a length-2 iterable"
-                                 % (name, rel))
+                                 % (field_name, rel))
         try:
             if rel.startswith('range'):
                 value = tuple(sorted(field_type(v) for v in value))
@@ -52,13 +102,14 @@ class TermsAndPhrases(object):
                 value = field_type(value)
         except (ValueError, TypeError):
                 raise ValueError("'%s__%s' arguments of the wrong type"
-                                 % (name, rel))
-        self.ranges.append((name, rel, value))
+                                 % (field_name, rel))
+        self.ranges.append((field_name, rel, value))
+
+    def term_or_phrase(self, arg):
+        return 'terms' if self.default_term_re.match(arg) else 'phrases'
 
 
 class SolrSearch(object):
-    default_term_re = re.compile(r'^\w+$')
-
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
@@ -67,11 +118,7 @@ class SolrSearch(object):
         self.range_queries = []
         self.options = {}
 
-    def update_search(self, q, t, k, v):
-        getattr(self, q).add_exact(t, k, v)
-        return self
-
-    def query_by_term(self, field_name=None, term=""):
+    def query_by_term(self, *args, **kwargs):
         return self.query_obj.add_exact('terms', field_name, term)
 
     def query_by_phrase(self, field_name=None, phrase=""):
@@ -86,34 +133,13 @@ class SolrSearch(object):
     def query(self, *args, **kwargs):
         for arg in args:
             self.query_obj.add_exact(self.term_or_phrase(arg), None, arg)
-        return self.update_q('query_obj', None, kwargs)
+        self.query_obj.add(kwargs)
+        return self
 
     def filter(self, *args, **kwargs):
         for arg in args:
             self.filter_obj.add_exact(self.term_or_phrase(arg), None, arg)
-        return self.update_q('filter_obj', None, kwargs)
-
-    def update_q(self, q, term_or_phrase, kwargs):
-        for k, v in kwargs.items():
-            try:
-                name, rel = k.split("__")
-            except ValueError:
-                name, rel = k, 'eq'
-            self._check_fields(name)
-            field_type  = self.schema.fields[name].type
-            if rel == 'eq':
-                if field_type is unicode:
-                    search_type = term_or_phrase or self.term_or_phrase(v)
-                else:
-                    try:
-                        v = field_type(v)
-                    except TypeError:
-                        raise SolrError("Invalid value %s for field %s"
-                                        % (v, name))
-                    search_type = "terms"
-                self.update_search(q, search_type, name, v)
-            else:
-                getattr(self, q).add_range(name, rel, v)
+        self.filter_obj.add(kwargs)
         return self
 
     def _check_fields(self, fields):
@@ -176,26 +202,13 @@ class SolrSearch(object):
         return self
 
     def execute(self):
-        q_bits = []
-        if self.query_obj:
-            q_bits.append(unicode(self.query_obj))
-        if self.query_obj.ranges:
-            q_bits.append(serialize_range_queries(self.query_obj.ranges))
-        q = " ".join(q_bits)
+        q = unicode(self.query_obj)
         if q:
             self.options["q"] = q
-        q_bits = []
-        if self.filter_obj:
-            q_bits.append(unicode(self.filter_obj))
-        if self.filter_obj.ranges:
-            q_bits.append(serialize_range_queries(self.filter_obj.ranges))
-        fq = " ".join(q_bits)
+        fq = unicode(self.filter_obj)
         if fq:
             self.options["fq"] = fq
         return self.interface.search(**self.options)
-
-    def term_or_phrase(self, arg):
-        return 'terms' if self.default_term_re.match(arg) else 'phrases'
 
 
 class MoreLikeThisOptions(object):
@@ -226,12 +239,6 @@ class MoreLikeThisOptions(object):
         return options
 
 
-
-_range_query_templates = {
-    "lt": "* TO %s",
-    "gt": "%s TO *",
-    "ra": "%s TO %s",
-}
 
 def serialize_range_queries(queries):
     s = []
