@@ -4,7 +4,7 @@ import collections
 import re
 
 
-class QueryOrFilter(object):
+class TermsAndPhrases(object):
     def __init__(self):
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
@@ -35,8 +35,8 @@ class SolrSearch(object):
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.search = {'query':QueryOrFilter(),
-                       'filter':QueryOrFilter()}
+        self.search = {'query':TermsAndPhrases(),
+                       'filter':TermsAndPhrases()}
         self.range_queries = []
         self.options = {}
 
