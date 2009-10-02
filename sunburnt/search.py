@@ -64,7 +64,13 @@ class LuceneQuery(object):
     def __nonzero__(self):
         return bool(self.terms) or bool(self.phrases) or bool(self.ranges)
 
-    def add(self, kwargs, terms_or_phrases=None):
+    def add(self, args, kwargs, terms_or_phrases=None):
+        try:
+            terms_or_phrases = kwargs.pop("__terms_or_phrases")
+        except KeyError:
+            terms_or_phrases = None
+        for value in args:
+            self.add_exact(None, value, terms_or_phrases)
         for k, v in kwargs.items():
             try:
                 field_name, rel = k.split("__")
@@ -74,22 +80,24 @@ class LuceneQuery(object):
                 raise ValueError("%s is not a valid field name" % k)
             field_type = self.schema.fields[field_name].type
             if rel == 'eq':
-                if field_type is unicode:
-                    search_type = terms_or_phrases or self.term_or_phrase(v)
-                else:
-                    try:
-                        v = field_type(v)
-                    except TypeError:
-                        raise SolrError("Invalid value %s for field %s"
-                                        % (v, name))
-                    search_type = "terms"
-                self.add_exact(search_type, field_name, v)
+                self.add_exact(field_name, v, terms_or_phrases)
             else:
                 self.add_range(field_name, rel, v)
 
-    def add_exact(self, term_or_phrase, field_name, value):
-        if field_name and field_name not in self.schema.fields:
-            raise ValueError("%s is not a valid field name" % k)
+    def add_exact(self, field_name, value, term_or_phrase):
+        if field_name:
+            field_type = self.schema.fields[field_name].type
+        else:
+            field_type = self.schema.fields[self.schema.default_field].type
+        if field_type is unicode:
+            term_or_phrase = term_or_phrase or self.term_or_phrase(value)
+        else:
+            try:
+                value = field_type(value)
+            except TypeError:
+                raise SolrError("Invalid value %s for field %s"
+                                % (value, field_name))
+            term_or_phrase = "terms"
         getattr(self, term_or_phrase)[field_name].add(value)
 
     def add_range(self, field_name, rel, value):
@@ -112,7 +120,7 @@ class LuceneQuery(object):
                                  % (field_name, rel))
         self.ranges.append((field_name, rel, value))
 
-    def term_or_phrase(self, arg):
+    def term_or_phrase(self, arg, force=None):
         return 'terms' if self.default_term_re.match(arg) else 'phrases'
 
 
@@ -125,27 +133,23 @@ class SolrSearch(object):
         self.options = {}
 
     def query_by_term(self, *args, **kwargs):
-        return self.query_obj.add_exact('terms', field_name, term)
+        return self.query(__terms_or_phrases="terms", *args, **kwargs)
 
-    def query_by_phrase(self, field_name=None, phrase=""):
-        return self.query_obj.add_exact('phrases', field_name, phrase)
+    def query_by_phrase(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
 
-    def filter_by_term(self, field_name=None, term=""):
-        return self.filter_obj.add_exact('terms', field_name, term)
+    def filter_by_term(self, *args, **kwargs):
+        return self.filter(__terms_or_phrases="terms", *args, **kwargs)
 
-    def filter_by_phrase(self, field_name=None, phrase=""):
-        return self.filter_obj.add_exact('phrases', field_name, phrase)
+    def filter_by_phrase(self, *args, **kwargs):
+        return self.filter(__terms_or_phrases="phrases", *args, **kwargs)
 
     def query(self, *args, **kwargs):
-        for arg in args:
-            self.query_obj.add_exact(self.term_or_phrase(arg), None, arg)
-        self.query_obj.add(kwargs)
+        self.query_obj.add(args, kwargs)
         return self
 
     def filter(self, *args, **kwargs):
-        for arg in args:
-            self.filter_obj.add_exact(self.term_or_phrase(arg), None, arg)
-        self.filter_obj.add(kwargs)
+        self.filter_obj.add(args, kwargs)
         return self
 
     def _check_fields(self, fields):
