@@ -54,26 +54,17 @@ class MockInterface(object):
 interface = MockInterface()
 
 
-class TestTermsAndQueries(object):
-    def setUp(self):
-        self.solr_search = SolrSearch(interface)
+query_by_term_data = (
+    (["hello"], {},
+     {"q":u"hello"}),
+    (["hello"], {"int_field":3},
+     {"q":u"hello int_field:3"}),
+    )
 
-    def test_nothing(self):
-        assert not self.solr_search.query_obj \
-            and not self.solr_search.filter_obj
+def check_query_by_term_data(args, kwargs, output):
+    solr_search = SolrSearch(interface)
+    assert solr_search.query_by_term(*args, **kwargs).execute() == output
 
-    def test_query_by_term(self):
-        self.solr_search.query_by_term(None, "hello")
-        assert self.solr_search.execute() == {"q":u"hello"}
-
-    def test_query_by_phrase(self):
-        self.solr_search.query_by_phrase(None, "hello world")
-        assert self.solr_search.execute() == {"q":u"\"hello world\""}
-
-    def test_filter_by_term(self):
-        self.solr_search.filter_by_term(None, "hello")
-        assert self.solr_search.execute() == {"qf":u"hello"}
-
-    def test_filter_by_phrase(self):
-        self.solr_search.filter_by_phrase(None, "hello world")
-        assert self.solr_search.execute() == {"qf":u"\"hello world\""}
+def test_query_by_term_data():
+    for args, kwargs, output in query_by_term_data:
+        yield check_query_by_term_data, args, kwargs, output
