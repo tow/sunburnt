@@ -65,14 +65,14 @@ class SolrSearch(object):
     def query(self, *args, **kwargs):
         for arg in args:
             self.query_obj.add(self.term_or_phrase(arg), None, arg)
-        return self.update_q('query_obj', kwargs)
+        return self.update_q('query_obj', None, kwargs)
 
     def filter(self, *args, **kwargs):
         for arg in args:
             self.filter_obj.add(self.term_or_phrase(arg), None, arg)
-        return self.update_q('filter_obj', kwargs)
+        return self.update_q('filter_obj', None, kwargs)
 
-    def update_q(self, q, kwargs):
+    def update_q(self, q, term_or_phrase, kwargs):
         for k, v in kwargs.items():
             try:
                 name, rel = k.split("__")
@@ -82,7 +82,7 @@ class SolrSearch(object):
             field_type  = self.schema.fields[name].type
             if rel == 'eq':
                 if field_type is unicode:
-                    search_type = self.term_or_phrase(v)
+                    search_type = term_or_phrase or self.term_or_phrase(v)
                 else:
                     try:
                         v = field_type(v)
