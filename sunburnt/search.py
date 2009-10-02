@@ -189,9 +189,9 @@ class SolrSearch(object):
             q_bits.append(unicode(self.filter_obj))
         if self.filter_obj.ranges:
             q_bits.append(serialize_range_queries(self.filter_obj.ranges))
-        qf = " ".join(q_bits)
-        if qf:
-            self.options["qf"] = qf
+        fq = " ".join(q_bits)
+        if fq:
+            self.options["fq"] = fq
         return self.interface.search(**self.options)
 
     def term_or_phrase(self, arg):
