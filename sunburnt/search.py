@@ -17,14 +17,15 @@ class LuceneQuery(object):
         self.phrases = collections.defaultdict(set)
         self.ranges = []
 
+    # Below, we sort all our value_sets - this is for predictability when testing.
     def serialize_term_queries(self):
         s = []
-        for name, value_set in self.terms.items():
+        for name, value_set in sorted(self.terms.items()):
             if name:
                 s += [u'%s:%s' % (name, self.__lqs_escape(value))
-                      for value in value_set]
+                      for value in sorted(value_set)]
             else:
-                s += [self.__lqs_escape(value) for value in value_set]
+                s += [self.__lqs_escape(value) for value in sorted(value_set)]
         return ' '.join(s)
 
     lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
@@ -36,17 +37,17 @@ class LuceneQuery(object):
 
     def serialize_phrase_queries(self):
         s = []
-        for name, value_set in self.phrases.items():
+        for name, value_set in sorted(self.phrases.items()):
             if name:
                 s += [u'%s:"%s"' % (name, value)
-                      for value in value_set]
+                      for value in sorted(value_set)]
             else:
-                s += [u'"%s"' % value for value in value_set]
+                s += [u'"%s"' % value for value in sorted(value_set)]
         return ' '.join(s)
 
     def serialize_range_queries(self):
         s = []
-        for name, rel, value in self.ranges:
+        for name, rel, value in sorted(self.ranges):
             if rel in ('lte', 'gte', 'range'):
                 left, right = "[", "]"
             else:

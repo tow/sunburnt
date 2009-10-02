@@ -59,6 +59,12 @@ query_by_term_data = (
      {"q":u"hello"}),
     (["hello"], {"int_field":3},
      {"q":u"hello int_field:3"}),
+    (["hello", "world"], {},
+     {"q":u"hello world"}),
+    # NB this next is not really what we want,
+    # probably this should warn
+    (["hello world"], {},
+     {"q":u"hello world"}),
     )
 
 def check_query_by_term_data(args, kwargs, output):
