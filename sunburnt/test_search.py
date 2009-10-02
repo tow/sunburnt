@@ -67,6 +67,7 @@ good_query_data = {
         (["hello world"], {},
          {"q":u"hello world"}),
         ),
+
     "query_by_phrase":(
         (["hello"], {},
          # Do we actually want this many quotes in here?
@@ -78,6 +79,54 @@ good_query_data = {
         (["hello world"], {},
          {"q":u"\"hello world\""}),
         ),
+
+    "filter_by_term":(
+        (["hello"], {},
+         {"fq":u"hello"}),
+        (["hello"], {"int_field":3},
+         {"fq":u"hello int_field:3"}),
+        (["hello", "world"], {},
+         {"fq":u"hello world"}),
+        # NB this next is not really what we want,
+        # probably this should warn
+        (["hello world"], {},
+         {"fq":u"hello world"}),
+        ),
+
+    "filter_by_phrase":(
+        (["hello"], {},
+         # Do we actually want this many quotes in here?
+         {"fq":u"\"hello\""}),
+        (["hello"], {"int_field":3},
+         {"fq":u"int_field:3 \"hello\""}), # Non-text data is always taken to be a term.
+        (["hello", "world"], {},
+         {"fq":u"\"hello\" \"world\""}),
+        (["hello world"], {},
+         {"fq":u"\"hello world\""}),
+        ),
+
+    "query":(
+        (["hello"], {},
+         {"q":u"hello"}),
+        (["hello"], {"int_field":3},
+         {"q":u"hello int_field:3"}), # Non-text data is always taken to be a term.
+        (["hello", "world"], {},
+         {"q":u"hello world"}),
+        (["hello world"], {},
+         {"q":u"\"hello world\""}),
+        ),
+
+    "filter":(
+        (["hello"], {},
+         {"fq":u"hello"}),
+        (["hello"], {"int_field":3},
+         {"fq":u"hello int_field:3"}), # Non-text data is always taken to be a term.
+        (["hello", "world"], {},
+         {"fq":u"hello world"}),
+        (["hello world"], {},
+         {"fq":u"\"hello world\""}),
+        ),
+
     }
 
 def check_query_data(method, args, kwargs, output):
