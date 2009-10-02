@@ -9,6 +9,7 @@ class TermsAndPhrases(object):
         self.schema = schema
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
+        self.ranges = []
 
     def __unicode__(self):
         s = []
@@ -92,10 +93,10 @@ class SolrSearch(object):
                     search_type = "terms"
                 self.update_search(q, search_type, name, v)
             else:
-                self._range_query(name, rel, v)
+                self._range_query(q, name, rel, v)
         return self
 
-    def _range_query(self, name, rel, value):
+    def _range_query(self, q, name, rel, value):
         field_type  = self.schema.fields[name].type
         if field_type is bool:
             raise ValueError("Cannot do a '%s' query on a bool field" % rel)
@@ -113,7 +114,7 @@ class SolrSearch(object):
         except (ValueError, TypeError):
                 raise ValueError("'%s__%s' arguments of the wrong type"
                                  % (name, rel))
-        self.range_queries.append((name, rel, value))
+        getattr(self, q).ranges.append((name, rel, value))
 
     def _check_fields(self, fields):
         if isinstance(fields, basestring):
@@ -178,13 +179,19 @@ class SolrSearch(object):
         q_bits = []
         if self.query_obj:
             q_bits.append(unicode(self.query_obj))
-        if self.range_queries:
-            q_bits.append(serialize_range_queries(self.range_queries))
+        if self.query_obj.ranges:
+            q_bits.append(serialize_range_queries(self.query_obj.ranges))
         q = " ".join(q_bits)
         if q:
             self.options["q"] = q
+        q_bits = []
         if self.filter_obj:
-            self.options["qf"] = unicode(self.filter_obj)
+            q_bits.append(unicode(self.filter_obj))
+        if self.filter_obj.ranges:
+            q_bits.append(serialize_range_queries(self.filter_obj.ranges))
+        qf = " ".join(q_bits)
+        if qf:
+            self.options["qf"] = qf
         return self.interface.search(**self.options)
 
     def term_or_phrase(self, arg):
