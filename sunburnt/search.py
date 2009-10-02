@@ -5,7 +5,8 @@ import re
 
 
 class TermsAndPhrases(object):
-    def __init__(self):
+    def __init__(self, schema):
+        self.schema = schema
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
 
@@ -29,6 +30,8 @@ class TermsAndPhrases(object):
         return self.terms or self.phrases
 
     def add(self, term_or_phrase, field_name, value):
+        if field_name and field_name not in self.schema.fields:
+            raise ValueError("%s is not a valid field name" % k)
         getattr(self, term_or_phrase)[field_name].add(value)
 
 
@@ -38,14 +41,12 @@ class SolrSearch(object):
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.query_obj = TermsAndPhrases()
-        self.filter_obj = TermsAndPhrases()
+        self.query_obj = TermsAndPhrases(self.schema)
+        self.filter_obj = TermsAndPhrases(self.schema)
         self.range_queries = []
         self.options = {}
 
     def update_search(self, q, t, k, v):
-        if k and k not in self.schema.fields:
-            raise ValueError("%s is not a valid field name" % k)
         getattr(self, q).add(t, k, v)
         return self
 
