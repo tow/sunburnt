@@ -76,6 +76,26 @@ class SolrField(object):
         self.required = node.attrib.get("required") == "true"
         self.type = data_type
 
+    def normalize(self, value):
+        try:
+            return self.type(value)
+        except TypeError:
+            raise SolrError("Cannot serialize %s as type %s"
+                            % (self.name, value))
+
+    def serialize(self, value):
+        if hasattr(value, "__iter__"):
+            if not self.multi_valued:
+                raise SolrError("'%s' is not a multi-valued field" % self.name)
+            return [self.serialize(v) for v in value]
+        value = self.normalize(value)
+        if self.type is unicode:
+            return value
+        elif self.type is bool:
+            return "true" if value else "false"
+        else:
+            return unicode(value)
+
 
 class SolrSchema(object):
     solr_data_types = {
@@ -129,25 +149,12 @@ class SolrSchema(object):
                 if self.fields[name].required]
 
     def serialize_value(self, k, v):
-        try:
-            value = self.fields[k].type(v)
-        except KeyError:
-            raise SolrError("No such field '%s' in current schema" % k)
-        if not isinstance(value, unicode):
-            if value is True:
-                value = u'true'
-            elif value is False:
-                value = u'false'
-            else:
-                value = unicode(value)
-        return value
-
-    def serialize_values(self, k, values):
         if not k in self.fields:
             raise SolrError("No such field '%s' in current schema" % k)
-        if not self.fields[k].multi_valued:
-            raise SolrError("'%s' is not a multi-valued field" % k)
-        return [self.serialize_value(k, value) for value in values]
+        return self.fields[k].serialize(v)
+
+    def serialize_values(self, k, values):
+        return self.serialize_value(k, values)
 
     def get_id_of_doc(self, doc):
         if self.unique_key not in doc:
