@@ -130,12 +130,34 @@ good_query_data = {
     "query":(
         ([], {"boolean_field":True},
          {"q":u"boolean_field:true"}),
+        ([], {"int_field":3},
+         {"q":u"int_field:3"}),
+        ([], {"int_field":3.1}, # casting from float should work
+         {"q":u"int_field:3"}),
         ([], {"sint_field":3},
+         {"q":u"sint_field:3"}),
+        ([], {"sint_field":3.1}, # casting from float should work
          {"q":u"sint_field:3"}),
         ([], {"long_field":2**31},
          {"q":u"long_field:2147483648"}),
         ([], {"slong_field":2**31},
          {"q":u"slong_field:2147483648"}),
+        ([], {"float_field":3.0},
+         {"q":u"float_field:3.0"}),
+        ([], {"float_field":3}, # casting from int should work
+         {"q":u"float_field:3.0"}),
+        ([], {"sfloat_field":3.0},
+         {"q":u"sfloat_field:3.0"}),
+        ([], {"sfloat_field":3}, # casting from int should work
+         {"q":u"sfloat_field:3.0"}),
+        ([], {"double_field":3.0},
+         {"q":u"double_field:3.0"}),
+        ([], {"double_field":3}, # casting from int should work
+         {"q":u"double_field:3.0"}),
+        ([], {"sdouble_field":3.0},
+         {"q":u"sdouble_field:3.0"}),
+        ([], {"sdouble_field":3}, # casting from int should work
+         {"q":u"sdouble_field:3.0"}),
         ),
 
 
