@@ -51,25 +51,25 @@ class SolrSearch(object):
         return self
 
     def query_by_term(self, field_name=None, term=""):
-        return self.update_search('query_obj', 'terms', field_name, term)
+        return self.query_obj.add('terms', field_name, term)
 
     def query_by_phrase(self, field_name=None, phrase=""):
-        return self.update_search('query_obj', 'phrases', field_name, phrase)
+        return self.query_obj.add('phrases', field_name, phrase)
 
     def filter_by_term(self, field_name=None, term=""):
-        return self.update_search('filter_obj', 'terms', field_name, term)
+        return self.filter_obj.add('terms', field_name, term)
 
     def filter_by_phrase(self, field_name=None, phrase=""):
-        return self.update_search('filter_obj', 'phrases', field_name, phrase)
+        return self.filter_obj.add('phrases', field_name, phrase)
 
     def query(self, *args, **kwargs):
         for arg in args:
-            self.update_search('query_obj', self.term_or_phrase(arg), None, arg)
+            self.query_obj.add(self.term_or_phrase(arg), None, arg)
         return self.update_q('query_obj', kwargs)
 
     def filter(self, *args, **kwargs):
         for arg in args:
-            self.update_search('filter_obj', self.term_or_phrase(arg), None, arg)
+            self.filter_obj.add(self.term_or_phrase(arg), None, arg)
         return self.update_q('filter_obj', kwargs)
 
     def update_q(self, q, kwargs):
