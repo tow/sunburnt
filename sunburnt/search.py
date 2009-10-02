@@ -4,25 +4,46 @@ import collections
 import re
 
 
+class QueryOrFilter(object):
+    def __init__(self):
+        self.terms = collections.defaultdict(set)
+        self.phrases = collections.defaultdict(set)
+
+    def __unicode__(self):
+        s = []
+        for name, value_set in self.terms.items():
+            if name:
+                s += [u'%s:%s' % (name, lqs_escape(value))
+                      for value in value_set]
+            else:
+                s += [lqs_escape(value) for value in value_set]
+        for name, value_set in self.phrases.items():
+            if name:
+                s += [u'%s:"%s"' % (name, value)
+                      for value in value_set]
+            else:
+                s += [u'"%s"' % value for value in value_set]
+        return ' '.join(s)
+
+    def __bool__(self):
+        return self.terms or self.phrases
+
+
 class SolrSearch(object):
     default_term_re = re.compile(r'^\w+$')
 
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.search = {'query':
-                          {'terms':collections.defaultdict(set),
-                           'phrases':collections.defaultdict(set)},
-                      'filter':
-                          {'terms':collections.defaultdict(set),
-                           'phrases':collections.defaultdict(set)}}
+        self.search = {'query':QueryOrFilter(),
+                       'filter':QueryOrFilter()}
         self.range_queries = []
         self.options = {}
 
     def update_search(self, q, t, k, v):
         if k and k not in self.schema.fields:
             raise ValueError("%s is not a valid field name" % k)
-        self.search[q][t][k].add(v)
+        getattr(self.search[q], t)[k].add(v)
         return self
 
     def query_by_term(self, field_name=None, term=""):
@@ -151,16 +172,15 @@ class SolrSearch(object):
 
     def execute(self):
         q_bits = []
-        if any(self.search["query"].values()):
-            q_bits.append(serialize_search(**self.search["query"]))
+        if self.search["query"]:
+            q_bits.append(unicode(self.search["query"]))
         if self.range_queries:
             q_bits.append(serialize_range_queries(self.range_queries))
         q = " ".join(q_bits)
         if q:
             self.options["q"] = q
-        qf = serialize_search(**self.search['filter'])
-        if qf:
-            self.options["qf"] = qf
+        if self.search["filter"]:
+            self.options["qf"] = unicode(self.search["filter"])
         return self.interface.search(**self.options)
 
     def term_or_phrase(self, arg):
@@ -195,21 +215,6 @@ class MoreLikeThisOptions(object):
         return options
 
 
-def serialize_search(terms, phrases):
-    s = []
-    for name in terms:
-        if name:
-            s += ['%s:%s' % (name, lqs_escape(value))
-                  for value in terms[name]]
-        else:
-            s += [lqs_escape(value) for value in terms[name]]
-    for name in phrases:
-        if name:
-            s += ['%s:"%s"' % (name, value)
-                  for value in phrases[name]]
-        else:
-            s += ['"%s"' % value for value in phrases[name]]
-    return ' '.join(s)
 
 _range_query_templates = {
     "lt": "* TO %s",
