@@ -28,6 +28,9 @@ class TermsAndPhrases(object):
     def __bool__(self):
         return self.terms or self.phrases
 
+    def add(self, term_or_phrase, field_name, value):
+        getattr(self, term_or_phrase)[field_name].add(value)
+
 
 class SolrSearch(object):
     default_term_re = re.compile(r'^\w+$')
@@ -43,7 +46,7 @@ class SolrSearch(object):
     def update_search(self, q, t, k, v):
         if k and k not in self.schema.fields:
             raise ValueError("%s is not a valid field name" % k)
-        getattr(self.search[q], t)[k].add(v)
+        self.search[q].add(t, k, v)
         return self
 
     def query_by_term(self, field_name=None, term=""):
