@@ -38,38 +38,38 @@ class SolrSearch(object):
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.search = {'query':TermsAndPhrases(),
-                       'filter':TermsAndPhrases()}
+        self.query_obj = TermsAndPhrases()
+        self.filter_obj = TermsAndPhrases()
         self.range_queries = []
         self.options = {}
 
     def update_search(self, q, t, k, v):
         if k and k not in self.schema.fields:
             raise ValueError("%s is not a valid field name" % k)
-        self.search[q].add(t, k, v)
+        getattr(self, q).add(t, k, v)
         return self
 
     def query_by_term(self, field_name=None, term=""):
-        return self.update_search('query', 'terms', field_name, term)
+        return self.update_search('query_obj', 'terms', field_name, term)
 
     def query_by_phrase(self, field_name=None, phrase=""):
-        return self.update_search('query', 'phrases', field_name, phrase)
+        return self.update_search('query_obj', 'phrases', field_name, phrase)
 
     def filter_by_term(self, field_name=None, term=""):
-        return self.update_search('filter', 'terms', field_name, term)
+        return self.update_search('filter_obj', 'terms', field_name, term)
 
     def filter_by_phrase(self, field_name=None, phrase=""):
-        return self.update_search('filter', 'phrases', field_name, phrase)
+        return self.update_search('filter_obj', 'phrases', field_name, phrase)
 
     def query(self, *args, **kwargs):
         for arg in args:
-            self.update_search('query', self.term_or_phrase(arg), None, arg)
-        return self.update_q('query', kwargs)
+            self.update_search('query_obj', self.term_or_phrase(arg), None, arg)
+        return self.update_q('query_obj', kwargs)
 
     def filter(self, *args, **kwargs):
         for arg in args:
-            self.update_search('filter', self.term_or_phrase(arg), None, arg)
-        return self.update_q('filter', kwargs)
+            self.update_search('filter_obj', self.term_or_phrase(arg), None, arg)
+        return self.update_q('filter_obj', kwargs)
 
     def update_q(self, q, kwargs):
         for k, v in kwargs.items():
@@ -175,15 +175,15 @@ class SolrSearch(object):
 
     def execute(self):
         q_bits = []
-        if self.search["query"]:
-            q_bits.append(unicode(self.search["query"]))
+        if self.query:
+            q_bits.append(unicode(self.query_obj))
         if self.range_queries:
             q_bits.append(serialize_range_queries(self.range_queries))
         q = " ".join(q_bits)
         if q:
             self.options["q"] = q
-        if self.search["filter"]:
-            self.options["qf"] = unicode(self.search["filter"])
+        if self.filter:
+            self.options["qf"] = unicode(self.filter_obj)
         return self.interface.search(**self.options)
 
     def term_or_phrase(self, arg):
