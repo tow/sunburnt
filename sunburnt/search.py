@@ -26,8 +26,8 @@ class TermsAndPhrases(object):
                 s += [u'"%s"' % value for value in value_set]
         return ' '.join(s)
 
-    def __bool__(self):
-        return self.terms or self.phrases
+    def __nonzero__(self):
+        return bool(self.terms) or bool(self.phrases)
 
     def add(self, term_or_phrase, field_name, value):
         if field_name and field_name not in self.schema.fields:
@@ -176,14 +176,14 @@ class SolrSearch(object):
 
     def execute(self):
         q_bits = []
-        if self.query:
+        if self.query_obj:
             q_bits.append(unicode(self.query_obj))
         if self.range_queries:
             q_bits.append(serialize_range_queries(self.range_queries))
         q = " ".join(q_bits)
         if q:
             self.options["q"] = q
-        if self.filter:
+        if self.filter_obj:
             self.options["qf"] = unicode(self.filter_obj)
         return self.interface.search(**self.options)
 
