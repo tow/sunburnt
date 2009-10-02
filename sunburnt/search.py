@@ -30,12 +30,12 @@ class TermsAndPhrases(object):
     def __nonzero__(self):
         return bool(self.terms) or bool(self.phrases)
 
-    def add(self, term_or_phrase, field_name, value):
+    def add_exact(self, term_or_phrase, field_name, value):
         if field_name and field_name not in self.schema.fields:
             raise ValueError("%s is not a valid field name" % k)
         getattr(self, term_or_phrase)[field_name].add(value)
 
-    def add_range_query(self, name, rel, value):
+    def add_range(self, name, rel, value):
         field_type  = self.schema.fields[name].type
         if field_type is bool:
             raise ValueError("Cannot do a '%s' query on a bool field" % rel)
@@ -68,29 +68,29 @@ class SolrSearch(object):
         self.options = {}
 
     def update_search(self, q, t, k, v):
-        getattr(self, q).add(t, k, v)
+        getattr(self, q).add_exact(t, k, v)
         return self
 
     def query_by_term(self, field_name=None, term=""):
-        return self.query_obj.add('terms', field_name, term)
+        return self.query_obj.add_exact('terms', field_name, term)
 
     def query_by_phrase(self, field_name=None, phrase=""):
-        return self.query_obj.add('phrases', field_name, phrase)
+        return self.query_obj.add_exact('phrases', field_name, phrase)
 
     def filter_by_term(self, field_name=None, term=""):
-        return self.filter_obj.add('terms', field_name, term)
+        return self.filter_obj.add_exact('terms', field_name, term)
 
     def filter_by_phrase(self, field_name=None, phrase=""):
-        return self.filter_obj.add('phrases', field_name, phrase)
+        return self.filter_obj.add_exact('phrases', field_name, phrase)
 
     def query(self, *args, **kwargs):
         for arg in args:
-            self.query_obj.add(self.term_or_phrase(arg), None, arg)
+            self.query_obj.add_exact(self.term_or_phrase(arg), None, arg)
         return self.update_q('query_obj', None, kwargs)
 
     def filter(self, *args, **kwargs):
         for arg in args:
-            self.filter_obj.add(self.term_or_phrase(arg), None, arg)
+            self.filter_obj.add_exact(self.term_or_phrase(arg), None, arg)
         return self.update_q('filter_obj', None, kwargs)
 
     def update_q(self, q, term_or_phrase, kwargs):
@@ -113,7 +113,7 @@ class SolrSearch(object):
                     search_type = "terms"
                 self.update_search(q, search_type, name, v)
             else:
-                getattr(self, q).add_range_query(name, rel, v)
+                getattr(self, q).add_range(name, rel, v)
         return self
 
     def _check_fields(self, fields):
