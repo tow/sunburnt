@@ -116,7 +116,12 @@ class SolrSchema(object):
     def __init__(self, f):
         """initialize a schema object from a
         filename or file-like object."""
-        self.fields, self.default_field, self.unique_key = self.schema_parse(f)
+        self.fields, self.default_field_name, self.unique_key \
+            = self.schema_parse(f)
+        self.default_field = self.fields[self.default_field_name] \
+            if self.default_field_name else None
+        self.unique_field = self.fields[self.unique_key] \
+            if self.unique_key else None
 
     def schema_parse(self, f):
         try:
@@ -138,11 +143,12 @@ class SolrSchema(object):
             except KeyError, e:
                 raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
             fields[name] = SolrField(field, data_type)
-        default_field = schemadoc.xpath("/schema/defaultSearchField")
-        default_field = default_field[0].text if default_field else None
+        default_field_name = schemadoc.xpath("/schema/defaultSearchField")
+        default_field_name = default_field_name[0].text \
+            if default_field_name else None
         unique_key = schemadoc.xpath("/schema/uniqueKey")
         unique_key = unique_key[0].text if unique_key else None
-        return fields, default_field, unique_key
+        return fields, default_field_name, unique_key
 
     def missing_fields(self, field_names):
         return [name for name in set(self.fields.keys()) - set(field_names)
@@ -156,12 +162,14 @@ class SolrSchema(object):
     def serialize_values(self, k, values):
         return self.serialize_value(k, values)
 
-    def get_id_of_doc(self, doc):
+    def get_id_for_doc(self, doc):
+        if not self.unique_key:
+            raise SolrError("Schema has no unique key")
         if self.unique_key not in doc:
-            raise SolrError("doc doesn't contain unique_key %s" % self.unique_key)
+            raise SolrError("doc doesn't contain unique_key %s"
+                            % self.unique_key)
         id = doc[self.unique_key]
-        unique_field = self.fields[self.unique_key]
-        return unique_field.serialize(id)
+        return self.unique_field.serialize(id)
 
     def make_update(self, docs):
         return SolrUpdate(self, docs)
@@ -232,12 +240,13 @@ class SolrDelete(object):
         for doc in docs:
             # Really this next should check the expected type of unique key
             if isinstance(doc, (basestring, int, long, float)):
-                v = self.schema.serialize_value(self.schema.unique_key, doc)
+                # and what about dates?
+                v = self.schema.unique_field.serialize(doc)
                 deletions.append(self.ID(v))
             else:
                 doc = doc if hasattr(doc, "items") \
                     else object_to_dict(doc, self.schema.fields.keys())
-                deletions.append(self.ID(self.schema.get_id_of_doc(doc)))
+                deletions.append(self.ID(self.schema.get_id_for_doc(doc)))
         return deletions
 
     def delete_queries(self, queries):

@@ -95,7 +95,7 @@ class TestReadingSchema(object):
         default field, and the right unique key"""
         assert set(self.s.fields.keys()) \
             == set(['boolean_field', 'int_field', 'text_field'])
-        assert self.s.default_field == 'text_field'
+        assert self.s.default_field_name == 'text_field'
         assert self.s.unique_key == 'int_field'
 
     def test_serialize_dict(self):
