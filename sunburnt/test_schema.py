@@ -46,7 +46,7 @@ samples_from_strings = {
     }
 
 def check_solr_date_from_date(s, date, canonical_date):
-    assert str(solr_date(date)) == s
+    assert unicode(solr_date(date)) == s
     check_solr_date_from_string(s, canonical_date)
 
 def check_solr_date_from_string(s, date):

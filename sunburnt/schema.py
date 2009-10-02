@@ -61,12 +61,12 @@ class solr_date(object):
     def __repr__(self):
         return repr(self.v)
 
-    def __str__(self):
+    def __unicode__(self):
         """ Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
-        return "%s.%sZ" % (self.v.strftime("%Y-%m-%dT%H:%M:%S"),
-                           "%06d" % self.microsecond)
+        return u"%s.%sZ" % (self.v.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "%06d" % self.microsecond)
 
 
 class SolrField(object):
