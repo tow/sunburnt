@@ -122,21 +122,21 @@ class TestReadingSchema(object):
             == set(['int_field', 'text_field'])
         assert set(self.s.missing_fields(['int_field'])) == set(['text_field'])
 
-    def test_serialize_values(self):
-        assert self.s.serialize_values('text_field', ["a", "b", "c"]) \
+    def test_serialize_value_list(self):
+        assert self.s.serialize_value('text_field', ["a", "b", "c"]) \
             == [u"a", u"b", u"c"]
 
-    def test_serialize_values_fails_with_bad_field_name(self):
+    def test_serialize_value_list_fails_with_bad_field_name(self):
         try:
-            self.s.serialize_values('text_field2', ["a", "b", "c"])
+            self.s.serialize_value('text_field2', ["a", "b", "c"])
         except SolrError:
             pass
         else:
             assert False
 
-    def test_serialize_values_fails_when_not_multivalued(self):
+    def test_serialize_value_list_fails_when_not_multivalued(self):
         try:
-            self.s.serialize_values('int_field', ["a", "b", "c"])
+            self.s.serialize_value('int_field', ["a", "b", "c"])
         except SolrError:
             pass
         else:

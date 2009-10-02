@@ -159,9 +159,6 @@ class SolrSchema(object):
             raise SolrError("No such field '%s' in current schema" % k)
         return self.fields[k].serialize(v)
 
-    def serialize_values(self, k, values):
-        return self.serialize_value(k, values)
-
     def get_id_for_doc(self, doc):
         if not self.unique_key:
             raise SolrError("Schema has no unique key")
@@ -192,7 +189,7 @@ class SolrUpdate(object):
 
     def fields(self, name, values):
         return [self.FIELD({'name':name}, value)
-                for value in self.schema.serialize_values(name, values)]
+                for value in self.schema.serialize_value(name, values)]
 
     def doc(self, doc):
         missing_fields = self.schema.missing_fields(doc.keys())

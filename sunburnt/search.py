@@ -21,8 +21,10 @@ class LuceneQuery(object):
     def serialize_term_queries(self):
         s = []
         for name, value_set in sorted(self.terms.items()):
-            _name = name or self.schema.default_field
-            field = self.schema.fields[_name]
+            if name:
+                field = self.schema.fields[name]
+            else:
+                field = self.schema.default_field
             if field.type is unicode:
                 serializer = lambda v: self.__lqs_escape(v)
             else:
@@ -41,8 +43,10 @@ class LuceneQuery(object):
     def serialize_phrase_queries(self):
         s = []
         for name, value_set in sorted(self.phrases.items()):
-            _name = name or self.schema.default_field
-            field = self.schema.fields[_name]
+            if name:
+                field = self.schema.fields[name]
+            else:
+                field = self.schema.default_field
             if field.type is unicode:
                 serializer = self.__phrase_escape
             else:
@@ -106,7 +110,7 @@ class LuceneQuery(object):
         if field_name:
             field_type = self.schema.fields[field_name].type
         else:
-            field_type = self.schema.fields[self.schema.default_field].type
+            field_type = self.schema.default_field.type
         if field_type is unicode:
             term_or_phrase = term_or_phrase or self.term_or_phrase(value)
         else:
