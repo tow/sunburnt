@@ -24,7 +24,7 @@ class LuceneQuery(object):
                 s += [u'%s:%s' % (name, self.__lqs_escape(value))
                       for value in value_set]
             else:
-                s += [lqs_escape(value) for value in value_set]
+                s += [self.__lqs_escape(value) for value in value_set]
         return ' '.join(s)
 
     lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
