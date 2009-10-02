@@ -4,7 +4,7 @@ import collections
 import re
 
 
-class TermsAndPhrases(object):
+class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
     range_query_templates = {
         "lt": "* TO %s",
@@ -21,11 +21,18 @@ class TermsAndPhrases(object):
         s = []
         for name, value_set in self.terms.items():
             if name:
-                s += [u'%s:%s' % (name, lqs_escape(value))
+                s += [u'%s:%s' % (name, self.__lqs_escape(value))
                       for value in value_set]
             else:
                 s += [lqs_escape(value) for value in value_set]
         return ' '.join(s)
+
+    lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
+    def __lqs_escape(self, s):
+        if isinstance(s, unicode):
+            return self.lucene_special_chars.sub(r'\\\1', s)
+        else:
+            return s
 
     def serialize_phrase_queries(self):
         s = []
@@ -113,9 +120,8 @@ class SolrSearch(object):
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.query_obj = TermsAndPhrases(self.schema)
-        self.filter_obj = TermsAndPhrases(self.schema)
-        self.range_queries = []
+        self.query_obj = LuceneQuery(self.schema)
+        self.filter_obj = LuceneQuery(self.schema)
         self.options = {}
 
     def query_by_term(self, *args, **kwargs):
@@ -237,24 +243,3 @@ class MoreLikeThisOptions(object):
                 raise SolrError("'mlt.%s' should be an '%s'"%
                                 (opt_name, opt_type.__name__))
         return options
-
-
-
-def serialize_range_queries(queries):
-    s = []
-    for name, rel, value in queries:
-        if rel in ('lte', 'gte', 'range'):
-            left, right = "[", "]"
-        else:
-            left, right = "{", "}"
-        range = _range_query_templates[rel[:2]] % value
-        s.append("%(name)s:%(left)s%(range)s%(right)s" % vars())
-    return ' '.join(s)
-
-
-lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
-def lqs_escape(s):
-    if isinstance(s, unicode):
-        return lucene_special_chars.sub(r'\\\1', s)
-    else:
-        return s
