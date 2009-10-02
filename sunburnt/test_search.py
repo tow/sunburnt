@@ -74,3 +74,24 @@ def check_query_by_term_data(args, kwargs, output):
 def test_query_by_term_data():
     for args, kwargs, output in query_by_term_data:
         yield check_query_by_term_data, args, kwargs, output
+
+
+query_by_phrase_data = (
+    (["hello"], {},
+     # Do we actually want this many quotes in here?
+     {"q":u"\"hello\""}),
+    (["hello"], {"int_field":3},
+     {"q":u"int_field:3 \"hello\""}), # Non-text data is always taken to be a term.
+    (["hello", "world"], {},
+     {"q":u"\"hello\" \"world\""}),
+    (["hello world"], {},
+     {"q":u"\"hello world\""}),
+    )
+
+def check_query_by_phrase_data(args, kwargs, output):
+    solr_search = SolrSearch(interface)
+    assert solr_search.query_by_phrase(*args, **kwargs).execute() == output
+
+def test_query_by_phrase_data():
+    for args, kwargs, output in query_by_phrase_data:
+        yield check_query_by_phrase_data, args, kwargs, output
