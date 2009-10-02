@@ -73,7 +73,7 @@ good_query_data = {
          # Do we actually want this many quotes in here?
          {"q":u"\"hello\""}),
         (["hello"], {"int_field":3},
-         {"q":u"int_field:3 \"hello\""}), # Non-text data is always taken to be a term.
+         {"q":u"int_field:3 \"hello\""}), # Non-text data is always taken to be a term, and terms come before phrases, so order is reversed
         (["hello", "world"], {},
          {"q":u"\"hello\" \"world\""}),
         (["hello world"], {},
@@ -98,7 +98,7 @@ good_query_data = {
          # Do we actually want this many quotes in here?
          {"fq":u"\"hello\""}),
         (["hello"], {"int_field":3},
-         {"fq":u"int_field:3 \"hello\""}), # Non-text data is always taken to be a term.
+         {"fq":u"int_field:3 \"hello\""}),
         (["hello", "world"], {},
          {"fq":u"\"hello\" \"world\""}),
         (["hello world"], {},
@@ -109,7 +109,7 @@ good_query_data = {
         (["hello"], {},
          {"q":u"hello"}),
         (["hello"], {"int_field":3},
-         {"q":u"hello int_field:3"}), # Non-text data is always taken to be a term.
+         {"q":u"hello int_field:3"}),
         (["hello", "world"], {},
          {"q":u"hello world"}),
         (["hello world"], {},
@@ -120,17 +120,30 @@ good_query_data = {
         (["hello"], {},
          {"fq":u"hello"}),
         (["hello"], {"int_field":3},
-         {"fq":u"hello int_field:3"}), # Non-text data is always taken to be a term.
+         {"fq":u"hello int_field:3"}),
         (["hello", "world"], {},
          {"fq":u"hello world"}),
         (["hello world"], {},
          {"fq":u"\"hello world\""}),
         ),
 
+    "query":(
+        ([], {"boolean_field":True},
+         {"q":u"boolean_field:true"}),
+        ([], {"sint_field":3},
+         {"q":u"sint_field:3"}),
+        ([], {"long_field":2**31},
+         {"q":u"long_field:2147483648"}),
+        ([], {"slong_field":2**31},
+         {"q":u"slong_field:2147483648"}),
+        ),
+
+
     }
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
+    print getattr(solr_search, method)(*args, **kwargs).execute(), output
     assert getattr(solr_search, method)(*args, **kwargs).execute() == output
 
 def test_query_data():
