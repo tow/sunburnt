@@ -22,11 +22,11 @@ class LuceneQuery(object):
         s = []
         for name, value_set in sorted(self.terms.items()):
             _name = name or self.schema.default_field
-            field_type = self.schema.fields[_name]
-            if field_type is unicode:
+            field = self.schema.fields[_name]
+            if field.type is unicode:
                 serializer = lambda v: self.__lqs_escape(v)
             else:
-                serializer = lambda v: self.schema.serialize_value(_name, v)
+                serializer = lambda v: field.serialize(v)
             if name:
                 s += [u'%s:%s' % (name, serializer(value))
                       for value in sorted(value_set)]
@@ -42,11 +42,11 @@ class LuceneQuery(object):
         s = []
         for name, value_set in sorted(self.phrases.items()):
             _name = name or self.schema.default_field
-            field_type = self.schema.fields[_name]
-            if field_type is unicode:
-                serializer = lambda v: self.__phrase_escape(v)
+            field = self.schema.fields[_name]
+            if field.type is unicode:
+                serializer = self.__phrase_escape
             else:
-                serializer = lambda v: self.schema.serialize_value(_name, v)
+                serializer = field.serialize
             if name:
                 s += [u'%s:"%s"' % (name, serializer(value))
                       for value in sorted(value_set)]
@@ -65,6 +65,10 @@ class LuceneQuery(object):
                 left, right = "[", "]"
             else:
                 left, right = "{", "}"
+            if isinstance(value, tuple):
+                value = tuple(self.schema.serialize_value(name, v) for v in value)
+            else:
+                value = self.schema.serialize_value(name, value)
             range = self.range_query_templates[rel[:2]] % value
             s.append("%(name)s:%(left)s%(range)s%(right)s" % vars())
         return ' '.join(s)

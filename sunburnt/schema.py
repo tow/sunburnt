@@ -160,7 +160,8 @@ class SolrSchema(object):
         if self.unique_key not in doc:
             raise SolrError("doc doesn't contain unique_key %s" % self.unique_key)
         id = doc[self.unique_key]
-        return self.serialize_value(self.unique_key, id)
+        unique_field = self.fields[self.unique_key]
+        return unique_field.serialize(id)
 
     def make_update(self, docs):
         return SolrUpdate(self, docs)
@@ -182,12 +183,8 @@ class SolrUpdate(object):
         self.xml = self.add(docs)
 
     def fields(self, name, values):
-        if hasattr(values, "__iter__"):
-            return [self.FIELD({'name':name}, value)
-                    for value in self.schema.serialize_values(name, values)]
-        else:
-            return [self.FIELD({'name':name},
-                           self.schema.serialize_value(name, values))]
+        return [self.FIELD({'name':name}, value)
+                for value in self.schema.serialize_values(name, values)]
 
     def doc(self, doc):
         missing_fields = self.schema.missing_fields(doc.keys())
@@ -204,8 +201,9 @@ class SolrUpdate(object):
     def add(self, docs):
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
             docs = [docs]
+        schema_fields = self.schema.fields.keys()
         docs = [(doc if hasattr(doc, "items")
-                 else object_to_dict(doc, self.schema.fields.keys()))
+                 else object_to_dict(doc, schema_fields))
                 for doc in docs]
         return self.ADD(*[self.doc(doc) for doc in docs])
 
