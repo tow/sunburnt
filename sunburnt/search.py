@@ -35,6 +35,26 @@ class TermsAndPhrases(object):
             raise ValueError("%s is not a valid field name" % k)
         getattr(self, term_or_phrase)[field_name].add(value)
 
+    def add_range_query(self, name, rel, value):
+        field_type  = self.schema.fields[name].type
+        if field_type is bool:
+            raise ValueError("Cannot do a '%s' query on a bool field" % rel)
+        if rel.startswith('range'):
+            try:
+                assert len(value) == 2
+            except (AssertionError, TypeError):
+                raise ValueError("'%s__%s' argument must be a length-2 iterable"
+                                 % (name, rel))
+        try:
+            if rel.startswith('range'):
+                value = tuple(sorted(field_type(v) for v in value))
+            else:
+                value = field_type(value)
+        except (ValueError, TypeError):
+                raise ValueError("'%s__%s' arguments of the wrong type"
+                                 % (name, rel))
+        self.ranges.append((name, rel, value))
+
 
 class SolrSearch(object):
     default_term_re = re.compile(r'^\w+$')
@@ -93,28 +113,8 @@ class SolrSearch(object):
                     search_type = "terms"
                 self.update_search(q, search_type, name, v)
             else:
-                self._range_query(q, name, rel, v)
+                getattr(self, q).add_range_query(name, rel, v)
         return self
-
-    def _range_query(self, q, name, rel, value):
-        field_type  = self.schema.fields[name].type
-        if field_type is bool:
-            raise ValueError("Cannot do a '%s' query on a bool field" % rel)
-        if rel.startswith('range'):
-            try:
-                assert len(value) == 2
-            except (AssertionError, TypeError):
-                raise ValueError("'%s__%s' argument must be a length-2 iterable"
-                                 % (name, rel))
-        try:
-            if rel.startswith('range'):
-                value = tuple(sorted(field_type(v) for v in value))
-            else:
-                value = field_type(value)
-        except (ValueError, TypeError):
-                raise ValueError("'%s__%s' arguments of the wrong type"
-                                 % (name, rel))
-        getattr(self, q).ranges.append((name, rel, value))
 
     def _check_fields(self, fields):
         if isinstance(fields, basestring):
