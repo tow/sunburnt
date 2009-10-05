@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import collections
 import re
 
-from .schema import SolrError
+from .schema import SolrError, SolrUnicodeField, SolrBooleanField
 
 
 class LuceneQuery(object):
@@ -27,7 +27,7 @@ class LuceneQuery(object):
                 field = self.schema.fields[name]
             else:
                 field = self.schema.default_field
-            if field.type is unicode:
+            if isinstance(field, SolrUnicodeField):
                 serializer = lambda v: self.__lqs_escape(v)
             else:
                 serializer = lambda v: field.serialize(v)
@@ -50,7 +50,7 @@ class LuceneQuery(object):
                 field = self.schema.fields[name]
             else:
                 field = self.schema.default_field
-            if field.type is unicode:
+            if isinstance(field, SolrUnicodeField):
                 serializer = self.__phrase_escape
             else:
                 serializer = field.serialize
@@ -103,7 +103,6 @@ class LuceneQuery(object):
                 field_name, rel = k, 'eq'
             if field_name not in self.schema.fields:
                 raise ValueError("%s is not a valid field name" % k)
-            field_type = self.schema.fields[field_name].type
             if rel == 'eq':
                 self.add_exact(field_name, v, terms_or_phrases)
             else:
@@ -114,7 +113,7 @@ class LuceneQuery(object):
             field = self.schema.fields[field_name]
         else:
             field = self.schema.default_field
-        if field.type is unicode:
+        if isinstance(field, SolrUnicodeField):
             term_or_phrase = term_or_phrase or self.term_or_phrase(value)
         else:
             value = field.normalize(value)
@@ -122,8 +121,8 @@ class LuceneQuery(object):
         getattr(self, term_or_phrase)[field_name].add(value)
 
     def add_range(self, field_name, rel, value):
-        field_type = self.schema.fields[field_name].type
-        if field_type is bool:
+        field = self.schema.fields[field_name]
+        if isinstance(field, SolrBooleanField):
             raise ValueError("Cannot do a '%s' query on a bool field" % rel)
         if rel.startswith('range'):
             try:

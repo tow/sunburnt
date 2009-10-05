@@ -71,87 +71,96 @@ class solr_date(object):
                             "%06d" % self.microsecond)
 
 
-class solr_int(int):
-    min = -(2**31)
-    max = 2**31-1
-    def __init__(self, i):
-        i = int(i)
-        if i < self.min or i > self.max:
-            raise ValueError("%s out of the range of a signed 32-bit long" % i)
-        int.__init__(self, i)
-
-
-class solr_long(long):
-    min = -(2**63)
-    max = 2**63-1
-    def __init__(self, i):
-        i = long(i)
-        if i < self.min or i > self.max:
-            raise ValueError("%s out of the range of a signed 64-bit long" % i)
-        long.__init__(self, i)
-
-
-class solr_float(float):
-    max = (2.0-2.0**(-23)) * 2.0**127
-    min = -max
-    def __init__(self, f):
-        f = float(f)
-        if f < self.min or f > self.max:
-            raise ValueError("%s out of the range of a 32-bit IEEE float" % f)
-        float.__init__(self, f)
-
-
-class solr_double(float):
-    max = (2.0-2.0**(-52)) * 2.0**1023
-    min = -max
-    def __init__(self, f):
-        f = float(f)
-        if f < self.min or f > self.max:
-            raise ValueError("%s out of the range of a 64-bit IEEE double" % f)
-        float.__init__(self, f)
-
 class SolrField(object):
-    def __init__(self, node, data_type):
+    def __init__(self, node):
         self.name = node.attrib["name"]
         self.multi_valued = node.attrib.get("multiValued") == "true"
         self.required = node.attrib.get("required") == "true"
-        self.type = data_type
-
-    def normalize(self, value):
-        try:
-            return self.type(value)
-        except (TypeError, OverflowError, ValueError):
-            raise SolrError("Cannot serialize %s as type %s"
-                            % (value, self.name))
 
     def serialize(self, value):
         if hasattr(value, "__iter__"):
             if not self.multi_valued:
                 raise SolrError("'%s' is not a multi-valued field" % self.name)
             return [self.serialize(v) for v in value]
-        value = self.normalize(value)
-        if self.type is unicode:
-            return value
-        elif self.type is bool:
-            return u"true" if value else u"false"
-        else:
+        return self.as_unicode(self.normalize(value))
+
+    def as_unicode(self, value):
+        return unicode(value)
+
+
+class SolrUnicodeField(SolrField):
+    def normalize(self, value):
+        try:
             return unicode(value)
+        except UnicodeError:
+            raise SolrError("%s could not be coerced to unicode" % value)
+
+    def as_unicode(self, value):
+        return value
+
+
+class SolrBooleanField(SolrField):
+    def normalize(self, value):
+        return bool(value)
+
+    def as_unicode(self, value):
+        return u"true" if value else u"false"
+
+
+class SolrNumericalField(SolrField):
+    def normalize(self, value):
+        try:
+            v = self.base_type(value)
+        except (OverflowError, ValueError):
+            raise SolrError("%s is invalid value for %s" % (value, self.__class__))
+        if v < self.min or v > self.max:
+            raise SolrError("%s out of range for a %s" % (value, self.__class__))
+        return v
+
+
+class SolrIntField(SolrNumericalField):
+    base_type = int
+    min = -(2**31)
+    max = 2**31-1
+
+
+class SolrLongField(SolrNumericalField):
+    base_type = long
+    min = -(2**63)
+    max = 2**63-1
+
+
+class SolrFloatField(SolrNumericalField):
+    base_type = float
+    max = (2.0-2.0**(-23)) * 2.0**127
+    min = -max
+
+
+class SolrDoubleField(SolrNumericalField):
+    base_type = float
+    max = (2.0-2.0**(-52)) * 2.0**1023
+    min = -max
+
+
+class SolrDateField(SolrField):
+    def normalize(self, v):
+        return solr_date(v)
 
 
 class SolrSchema(object):
     solr_data_types = {
-        'solr.StrField':unicode,
-        'solr.TextField':unicode,
-        'solr.BoolField':bool,
-        'solr.IntField':solr_int,
-        'solr.SortableIntField':solr_int,
-        'solr.LongField':solr_long,
-        'solr.SortableLongField':solr_long,
-        'solr.FloatField':solr_float,
-        'solr.SortableFloatField':solr_float,
-        'solr.DoubleField':solr_double,
-        'solr.SortableDoubleField':solr_double,
-        'solr.DateField':solr_date
+        'solr.StrField':SolrUnicodeField,
+        'solr.TextField':SolrUnicodeField,
+        'solr.BoolField':SolrBooleanField,
+        'solr.IntField':SolrIntField,
+        'solr.SortableIntField':SolrIntField,
+        'solr.LongField':SolrLongField,
+        'solr.SortableLongField':SolrLongField,
+        'solr.FloatField':SolrFloatField,
+        'solr.SortableFloatField':SolrFloatField,
+        'solr.DoubleField':SolrDoubleField,
+        'solr.SortableDoubleField':SolrDoubleField,
+        'solr.DateField':SolrDateField,
         }
 
     def __init__(self, f):
@@ -170,20 +179,20 @@ class SolrSchema(object):
         except lxml.etree.XMLSyntaxError, e:
             raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
         field_types = {}
-        for data_type, t in self.solr_data_types.items():
+        for data_type, field_class in self.solr_data_types.items():
             for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
-                field_types[field_type] = t
+                field_types[field_type] = field_class
         fields = {}
-        for field in schemadoc.xpath("/schema/fields/field"):
+        for field_node in schemadoc.xpath("/schema/fields/field"):
             try:
-                name, type = field.attrib['name'], field.attrib['type']
+                name, type = field_node.attrib['name'], field_node.attrib['type']
             except KeyError, e:
                 raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.message)
             try:
-                data_type = field_types[type]
+                field_class = field_types[type]
             except KeyError, e:
                 raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
-            fields[name] = SolrField(field, data_type)
+            fields[name] = field_class(field_node)
         default_field_name = schemadoc.xpath("/schema/defaultSearchField")
         default_field_name = default_field_name[0].text \
             if default_field_name else None
