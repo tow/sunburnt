@@ -186,7 +186,7 @@ class SolrSearch(object):
         return self
 
     def highlight(self, fields=None, snippets=None, fragsize=None):
-        self.highlighter(fields, snippets, fragsize)
+        self.highlighter.update(fields, snippets, fragsize)
         return self
 
     def mlt(self, fields, query_fields=None, **kwargs):
@@ -194,8 +194,7 @@ class SolrSearch(object):
         return self
 
     def paginate(self, start=None, rows=None):
-        self.paginator.start = start
-        self.paginator.rows = rows
+        self.paginator.update(start, rows)
         return self
 
     def execute(self):
@@ -206,38 +205,67 @@ class SolrSearch(object):
 
 
 class Options(object):
-    def __init__(self, schema):
-        self.schema = schema
-        self.options = {}
+    pass
 
 
 class FacetOptions(Options):
+    def __init__(self, schema):
+        self.schema = schema
+        self.fields = {}
+        
     def update(self, field, limit=None, mincount=None):
-        self.options['facet'] = True
-
         self.schema.check_fields(field)
-        self.options['facet.field'] = field
+        fields[field] = {"limit":limit, "mincount":mincount}
 
-        if limit:
-            self.options["f.%s.facet.limit" % field] = limit
-        if mincount:
-            self.options["f.%s.facet.mincount" % field] = mincount
+    @property
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts['facet'] = True
+        for field_name, field_opts in self.fields:
+            opts['facet.field'] = field_name
+            
+            if field_opts['limit'] is not None:
+                opts["f.%s.facet.limit" % field_name] = field_opts['limit']
+            if field_opts['mincount'] is not None:
+                opts["f.%s.facet.mincount" % field_name] = field_opts['mincount']
+        return opts
 
 
 class HighlightOptions(Options):
-    def update(self, fields=None, snippets=None, fragsize=None):
-        self.options["hl"] = True
+    def __init__(self, schema):
+        self.schema = schema
+        self.fields = {}
+        self.snippets = None
+        self.fragsize = None
 
+    def update(self, fields=None, snippets=None, fragsize=None):
         if fields:
             self.schema.check_fields(fields)
-            self.options["hl.fl"] = ','.join(fields)
-            # what if fields has a comma in it?
-        if snippets is not None:
             for field in fields:
-                self.options["f.%s.hl.snippets" % field] = snippets
-        if fragsize is not None:
-            for field in fields:
-                self.options["f.%s.hl.fragsize" % field] = fragsize
+                self.fields[field] = {'snippets':snippets, 'fragsize':fragsize}
+        else:
+            if snippets is not None:
+                self.snippets = snippets
+            if fragsize is not None:
+                self.fragsize = fragsize
+
+    @property
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts['hl'] = True
+            opts["hl.fl"] = ','.join(fields)
+            if self.snippets is not None:
+                opts['hl.snippets'] = self.snippets
+            if self.fragsize is not None:
+                opts['hl.fragsize'] = self.fragsize
+        for field_name, field_opts in self.fields:
+            if field_opts.get('snippets') is not None:
+                opts["f.%s.hl.snippets" % field_name] = field_opts['snippets']
+            if field_opts.get('fragsize') is not None:
+                opts["f.%s.hl.fragsize" % field_name] = field_opts['fragsize']
+        return opts
 
 
 class MoreLikeThisOptions(Options):
@@ -250,42 +278,81 @@ class MoreLikeThisOptions(Options):
             "maxntp":int,
             "boost":bool,
             }
-    def update(self, fields, query_fields, **kwargs):
-        self.options["mlt"] = True
+    def __init__(self, schema):
+        self.schema = schema
+        self.fields = set()
+        self.query_fields = {}
+        self.kwargs = {}
 
+    def update(self, fields, query_fields, **kwargs):
         self.schema.check_fields(fields)
-        self.options["mlt.fl"] = ",".join(fields)
+        self.fields = self.fields.add(fields)
 
         if query_fields is not None:
-            qf_arg = []
             for k, v in query_fields.items():
-                if k not in fields:
-                    raise SolrError("'%s' specified in query_fields but not fields")
-                if v is None:
-                    qf_arg.append(k)
-                else:
+                if k not in self.fields:
+                    raise SolrError("'%s' specified in query_fields but not fields", k)
+                if v is not None:
                     try:
                         v = float(v)
                     except ValueError:
-                        raise SolrError("'%s' has non-numerical boost value")
-                    qf_arg.append("%s^%s" % (k, v))
-            self.options["mlt.qf"] = " ".join(qf_arg)
+                        raise SolrError("'%s' has non-numerical boost value", k)
+        self.query_fields.update(query_fields)
 
-        for opt_name, opt_value in kwargs.items():
-            try:
-                opt_type = self.opts[opt_name]
-            except IndexError:
+        for opt_name, opt_type in kwargs.items():
+            if opt_name not in self.opts:
                 raise SolrError("Invalid MLT option %s" % opt_name)
             try:
-                self.options["mlt.%s" % opt_name] = opt_type(opt_value)
+                opt_type(opt_value)
             except (ValueError, TypeError):
                 raise SolrError("'mlt.%s' should be an '%s'"%
                                 (opt_name, opt_type.__name__))
+        self.kwargs.update(kwargs)
+
+    @property
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts['mlt'] = True
+            opts['mlt.fl'] = ','.join(self.fields)
+
+        if self.query_fields:
+            qf_arg = []
+            for k, v in self.query_fields.items():
+                if v is None:
+                    qf_arg.append(k)
+                else:
+                    qf_arg.append("%s^%s" % (k, float(v)))
+            opts["mlt.qf"] = " ".join(qf_arg)
+
+        for opt_name, opt_value in self.kwargs.items():
+            opt_type = self.opts[opt_name]
+            opts["mlt.%s" % opt_name] = opt_type(opt_value)
+
+        return opts
 
 
 class PaginateOptions(Options):
-    def update(start, rows):
+    def __init__(self, schema):
+        self.schema = schema
+        self.start = None
+        self.rows = None
+
+    def update(self, start, rows):
         if start is not None:
-            self.options['start'] = start
+            if start < 0:
+                raise SolrError("paginator start index must be 0 or greater")
+            self.start = start
         if rows is not None:
-            self.options['rows'] = rows
+            if rows < 0:
+                raise SolrError("paginator rows must be 0 or greater")
+            self.rows = rows
+
+    @property
+    def options(self):
+        opts = {}
+        if self.start is not None:
+            opts['start'] = self.start
+        if self.rows is not None:
+            opts['rows'] = self.rows
+        return opts

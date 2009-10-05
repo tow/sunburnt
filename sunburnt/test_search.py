@@ -209,3 +209,41 @@ def test_bad_query_data():
     for kwargs in bad_query_data:
         yield check_bad_query_data, kwargs
 
+
+good_paginator_data = (
+    ({"start":5, "rows":10},
+     {"start":5, "rows":10}),
+    ({"start":5},
+     {"start":5}),
+    ({"rows":10},
+     {"rows":10}),
+)
+
+def check_paginator_data(kwargs, output):
+    solr_search = SolrSearch(interface)
+    assert solr_search.paginate(**kwargs).execute() == output
+
+def test_paginator_data():
+    for kwargs, output in good_paginator_data:
+        yield check_paginator_data, kwargs, output
+
+
+bad_paginator_data = (
+    {"stop":5, "rows":10}, # bad arg
+    {"start":-1}, # negative start
+    {"rows":-1}, # negative rows
+)
+
+def check_bad_paginator_data(kwargs):
+    solr_search = SolrSearch(interface)
+    try:
+        solr_search.paginate(**kwargs).execute()
+    except SolrError:
+        pass
+    else:
+        assert False
+
+def test_bad_paginator_data():
+    for kwargs in bad_paginator_data:
+        yield check_bad_paginator_data, kwargs
+
