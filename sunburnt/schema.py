@@ -118,6 +118,12 @@ class SolrNumericalField(SolrField):
         return v
 
 
+class SolrShortField(SolrNumericalField):
+    base_type = int
+    min = -(2**15)
+    max = 2**15-1
+
+
 class SolrIntField(SolrNumericalField):
     base_type = int
     min = -(2**31)
@@ -152,6 +158,7 @@ class SolrSchema(object):
         'solr.StrField':SolrUnicodeField,
         'solr.TextField':SolrUnicodeField,
         'solr.BoolField':SolrBooleanField,
+        'solr.ShortField':SolrShortField,
         'solr.IntField':SolrIntField,
         'solr.SortableIntField':SolrIntField,
         'solr.TrieIntField':SolrIntField,
