@@ -133,6 +133,10 @@ good_query_data = {
     "query":(
         ([], {"boolean_field":True},
          {"q":u"boolean_field:true"}),
+        ([], {"boolean_field":"false"},
+         {"q":u"boolean_field:true"}), # boolean field takes any truth-y value
+        ([], {"boolean_field":0},
+         {"q":u"boolean_field:false"}),
         ([], {"int_field":3},
          {"q":u"int_field:3"}),
         ([], {"int_field":3.1}, # casting from float should work
