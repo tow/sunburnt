@@ -182,9 +182,18 @@ def test_query_data():
             yield check_query_data, method, args, kwargs, output
 
 bad_query_data = (
-    {"int_field":2**31},
-    {"long_field":2**64},
     {"int_field":"a"},
+    {"int_field":2**31},
+    {"int_field":-(2**31)-1},
+    {"long_field":"a"},
+    {"long_field":2**63},
+    {"long_field":-(2**63)-1},
+    {"float_field":"a"},
+    {"float_field":2**1000},
+    {"float_field":-(2**1000)},
+    {"double_field":"a"},
+    {"double_field":2**2000},
+    {"double_field":-(2**2000)},
 )
 
 def check_bad_query_data(kwargs):

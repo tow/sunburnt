@@ -72,20 +72,43 @@ class solr_date(object):
 
 
 class solr_int(int):
+    min = -(2**31)
+    max = 2**31-1
     def __init__(self, i):
         i = int(i)
-        if i < -2**31 or i >= 2**31:
+        if i < self.min or i > self.max:
             raise ValueError("%s out of the range of a signed 32-bit long" % i)
         int.__init__(self, i)
 
 
 class solr_long(long):
+    min = -(2**63)
+    max = 2**63-1
     def __init__(self, i):
         i = long(i)
-        if i < -2**63 or i >= 2**63:
+        if i < self.min or i > self.max:
             raise ValueError("%s out of the range of a signed 64-bit long" % i)
         long.__init__(self, i)
 
+
+class solr_float(float):
+    max = (2.0-2.0**(-23)) * 2.0**127
+    min = -max
+    def __init__(self, f):
+        f = float(f)
+        if f < self.min or f > self.max:
+            raise ValueError("%s out of the range of a 32-bit IEEE float" % f)
+        float.__init__(self, f)
+
+
+class solr_double(float):
+    max = (2.0-2.0**(-52)) * 2.0**1023
+    min = -max
+    def __init__(self, f):
+        f = float(f)
+        if f < self.min or f > self.max:
+            raise ValueError("%s out of the range of a 64-bit IEEE double" % f)
+        float.__init__(self, f)
 
 class SolrField(object):
     def __init__(self, node, data_type):
@@ -124,10 +147,10 @@ class SolrSchema(object):
         'solr.SortableIntField':solr_int,
         'solr.LongField':solr_long,
         'solr.SortableLongField':solr_long,
-        'solr.FloatField':float,
-        'solr.SortableFloatField':float,
-        'solr.DoubleField':float,
-        'solr.SortableDoubleField':float,
+        'solr.FloatField':solr_float,
+        'solr.SortableFloatField':solr_float,
+        'solr.DoubleField':solr_double,
+        'solr.SortableDoubleField':solr_double,
         'solr.DateField':solr_date
         }
 
