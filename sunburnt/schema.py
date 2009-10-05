@@ -154,12 +154,16 @@ class SolrSchema(object):
         'solr.BoolField':SolrBooleanField,
         'solr.IntField':SolrIntField,
         'solr.SortableIntField':SolrIntField,
+        'solr.TrieIntField':SolrIntField,
         'solr.LongField':SolrLongField,
         'solr.SortableLongField':SolrLongField,
+        'solr.TrieLongField':SolrLongField,
         'solr.FloatField':SolrFloatField,
         'solr.SortableFloatField':SolrFloatField,
+        'solr.TrieFloatField':SolrFloatField,
         'solr.DoubleField':SolrDoubleField,
         'solr.SortableDoubleField':SolrDoubleField,
+        'solr.TrieDoubleField':SolrDoubleField,
         'solr.DateField':SolrDateField,
         }
 
