@@ -229,6 +229,10 @@ update_docs = [
     # object containing key to be ignored
     (D(1, "a", True),
      """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc></add>"""),
+
+    # Make sure we distinguish strings and lists
+    ({"int_field":1, "text_field":"abcde"},
+      """<add><doc><field name="int_field">1</field><field name="text_field">abcde</field></doc></add>"""),
     ]
 
 def check_update_serialization(s, obj, xml_string):

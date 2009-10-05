@@ -249,8 +249,11 @@ class SolrUpdate(object):
         self.xml = self.add(docs)
 
     def fields(self, name, values):
-        return [self.FIELD({'name':name}, value)
-                for value in self.schema.serialize_value(name, values)]
+        values = self.schema.serialize_value(name, values)
+        # Distinguish lists and strings
+        if isinstance(values, basestring):
+            values = [values]
+        return [self.FIELD({'name':name}, value) for value in values]
 
     def doc(self, doc):
         missing_fields = self.schema.missing_fields(doc.keys())
