@@ -3,6 +3,8 @@ from __future__ import absolute_import
 import collections
 import re
 
+from .schema import SolrError
+
 
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
@@ -36,6 +38,7 @@ class LuceneQuery(object):
                 s += [serializer(value) for value in sorted(value_set)]
         return ' '.join(s)
 
+    # I'm very much not sure we're doing the right thing here:
     lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
     def __lqs_escape(self, s):
         return self.lucene_special_chars.sub(r'\\\1', s)

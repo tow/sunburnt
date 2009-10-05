@@ -5,6 +5,9 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+import datetime
+import mx.DateTime
+
 from .schema import SolrSchema
 from .search import SolrSearch
 
@@ -158,14 +161,13 @@ good_query_data = {
          {"q":u"sdouble_field:3.0"}),
         ([], {"sdouble_field":3}, # casting from int should work
          {"q":u"sdouble_field:3.0"}),
+        ([], {"date_field":datetime.datetime(2009, 1, 1)},
+         {"q":u"date_field:2009-01-01T00:00:00.000000Z"}),
         ),
-
-
     }
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
-    print getattr(solr_search, method)(*args, **kwargs).execute(), output
     assert getattr(solr_search, method)(*args, **kwargs).execute() == output
 
 def test_query_data():
