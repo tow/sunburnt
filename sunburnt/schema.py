@@ -71,6 +71,22 @@ class solr_date(object):
                             "%06d" % self.microsecond)
 
 
+class solr_int(int):
+    def __init__(self, i):
+        i = int(i)
+        if i < -2**31 or i >= 2**31:
+            raise ValueError("%s out of the range of a signed 32-bit long" % i)
+        int.__init__(self, i)
+
+
+class solr_long(long):
+    def __init__(self, i):
+        i = long(i)
+        if i < -2**63 or i >= 2**63:
+            raise ValueError("%s out of the range of a signed 64-bit long" % i)
+        long.__init__(self, i)
+
+
 class SolrField(object):
     def __init__(self, node, data_type):
         self.name = node.attrib["name"]
@@ -81,9 +97,9 @@ class SolrField(object):
     def normalize(self, value):
         try:
             return self.type(value)
-        except (TypeError, ValueError):
+        except (TypeError, OverflowError, ValueError):
             raise SolrError("Cannot serialize %s as type %s"
-                            % (self.name, value))
+                            % (value, self.name))
 
     def serialize(self, value):
         if hasattr(value, "__iter__"):
@@ -104,10 +120,10 @@ class SolrSchema(object):
         'solr.StrField':unicode,
         'solr.TextField':unicode,
         'solr.BoolField':bool,
-        'solr.IntField':int,
-        'solr.SortableIntField':int,
-        'solr.LongField':long,
-        'solr.SortableLongField':long,
+        'solr.IntField':solr_int,
+        'solr.SortableIntField':solr_int,
+        'solr.LongField':solr_long,
+        'solr.SortableLongField':solr_long,
         'solr.FloatField':float,
         'solr.SortableFloatField':float,
         'solr.DoubleField':float,

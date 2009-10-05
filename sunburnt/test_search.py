@@ -8,7 +8,7 @@ except ImportError:
 import datetime
 import mx.DateTime
 
-from .schema import SolrSchema
+from .schema import SolrSchema, SolrError
 from .search import SolrSearch
 
 schema_string = \
@@ -180,3 +180,23 @@ def test_query_data():
     for method, data in good_query_data.items():
         for args, kwargs, output in data:
             yield check_query_data, method, args, kwargs, output
+
+bad_query_data = (
+    {"int_field":2**31},
+    {"long_field":2**64},
+    {"int_field":"a"},
+)
+
+def check_bad_query_data(kwargs):
+    solr_search = SolrSearch(interface)
+    try:
+        solr_search.query(**kwargs).execute()
+    except SolrError:
+        pass
+    else:
+        assert False
+
+def test_bad_query_data():
+    for kwargs in bad_query_data:
+        yield check_bad_query_data, kwargs
+
