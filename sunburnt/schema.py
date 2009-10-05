@@ -34,9 +34,12 @@ class solr_date(object):
         if isinstance(v, solr_date):
             self._dt_obj = v._dt_obj
         elif isinstance(v, basestring):
-            self._dt_obj = self.from_str(v)
-        else:
+            self._dt_obj = dates.datetime_from_w3_datestring(s)
+        elif hasattr(v, "strftime"):
             self._dt_obj = self.from_date(v)
+        else:
+            raise TypeError("Cannot initialize solr_date from %s object"
+                            % type(v))
 
     @staticmethod
     def from_date(dt_obj):
@@ -49,11 +52,6 @@ class solr_date(object):
                 raise EnvironmentError("pytz not available, cannot do timezone conversions")
         else:
             return dt_obj
-
-    @staticmethod
-    def from_str(s):
-        dt_obj = dates.datetime_from_w3_datestring(s)
-        return dt_obj
 
     @property
     def microsecond(self):
