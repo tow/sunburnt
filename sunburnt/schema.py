@@ -83,7 +83,7 @@ class SolrField(object):
     def normalize(self, value):
         try:
             return self.type(value)
-        except TypeError:
+        except (TypeError, UnicodeError):
             raise SolrError("Cannot serialize %s as type %s"
                             % (self.name, value))
 
@@ -96,7 +96,7 @@ class SolrField(object):
         if self.type is unicode:
             return value
         elif self.type is bool:
-            return "true" if value else "false"
+            return u"true" if value else u"false"
         else:
             return unicode(value)
 
