@@ -50,7 +50,7 @@ def check_solr_date_from_date(s, date, canonical_date):
     check_solr_date_from_string(s, canonical_date)
 
 def check_solr_date_from_string(s, date):
-    assert solr_date(s).v == date
+    assert solr_date(s)._dt_obj == date
 
 
 def test_solr_date_from_pydatetimes():

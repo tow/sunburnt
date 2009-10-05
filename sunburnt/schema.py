@@ -31,41 +31,45 @@ class solr_date(object):
     objects and mx.DateTime objects, and will serialize to a format
     appropriate for Solr"""
     def __init__(self, v):
-        if isinstance(v, basestring):
-            self.from_str(v)
+        if isinstance(v, solr_date):
+            self._dt_obj = v._dt_obj
+        elif isinstance(v, basestring):
+            self._dt_obj = self.from_str(v)
         else:
-            self.from_date(v)
+            self._dt_obj = self.from_date(v)
 
-    def from_date(self, v):
+    @staticmethod
+    def from_date(dt_obj):
         # Python datetime objects may include timezone information
-        if hasattr(v, 'tzinfo') and v.tzinfo:
+        if hasattr(dt_obj, 'tzinfo') and dt_obj.tzinfo:
             # but Solr requires UTC times.
             if pytz:
-                self.v = v.astimezone(pytz.utc)
+                return dt_obj.astimezone(pytz.utc)
             else:
                 raise EnvironmentError("pytz not available, cannot do timezone conversions")
         else:
-            self.v = v
+            return dt_obj
 
-    def from_str(self, s):
-        v = dates.datetime_from_w3_datestring(s)
-        self.from_date(v)
+    @staticmethod
+    def from_str(s):
+        dt_obj = dates.datetime_from_w3_datestring(s)
+        return dt_obj
 
     @property
     def microsecond(self):
-        if hasattr(self.v, "microsecond"):
-            return self.v.microsecond
+        if hasattr(self._dt_obj, "microsecond"):
+            return self._dt_obj.microsecond
         else:
-            return int(1000000*math.modf(self.v.second)[0])
+            return int(1000000*math.modf(self._dt_obj.second)[0])
 
     def __repr__(self):
-        return repr(self.v)
+        return repr(self._dt_obj)
 
     def __unicode__(self):
         """ Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
-        return u"%s.%sZ" % (self.v.strftime("%Y-%m-%dT%H:%M:%S"),
+        return u"%s.%sZ" % (self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S"),
                             "%06d" % self.microsecond)
 
 
