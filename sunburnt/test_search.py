@@ -163,6 +163,8 @@ good_query_data = {
          {"q":u"sdouble_field:3.0"}),
         ([], {"date_field":datetime.datetime(2009, 1, 1)},
          {"q":u"date_field:2009-01-01T00:00:00.000000Z"}),
+        ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
+         {"q":u"date_field:2009-01-01T00:00:00.000000Z"}),
         ),
     }
 
