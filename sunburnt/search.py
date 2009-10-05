@@ -28,14 +28,11 @@ class LuceneQuery(object):
             else:
                 field = self.schema.default_field
             if isinstance(field, SolrUnicodeField):
-                serializer = lambda v: self.__lqs_escape(v)
-            else:
-                serializer = lambda v: field.serialize(v)
+                value_set = [self.__lqs_escape(value) for value in value_set]
             if name:
-                s += [u'%s:%s' % (name, serializer(value))
-                      for value in sorted(value_set)]
+                s += [u'%s:%s' % (name, value) for value in sorted(value_set)]
             else:
-                s += [serializer(value) for value in sorted(value_set)]
+                s += sorted(value_set)
         return ' '.join(s)
 
     # I'm very much not sure we're doing the right thing here:
@@ -51,14 +48,12 @@ class LuceneQuery(object):
             else:
                 field = self.schema.default_field
             if isinstance(field, SolrUnicodeField):
-                serializer = self.__phrase_escape
-            else:
-                serializer = field.serialize
+                value_set = [self.__phrase_escape(value) for value in value_set]
             if name:
-                s += [u'%s:"%s"' % (name, serializer(value))
+                s += [u'%s:"%s"' % (name, value)
                       for value in sorted(value_set)]
             else:
-                s += ['"%s"' % serializer(value) for value in sorted(value_set)]
+                s += ['"%s"' % value for value in sorted(value_set)]
         return ' '.join(s)
 
     phrase_special_chars = re.compile(r'"')
@@ -116,7 +111,7 @@ class LuceneQuery(object):
         if isinstance(field, SolrUnicodeField):
             term_or_phrase = term_or_phrase or self.term_or_phrase(value)
         else:
-            value = field.normalize(value)
+            value = field.serialize(value)
             term_or_phrase = "terms"
         getattr(self, term_or_phrase)[field_name].add(value)
 
