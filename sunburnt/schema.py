@@ -34,7 +34,7 @@ class solr_date(object):
         if isinstance(v, solr_date):
             self._dt_obj = v._dt_obj
         elif isinstance(v, basestring):
-            self._dt_obj = dates.datetime_from_w3_datestring(s)
+            self._dt_obj = dates.datetime_from_w3_datestring(v)
         elif hasattr(v, "strftime"):
             self._dt_obj = self.from_date(v)
         else:
