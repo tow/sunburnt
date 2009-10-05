@@ -13,11 +13,20 @@ class LuceneQuery(object):
         "gt": "%s TO *",
         "ra": "%s TO %s",
     }
-    def __init__(self, schema):
+    def __init__(self, option_flag, schema):
+        self.option_flag = option_flag
         self.schema = schema
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
         self.ranges = []
+
+    @property
+    def options(self):
+        opts = {}
+        s = unicode(self)
+        if s:
+            opts[self.option_flag] = s
+        return opts
 
     # Below, we sort all our value_sets - this is for predictability when testing.
     def serialize_term_queries(self):
@@ -143,9 +152,14 @@ class SolrSearch(object):
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.query_obj = LuceneQuery(self.schema)
-        self.filter_obj = LuceneQuery(self.schema)
-        self.options = {}
+        self.query_obj = LuceneQuery('q', self.schema)
+        self.filter_obj = LuceneQuery('fq', self.schema)
+        self.paginator = PaginateOptions(self.schema)
+        self.more_like_this = MoreLikeThisOptions(self.schema)
+        self.highlighter = HighlightOptions(self.schema)
+        self.faceter = FacetOptions(self.schema)
+        self.option_modules = [self.query_obj, self.filter_obj, self.paginator,
+                               self.more_like_this, self.highlighter, self.faceter]
 
     def query_by_term(self, *args, **kwargs):
         return self.query(__terms_or_phrases="terms", *args, **kwargs)
@@ -167,28 +181,55 @@ class SolrSearch(object):
         self.filter_obj.add(args, kwargs)
         return self
 
-    def _check_fields(self, fields):
-        if isinstance(fields, basestring):
-            fields = [fields]
-        for field in fields:
-            if field not in self.schema.fields:
-                raise ValueError("Field '%s' not defined in schema" % field)
-        return fields
-
     def facet_by(self, field, limit=None, mincount=None):
-        self._check_fields(field)
-        self.options.update({"facet":"true",
-                             "facet.field":field})
+        self.faceter.update(field, limit, mincount)
+        return self
+
+    def highlight(self, fields=None, snippets=None, fragsize=None):
+        self.highlighter(fields, snippets, fragsize)
+        return self
+
+    def mlt(self, fields, query_fields=None, **kwargs):
+        self.more_like_this.update(fields, query_fields, **kwargs)
+        return self
+
+    def paginate(self, start=None, rows=None):
+        self.paginator.start = start
+        self.paginator.rows = rows
+        return self
+
+    def execute(self):
+        options = {}
+        for option_module in self.option_modules:
+            options.update(option_module.options)
+        return self.interface.search(**options)
+
+
+class Options(object):
+    def __init__(self, schema):
+        self.schema = schema
+        self.options = {}
+
+
+class FacetOptions(Options):
+    def update(self, field, limit=None, mincount=None):
+        self.options['facet'] = True
+
+        self.schema.check_fields(field)
+        self.options['facet.field'] = field
+
         if limit:
             self.options["f.%s.facet.limit" % field] = limit
         if mincount:
             self.options["f.%s.facet.mincount" % field] = mincount
-        return self
 
-    def highlight(self, fields=None, snippets=None, fragsize=None):
-        self.options["hl"] = "true"
+
+class HighlightOptions(Options):
+    def update(self, fields=None, snippets=None, fragsize=None):
+        self.options["hl"] = True
+
         if fields:
-            fields = self._check_fields(fields)
+            self.schema.check_fields(fields)
             self.options["hl.fl"] = ','.join(fields)
             # what if fields has a comma in it?
         if snippets is not None:
@@ -197,12 +238,24 @@ class SolrSearch(object):
         if fragsize is not None:
             for field in fields:
                 self.options["f.%s.hl.fragsize" % field] = fragsize
-        return self
 
-    def mlt(self, fields, query_fields=None, **kwargs):
-        self.options["mlt"] = "true"
-        fields = self._check_fields(fields)
+
+class MoreLikeThisOptions(Options):
+    opts = {"count":int,
+            "mintf":float,
+            "mindf":float,
+            "minwl":int,
+            "maxwl":int,
+            "maxqt":int,
+            "maxntp":int,
+            "boost":bool,
+            }
+    def update(self, fields, query_fields, **kwargs):
+        self.options["mlt"] = True
+
+        self.schema.check_fields(fields)
         self.options["mlt.fl"] = ",".join(fields)
+
         if query_fields is not None:
             qf_arg = []
             for k, v in query_fields.items():
@@ -217,48 +270,22 @@ class SolrSearch(object):
                         raise SolrError("'%s' has non-numerical boost value")
                     qf_arg.append("%s^%s" % (k, v))
             self.options["mlt.qf"] = " ".join(qf_arg)
-        mlt_options = MoreLikeThisOptions(self.schema)
-        self.options.update(mlt_options(**kwargs))
-        return self
 
-    def paginate(self, start=1, rows=10):
-        self.options["start"] = start
-        self.options["rows"] = rows
-        return self
-
-    def execute(self):
-        q = unicode(self.query_obj)
-        if q:
-            self.options["q"] = q
-        fq = unicode(self.filter_obj)
-        if fq:
-            self.options["fq"] = fq
-        return self.interface.search(**self.options)
-
-
-class MoreLikeThisOptions(object):
-    opts = {"count":int,
-            "mintf":float,
-            "mindf":float,
-            "minwl":int,
-            "maxwl":int,
-            "maxqt":int,
-            "maxntp":int,
-            "boost":bool,
-            }
-    def __init__(self, schema):
-        self.schema = schema
-
-    def __call__(self, **kwargs):
-        options = {}
         for opt_name, opt_value in kwargs.items():
             try:
                 opt_type = self.opts[opt_name]
             except IndexError:
                 raise SolrError("Invalid MLT option %s" % opt_name)
             try:
-                options["mlt.%s" % opt_name] = opt_type(opt_value)
+                self.options["mlt.%s" % opt_name] = opt_type(opt_value)
             except (ValueError, TypeError):
                 raise SolrError("'mlt.%s' should be an '%s'"%
                                 (opt_name, opt_type.__name__))
-        return options
+
+
+class PaginateOptions(Options):
+    def update(start, rows):
+        if start is not None:
+            self.options['start'] = start
+        if rows is not None:
+            self.options['rows'] = rows

@@ -215,6 +215,13 @@ class SolrSchema(object):
         return [name for name in set(self.fields.keys()) - set(field_names)
                 if self.fields[name].required]
 
+    def check_fields(self, field_names):
+        if isinstance(field_names, basestring):
+            field_names = [field_names]
+        for field in field_names:
+            if field_name not in self.schema.fields:
+                raise ValueError("Field '%s' not defined in schema" % field)
+
     def serialize_value(self, k, v):
         if not k in self.fields:
             raise SolrError("No such field '%s' in current schema" % k)
