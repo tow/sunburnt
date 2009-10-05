@@ -111,17 +111,13 @@ class LuceneQuery(object):
 
     def add_exact(self, field_name, value, term_or_phrase):
         if field_name:
-            field_type = self.schema.fields[field_name].type
+            field = self.schema.fields[field_name]
         else:
-            field_type = self.schema.default_field.type
-        if field_type is unicode:
+            field = self.schema.default_field
+        if field.type is unicode:
             term_or_phrase = term_or_phrase or self.term_or_phrase(value)
         else:
-            try:
-                value = field_type(value)
-            except TypeError:
-                raise SolrError("Invalid value %s for field %s"
-                                % (value, field_name))
+            value = field.normalize(value)
             term_or_phrase = "terms"
         getattr(self, term_or_phrase)[field_name].add(value)
 
