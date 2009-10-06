@@ -209,30 +209,64 @@ class Options(object):
 
 
 class FacetOptions(Options):
+    opts = {"prefix":unicode,
+            "sort":[True, False, "count", "index"],
+            "limit":int,
+            "offset":int,
+            "mincount":int,
+            "missing":bool,
+            "method":["enum", "fc"],
+            "enum.cache.minDf":int,
+            }
+
     def __init__(self, schema):
         self.schema = schema
         self.fields = {}
         
-    def update(self, fields, limit=None, mincount=None):
-        self.schema.check_fields(fields)
-        if isinstance(fields, basestring):
-            fields = [fields]
-        for field in fields:
-            self.fields[field] = {"limit":limit, "mincount":mincount}
+    def update(self, fields=None, **kwargs):
+        if fields:
+            self.schema.check_fields(fields)
+            if isinstance(fields, basestring):
+                fields = [fields]
+            for field in fields:
+                self.fields[field] = {}
+        elif kwargs:
+            fields = [None]
+            if None not in self.fields:
+                self.fields[None] = {}
+        self.check_opts(fields, kwargs)
+
+    def check_opts(self, fields, kwargs):
+        for k, v in kwargs.items():
+            if k not in self.opts:
+                raise SolrError("No such option for facet: %s" % k)
+            opt_type = self.opts[k]
+            if isinstance(opt_type, (list, tuple)):
+                if v not in opt_type:
+                    raise SolrError("Invalid value for facet option %s: %s" % (k, v))
+            else:
+                try:
+                    v = opt_type(v)
+                except:
+                    raise SolrError("Invalid value for facet option %s: %s" % (k, v))
+            for field in fields:
+                self.fields[field][k] = v
 
     @property
     def options(self):
         opts = {}
         if self.fields:
             opts['facet'] = True
-            opts['facet.field'] = set()
+            facet_fields = [field for field in self.fields if field]
+            if facet_fields:
+                opts['facet.field'] = facet_fields
         for field_name, field_opts in self.fields.items():
-            opts['facet.field'].add(field_name)
-            
-            if field_opts['limit'] is not None:
-                opts["f.%s.facet.limit" % field_name] = field_opts['limit']
-            if field_opts['mincount'] is not None:
-                opts["f.%s.facet.mincount" % field_name] = field_opts['mincount']
+            if not field_name:
+                for field_opt, v in field_opts.items():
+                    opts['facet.%s'%field_opt] = v
+            else:
+                for field_opt, v in field_opts.items():
+                    opts['f.%s.facet.%s'%(field_name, field_opt)] = v
         return opts
 
 

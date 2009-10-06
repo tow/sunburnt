@@ -251,9 +251,13 @@ def test_bad_paginator_data():
 
 good_faceter_data = (
     ({"fields":"int_field"},
-     {"facet":True, "facet.field":set(["int_field"])}),
+     {"facet":True, "facet.field":["int_field"]}),
     ({"fields":["int_field", "text_field"]},
-     {"facet":True, "facet.field":set(["int_field","text_field"])}),
+     {"facet":True, "facet.field":["int_field","text_field"]}),
+    ({"prefix":"abc"},
+     {"facet":True, "facet.prefix":"abc"}),
+    ({"prefix":"abc", "sort":True, "limit":3, "offset":25, "mincount":1, "missing":False, "method":"enum"},
+     {"facet":True, "facet.prefix":"abc", "facet.sort":True, "facet.limit":3, "facet.offset":25, "facet.mincount":1, "facet.missing":False, "facet.method":"enum"}),
 )
 
 def check_faceter_data(kwargs, output):
