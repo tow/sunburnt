@@ -279,6 +279,7 @@ bad_faceter_data = (
     {"oops":True}, # undefined option
     {"limit":"a"}, # invalid type
     {"sort":"yes"}, # invalid choice
+    {"offset":-1}, # invalid value
 )
 
 def check_bad_faceter_data(kwargs):

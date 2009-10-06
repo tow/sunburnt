@@ -205,6 +205,9 @@ class SolrSearch(object):
 
 
 class Options(object):
+    def invalid_value(self, msg=""):
+        assert False, msg
+
     def check_opts(self, fields, kwargs):
         for k, v in kwargs.items():
             if k not in self.opts:
@@ -226,9 +229,9 @@ class FacetOptions(Options):
     option_name = "facet"
     opts = {"prefix":unicode,
             "sort":[True, False, "count", "index"],
-            "limit":int,
-            "offset":int,
-            "mincount":int,
+            "limit":lambda x: int(x) > 0 and int(x) or self.invalid_value(),
+            "offset":lambda x: int(x) > 0 and int(x) or self.invalid_value(),
+            "mincount":lambda x: int(x) > 0 and int(x) or self.invalid_value(),
             "missing":bool,
             "method":["enum", "fc"],
             "enum.cache.minDf":int,
