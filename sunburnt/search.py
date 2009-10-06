@@ -9,16 +9,19 @@ from .schema import SolrError, SolrUnicodeField, SolrBooleanField
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
     range_query_templates = {
-        "lt": "* TO %s",
-        "gt": "%s TO *",
-        "ra": "%s TO %s",
+        "lt": "{* TO %s}",
+        "lte": "[* TO %s]",
+        "gt": "{%s TO *}",
+        "gte": "[%s TO *]",
+        "rangeexc": "{%s TO %s}",
+        "range": "[%s TO %s]",
     }
     def __init__(self, option_flag, schema):
         self.option_flag = option_flag
         self.schema = schema
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
-        self.ranges = []
+        self.ranges = set()
 
     @property
     def options(self):
@@ -72,16 +75,12 @@ class LuceneQuery(object):
     def serialize_range_queries(self):
         s = []
         for name, rel, value in sorted(self.ranges):
-            if rel in ('lte', 'gte', 'range'):
-                left, right = "[", "]"
-            else:
-                left, right = "{", "}"
             if isinstance(value, tuple):
                 value = tuple(self.schema.serialize_value(name, v) for v in value)
             else:
                 value = self.schema.serialize_value(name, value)
-            range = self.range_query_templates[rel[:2]] % value
-            s.append("%(name)s:%(left)s%(range)s%(right)s" % vars())
+            range = self.range_query_templates[rel] % value
+            s.append("%(name)s:%(range)s" % vars())
         return ' '.join(s)
 
     def __unicode__(self):
@@ -136,13 +135,13 @@ class LuceneQuery(object):
                                  % (field_name, rel))
         try:
             if rel.startswith('range'):
-                value = tuple(sorted(field_type(v) for v in value))
+                value = tuple(sorted(field.serialize(v) for v in value))
             else:
-                value = field_type(value)
+                value = field.serialize(value)
         except (ValueError, TypeError):
                 raise ValueError("'%s__%s' arguments of the wrong type"
                                  % (field_name, rel))
-        self.ranges.append((field_name, rel, value))
+        self.ranges.add((field_name, rel, value))
 
     def term_or_phrase(self, arg, force=None):
         return 'terms' if self.default_term_re.match(arg) else 'phrases'

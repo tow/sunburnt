@@ -171,6 +171,25 @@ good_query_data = {
         ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
          {"q":u"date_field:2009-01-01T00:00:00.000000Z"}),
         ),
+
+    "query":(
+        ([], {"int_field__lt":3},
+         {"q":u"int_field:{* TO 3}"}),
+        ([], {"int_field__gt":3},
+         {"q":u"int_field:{3 TO *}"}),
+        ([], {"int_field__rangeexc":(-3, 3)},
+         {"q":u"int_field:{-3 TO 3}"}),
+        ([], {"int_field__rangeexc":(3, -3)},
+         {"q":u"int_field:{-3 TO 3}"}),
+        ([], {"int_field__lte":3},
+         {"q":u"int_field:[* TO 3]"}),
+        ([], {"int_field__gte":3},
+         {"q":u"int_field:[3 TO *]"}),
+        ([], {"int_field__range":(-3, 3)},
+         {"q":u"int_field:[-3 TO 3]"}),
+        ([], {"int_field__range":(3, -3)},
+         {"q":u"int_field:[-3 TO 3]"}),
+        ),
     }
 
 def check_query_data(method, args, kwargs, output):
