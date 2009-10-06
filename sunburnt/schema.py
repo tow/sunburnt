@@ -34,11 +34,14 @@ class solr_date(object):
         if isinstance(v, solr_date):
             self._dt_obj = v._dt_obj
         elif isinstance(v, basestring):
-            self._dt_obj = dates.datetime_from_w3_datestring(v)
+            try:
+                self._dt_obj = dates.datetime_from_w3_datestring(v)
+            except ValueError, e:
+                raise SolrError(*e.args)
         elif hasattr(v, "strftime"):
             self._dt_obj = self.from_date(v)
         else:
-            raise TypeError("Cannot initialize solr_date from %s object"
+            raise SolrError("Cannot initialize solr_date from %s object"
                             % type(v))
 
     @staticmethod

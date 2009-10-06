@@ -227,6 +227,11 @@ bad_query_data = (
     {"double_field":"a"},
     {"double_field":2**2000},
     {"double_field":-(2**2000)},
+    {"date_field":"a"},
+    {"int_field__gt":"a"},
+    {"date_field__gt":"a"},
+    {"int_field__range":1},
+    {"date_field__range":1},
 )
 
 def check_bad_query_data(kwargs):

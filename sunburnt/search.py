@@ -129,7 +129,7 @@ class LuceneQuery(object):
             try:
                 assert len(value) == 2
             except (AssertionError, TypeError):
-                raise ValueError("'%s__%s' argument must be a length-2 iterable"
+                raise SolrError("'%s__%s' argument must be a length-2 iterable"
                                  % (field_name, rel))
             value = tuple(sorted(field.serialize(v) for v in value))
         else:
