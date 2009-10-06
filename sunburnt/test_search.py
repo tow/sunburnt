@@ -265,13 +265,28 @@ def test_good_option_data():
             yield check_good_option_data, OptionClass, kwargs, output
 
 
-bad_paginator_data = (
-    {"start":-1, "rows":None}, # negative start
-    {"start":None, "rows":-1}, # negative rows
-)
+bad_option_data = {
+    PaginateOptions:(
+        {"start":-1, "rows":None}, # negative start
+        {"start":None, "rows":-1}, # negative rows
+        ),
+    FacetOptions:(
+        {"fields":"myarse"}, # Undefined field
+        {"oops":True}, # undefined option
+        {"limit":"a"}, # invalid type
+        {"sort":"yes"}, # invalid choice
+        {"offset":-1}, # invalid value
+        ),
+    HighlightOptions:(
+        {"fields":"myarse"}, # Undefined field
+        {"oops":True}, # undefined option
+        {"snippets":"a"}, # invalid type
+        {"alternateField":"yourarse"}, # another invalid option
+        ),
+    }
 
-def check_bad_paginator_data(kwargs):
-    paginate = PaginateOptions(schema)
+def check_bad_option_data(OptionClass, kwargs):
+    paginate = OptionClass(schema)
     try:
         paginate.update(**kwargs)
     except SolrError:
@@ -279,51 +294,7 @@ def check_bad_paginator_data(kwargs):
     else:
         assert False
 
-def test_bad_paginator_data():
-    for kwargs in bad_paginator_data:
-        yield check_bad_paginator_data, kwargs
-
-
-
-bad_faceter_data = (
-    {"fields":"myarse"}, # Undefined field
-    {"oops":True}, # undefined option
-    {"limit":"a"}, # invalid type
-    {"sort":"yes"}, # invalid choice
-    {"offset":-1}, # invalid value
-)
-
-def check_bad_faceter_data(kwargs):
-    faceter = FacetOptions(schema)
-    try:
-        faceter.update(**kwargs)
-    except SolrError:
-        pass
-    else:
-        assert False
-
-def test_bad_faceter_data():
-    for kwargs in bad_faceter_data:
-        yield check_bad_faceter_data, kwargs
-
-
-bad_highlighter_data = (
-    {"fields":"myarse"}, # Undefined field
-    {"oops":True}, # undefined option
-    {"snippets":"a"}, # invalid type
-    {"alternateField":"yourarse"}, # another invalid option
-)
-
-def check_bad_highlighter_data(kwargs):
-    highlighter = HighlightOptions(schema)
-    try:
-        highlighter.update(**kwargs)
-    except SolrError:
-        pass
-    else:
-        assert False
-
-def test_bad_highlighter_data():
-    for kwargs in bad_highlighter_data:
-        yield check_bad_highlighter_data, kwargs
-
+def test_bad_option_data():
+    for OptionClass, option_data in bad_option_data.items():
+        for kwargs in option_data:
+            yield check_bad_option_data, OptionClass, kwargs
