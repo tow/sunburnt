@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import cgi
 from itertools import islice
 import urllib
+import warnings
 
 import httplib2
 
@@ -86,6 +87,12 @@ class SolrInterface(object):
             if hasattr(v, "items"):
                 del params[k]
                 params.update(v)
+        if 'q' not in params:
+            if 'fq' in params:
+                params['q'] = params['fq']
+                warnings.warn("No query parameter in search, re-using filter query")
+            else:
+                raise SolrError("No query parameter in search")
         return self.schema.parse_results(self.conn.select(params))
 
     def query(self, *args, **kwargs):
