@@ -22,6 +22,7 @@ class LuceneQuery(object):
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
         self.ranges = set()
+        self.subqueries = []
 
     @property
     def options(self):
@@ -80,15 +81,40 @@ class LuceneQuery(object):
         return ' '.join(s)
 
     def __unicode__(self):
-        u = [self.serialize_term_queries(),
-             self.serialize_phrase_queries(),
-             self.serialize_range_queries()]
-        return ' '.join(s for s in u if s)
+        if hasattr(self, '_or'):
+            _or = tuple(unicode(o) for o in self._or)
+            return "(%s) OR (%s)" % _or
+        elif hasattr(self, '_and'):
+            _and = tuple(unicode(a) for a in self._and)
+            return "(%s) AND (%s)" % _and
+        else:
+            u = [self.serialize_term_queries(),
+                 self.serialize_phrase_queries(),
+                 self.serialize_range_queries()] + \
+                 [unicode(q) for q in self.subqueries]
+            return ' '.join(s for s in u if s)
 
     def __nonzero__(self):
         return bool(self.terms) or bool(self.phrases) or bool(self.ranges)
 
+    def __or__(self, other):
+        q = LuceneQuery(self.schema)
+        q._or = (self, other)
+        return q
+
+    def __and__(self, other):
+        q = LuceneQuery(self.schema)
+        q._and = (self, other)
+        return q
+
     def add(self, args, kwargs, terms_or_phrases=None):
+        _args = []
+        for arg in args:
+            if isinstance(arg, LuceneQuery):
+                self.subqueries.append(arg)
+            else:
+                _args.append(arg)
+        args = _args
         try:
             terms_or_phrases = kwargs.pop("__terms_or_phrases")
         except KeyError:
@@ -155,6 +181,11 @@ class SolrSearch(object):
         self.faceter = FacetOptions(self.schema)
         self.option_modules = [self.query_obj, self.filter_obj, self.paginator,
                                self.more_like_this, self.highlighter, self.faceter]
+
+    def Q(self, *args, **kwargs):
+        q = LuceneQuery(self.schema)
+        q.add(args, kwargs)
+        return q
 
     def query_by_term(self, *args, **kwargs):
         return self.query(__terms_or_phrases="terms", *args, **kwargs)

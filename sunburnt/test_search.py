@@ -357,3 +357,23 @@ def test_bad_option_data():
     for OptionClass, option_data in bad_option_data.items():
         for kwargs in option_data:
             yield check_bad_option_data, OptionClass, kwargs
+
+
+class TestAndOrSyntax(object):
+    # I'm not completely sure of the syntax for this yet ...
+    def setUp(self):
+        solr_search = SolrSearch(interface)
+        self.q = solr_search.query()
+
+    def test_or_example(self):
+        Q = self.q.Q
+        self.q.query("hello world").filter(Q(text_field="tow") | Q(boolean_field=False, int_field__gt=3))
+        assert self.q.execute() == \
+            {'q': u'"hello world"', 'fq': u'(text_field:tow) OR (boolean_field:false int_field:{3 TO *})'}
+
+    def test_and_example(self):
+        Q = self.q.Q
+        self.q.query("hello world").filter(Q(text_field="tow") & Q(boolean_field=False, int_field__gt=3))
+        assert self.q.execute() == \
+            {'q': u'"hello world"', 'fq': u'(text_field:tow) AND (boolean_field:false int_field:{3 TO *})'}
+
