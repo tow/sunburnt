@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions
+from .search import SolrSearch, PaginateOptions, FacetOptions
 
 schema_string = \
 """<schema name="timetric" version="1.1">
@@ -247,4 +247,37 @@ def check_bad_paginator_data(kwargs):
 def test_bad_paginator_data():
     for kwargs in bad_paginator_data:
         yield check_bad_paginator_data, kwargs
+
+
+good_faceter_data = (
+    ({"field":"int_field"},
+     {"facet":True, "facet.field":"int_field"}),
+)
+
+def check_faceter_data(kwargs, output):
+    faceter = FacetOptions(schema)
+    faceter.update(**kwargs)
+    assert faceter.options == output
+
+def test_faceter_data():
+    for kwargs, output in good_faceter_data:
+        yield check_faceter_data, kwargs, output
+
+
+bad_faceter_data = (
+    {"field":"myarse"}, # Undefined field
+)
+
+def check_bad_faceter_data(kwargs):
+    faceter = FacetOptions(schema)
+    try:
+        faceter.update(**kwargs)
+    except SolrError:
+        pass
+    else:
+        assert False
+
+def test_bad_faceter_data():
+    for kwargs in bad_faceter_data:
+        yield check_bad_faceter_data, kwargs
 
