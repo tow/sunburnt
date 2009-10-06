@@ -16,9 +16,9 @@ class LuceneQuery(object):
         "rangeexc": "{%s TO %s}",
         "range": "[%s TO %s]",
     }
-    def __init__(self, option_flag, schema):
-        self.option_flag = option_flag
+    def __init__(self, schema, option_flag=None):
         self.schema = schema
+        self.option_flag = option_flag
         self.terms = collections.defaultdict(set)
         self.phrases = collections.defaultdict(set)
         self.ranges = set()
@@ -147,8 +147,8 @@ class SolrSearch(object):
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
-        self.query_obj = LuceneQuery('q', self.schema)
-        self.filter_obj = LuceneQuery('fq', self.schema)
+        self.query_obj = LuceneQuery(self.schema, 'q')
+        self.filter_obj = LuceneQuery(self.schema, 'fq')
         self.paginator = PaginateOptions(self.schema)
         self.more_like_this = MoreLikeThisOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
