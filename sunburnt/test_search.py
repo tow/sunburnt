@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions
+from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions
 
 schema_string = \
 """<schema name="timetric" version="1.1">
@@ -252,6 +252,13 @@ good_option_data = {
         ({"fields":["int_field", "text_field"], "snippets":3, "fragsize":5},
          {"hl":True, "hl.fl":"int_field,text_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5, "f.text_field.hl.snippets":3, "f.text_field.hl.fragsize":5}),
         ),
+    MoreLikeThisOptions:(
+        ({"fields":"int_field"},
+         {"mlt":True, "mlt.fl":"int_field"}),
+        ({"fields":["int_field", "text_field"]},
+         {"mlt":True, "mlt.fl":"int_field,text_field"}),
+        ({"fields":["text_field", "string_field"], "query_fields":{"text_field":0.25, "string_field":0.75}},
+         {"mlt":True, "mlt.fl":"string_field,text_field", "mlt.qf":"text_field^0.25 string_field^0.75"})),
     }
 
 def check_good_option_data(OptionClass, kwargs, output):

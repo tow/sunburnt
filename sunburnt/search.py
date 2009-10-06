@@ -272,7 +272,7 @@ class FacetOptions(Options):
 
     def field_names_in_opts(self, opts, fields):
         if fields:
-            opts["facet.field"] = fields
+            opts["facet.field"] = sorted(fields)
 
 
 class HighlightOptions(Options):
@@ -300,7 +300,7 @@ class HighlightOptions(Options):
 
     def field_names_in_opts(self, opts, fields):
         if fields:
-            opts["hl.fl"] = ",".join(fields)
+            opts["hl.fl"] = ",".join(sorted(fields))
 
 
 class MoreLikeThisOptions(Options):
@@ -319,20 +319,22 @@ class MoreLikeThisOptions(Options):
         self.query_fields = {}
         self.kwargs = {}
 
-    def update(self, fields, query_fields, **kwargs):
+    def update(self, fields, query_fields=None, **kwargs):
         self.schema.check_fields(fields)
-        self.fields = self.fields.add(fields)
+        if isinstance(fields, basestring):
+            fields = [fields]
+        self.fields.update(fields)
 
         if query_fields is not None:
             for k, v in query_fields.items():
                 if k not in self.fields:
-                    raise SolrError("'%s' specified in query_fields but not fields", k)
+                    raise SolrError("'%s' specified in query_fields but not fields"% k)
                 if v is not None:
                     try:
                         v = float(v)
                     except ValueError:
-                        raise SolrError("'%s' has non-numerical boost value", k)
-        self.query_fields.update(query_fields)
+                        raise SolrError("'%s' has non-numerical boost value"% k)
+            self.query_fields.update(query_fields)
 
         for opt_name, opt_type in kwargs.items():
             if opt_name not in self.opts:
@@ -349,7 +351,7 @@ class MoreLikeThisOptions(Options):
         opts = {}
         if self.fields:
             opts['mlt'] = True
-            opts['mlt.fl'] = ','.join(self.fields)
+            opts['mlt.fl'] = ','.join(sorted(self.fields))
 
         if self.query_fields:
             qf_arg = []
