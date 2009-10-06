@@ -102,7 +102,7 @@ def utf8_urlencode(params):
         if isinstance(k, unicode):
             k = k.encode('utf-8')
         # We allow for multivalued options with lists.
-        if not hasattr(v, "__iter__"):
+        if not hasattr(vs, "__iter__"):
             vs = [vs]
         for v in vs:
             if isinstance(v, unicode):
