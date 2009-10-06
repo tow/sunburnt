@@ -211,23 +211,58 @@ def test_bad_query_data():
         yield check_bad_query_data, kwargs
 
 
-good_paginator_data = (
-    ({"start":5, "rows":10},
-     {"start":5, "rows":10}),
-    ({"start":5, "rows":None},
-     {"start":5}),
-    ({"start":None, "rows":10},
-     {"rows":10}),
-)
+good_option_data = {
+    PaginateOptions:(
+        ({"start":5, "rows":10},
+         {"start":5, "rows":10}),
+        ({"start":5, "rows":None},
+         {"start":5}),
+        ({"start":None, "rows":10},
+         {"rows":10}),
+        ),
+    FacetOptions:(
+        ({"fields":"int_field"},
+         {"facet":True, "facet.field":["int_field"]}),
+        ({"fields":["int_field", "text_field"]},
+         {"facet":True, "facet.field":["int_field","text_field"]}),
+        ({"prefix":"abc"},
+         {"facet":True, "facet.prefix":"abc"}),
+        ({"prefix":"abc", "sort":True, "limit":3, "offset":25, "mincount":1, "missing":False, "method":"enum"},
+         {"facet":True, "facet.prefix":"abc", "facet.sort":True, "facet.limit":3, "facet.offset":25, "facet.mincount":1, "facet.missing":False, "facet.method":"enum"}),
+        ({"fields":"int_field", "prefix":"abc"},
+         {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc"}),
+        ({"fields":"int_field", "prefix":"abc", "limit":3},
+         {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3}),
+        ({"fields":["int_field", "text_field"], "prefix":"abc", "limit":3},
+         {"facet":True, "facet.field":["int_field", "text_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3, "f.text_field.facet.prefix":"abc", "f.text_field.facet.limit":3, }),
+        ),
+    HighlightOptions:(
+        ({"fields":"int_field"},
+         {"hl":True, "hl.fl":"int_field"}),
+        ({"fields":["int_field", "text_field"]},
+         {"hl":True, "hl.fl":"int_field,text_field"}),
+        ({"snippets":3},
+         {"hl":True, "hl.snippets":3}),
+        ({"snippets":3, "fragsize":5, "mergeContinuous":True, "requireFieldMatch":True, "maxAnalyzedChars":500, "alternateField":"text_field", "maxAlternateFieldLength":50, "formatter":"simple", "simple.pre":"<b>", "simple.post":"</b>", "fragmenter":"regex", "usePhraseHighlighter":True, "highlightMultiTerm":True, "regex.slop":0.2, "regex.pattern":"\w", "regex.maxAnalyzedChars":100},
+        {"hl":True, "hl.snippets":3, "hl.fragsize":5, "hl.mergeContinuous":True, "hl.requireFieldMatch":True, "hl.maxAnalyzedChars":500, "hl.alternateField":"text_field", "hl.maxAlternateFieldLength":50, "hl.formatter":"simple", "hl.simple.pre":"<b>", "hl.simple.post":"</b>", "hl.fragmenter":"regex", "hl.usePhraseHighlighter":True, "hl.highlightMultiTerm":True, "hl.regex.slop":0.2, "hl.regex.pattern":"\w", "hl.regex.maxAnalyzedChars":100}),
+        ({"fields":"int_field", "snippets":"3"},
+         {"hl":True, "hl.fl":"int_field", "f.int_field.hl.snippets":3}),
+        ({"fields":"int_field", "snippets":3, "fragsize":5},
+         {"hl":True, "hl.fl":"int_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5}),
+        ({"fields":["int_field", "text_field"], "snippets":3, "fragsize":5},
+         {"hl":True, "hl.fl":"int_field,text_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5, "f.text_field.hl.snippets":3, "f.text_field.hl.fragsize":5}),
+        ),
+    }
 
-def check_paginator_data(kwargs, output):
-    paginate = PaginateOptions(schema)
-    paginate.update(**kwargs)
-    assert paginate.options == output
+def check_good_option_data(OptionClass, kwargs, output):
+    optioner = OptionClass(schema)
+    optioner.update(**kwargs)
+    assert optioner.options == output
 
-def test_paginator_data():
-    for kwargs, output in good_paginator_data:
-        yield check_paginator_data, kwargs, output
+def test_good_option_data():
+    for OptionClass, option_data in good_option_data.items():
+        for kwargs, output in option_data:
+            yield check_good_option_data, OptionClass, kwargs, output
 
 
 bad_paginator_data = (
@@ -248,30 +283,6 @@ def test_bad_paginator_data():
     for kwargs in bad_paginator_data:
         yield check_bad_paginator_data, kwargs
 
-
-good_faceter_data = (
-    ({"fields":"int_field"},
-     {"facet":True, "facet.field":["int_field"]}),
-    ({"fields":["int_field", "text_field"]},
-     {"facet":True, "facet.field":["int_field","text_field"]}),
-    ({"prefix":"abc"},
-     {"facet":True, "facet.prefix":"abc"}),
-    ({"prefix":"abc", "sort":True, "limit":3, "offset":25, "mincount":1, "missing":False, "method":"enum"},
-     {"facet":True, "facet.prefix":"abc", "facet.sort":True, "facet.limit":3, "facet.offset":25, "facet.mincount":1, "facet.missing":False, "facet.method":"enum"}),
-    ({"fields":"int_field", "prefix":"abc"},
-     {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc"}),
-    ({"fields":"int_field", "prefix":"abc", "limit":3},
-     {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3}),
-)
-
-def check_faceter_data(kwargs, output):
-    faceter = FacetOptions(schema)
-    faceter.update(**kwargs)
-    assert faceter.options == output
-
-def test_faceter_data():
-    for kwargs, output in good_faceter_data:
-        yield check_faceter_data, kwargs, output
 
 
 bad_faceter_data = (
@@ -294,33 +305,6 @@ def check_bad_faceter_data(kwargs):
 def test_bad_faceter_data():
     for kwargs in bad_faceter_data:
         yield check_bad_faceter_data, kwargs
-
-
-good_highlighter_data = (
-    ({"fields":"int_field"},
-     {"hl":True, "hl.fl":"int_field"}),
-    ({"fields":["int_field", "text_field"]},
-     {"hl":True, "hl.fl":"int_field,text_field"}),
-    ({"snippets":3},
-     {"hl":True, "hl.snippets":3}),
-    ({"snippets":3, "fragsize":5, "mergeContinuous":True, "requireFieldMatch":True, "maxAnalyzedChars":500, "alternateField":"text_field", "maxAlternateFieldLength":50, "formatter":"simple", "simple.pre":"<b>", "simple.post":"</b>", "fragmenter":"regex", "usePhraseHighlighter":True, "highlightMultiTerm":True, "regex.slop":0.2, "regex.pattern":"\w", "regex.maxAnalyzedChars":100},
-    {"hl":True, "hl.snippets":3, "hl.fragsize":5, "hl.mergeContinuous":True, "hl.requireFieldMatch":True, "hl.maxAnalyzedChars":500, "hl.alternateField":"text_field", "hl.maxAlternateFieldLength":50, "hl.formatter":"simple", "hl.simple.pre":"<b>", "hl.simple.post":"</b>", "hl.fragmenter":"regex", "hl.usePhraseHighlighter":True, "hl.highlightMultiTerm":True, "hl.regex.slop":0.2, "hl.regex.pattern":"\w", "hl.regex.maxAnalyzedChars":100}),
-    ({"fields":"int_field", "snippets":"3"},
-     {"hl":True, "hl.fl":"int_field", "f.int_field.hl.snippets":3}),
-    ({"fields":"int_field", "snippets":3, "fragsize":5},
-     {"hl":True, "hl.fl":"int_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5}),
-    ({"fields":["int_field", "text_field"], "snippets":3, "fragsize":5},
-     {"hl":True, "hl.fl":"int_field,text_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5, "f.text_field.hl.snippets":3, "f.text_field.hl.fragsize":5}),
-)
-
-def check_highlighter_data(kwargs, output):
-    highlighter = HighlightOptions(schema)
-    highlighter.update(**kwargs)
-    assert highlighter.options == output
-
-def test_highlighter_data():
-    for kwargs, output in good_highlighter_data:
-        yield check_highlighter_data, kwargs, output
 
 
 bad_highlighter_data = (
