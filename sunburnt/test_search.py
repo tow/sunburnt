@@ -276,6 +276,9 @@ def test_faceter_data():
 
 bad_faceter_data = (
     {"fields":"myarse"}, # Undefined field
+    {"oops":True}, # undefined option
+    {"limit":"a"}, # invalid type
+    {"sort":"yes"}, # invalid choice
 )
 
 def check_bad_faceter_data(kwargs):
