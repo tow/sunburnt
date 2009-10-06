@@ -28,7 +28,7 @@ schema_string = \
     <fieldType name="date" class="solr.DateField" sortMissingLast="true" omitNorms="true"/>
   </types>
   <fields>
-    <field name="string_field" required="true" type="string"/>
+    <field name="string_field" required="true" type="string" multiValued="true"/>
     <field name="text_field" required="true" type="text"/>
     <field name="boolean_field" required="false" type="boolean"/>
     <field name="int_field" required="true" type="int"/>
@@ -82,6 +82,8 @@ good_query_data = {
          {"q":u"\"hello\" \"world\""}),
         (["hello world"], {},
          {"q":u"\"hello world\""}),
+        ([], {'string_field':['hello world', 'goodbye, cruel world']},
+         {"q":u"string_field:\"goodbye, cruel world\" string_field:\"hello world\""}),
         ),
 
     "filter_by_term":(
@@ -201,6 +203,8 @@ good_query_data = {
          {"q":u"date_field:[2009-01-01T00:00:00.000000Z TO *]"}),
         ([], {"date_field__range":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
          {"q":u"date_field:[2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z]"}),
+        ([], {'string_field':['hello world', 'goodbye, cruel world']},
+         {"q":u"string_field:\"goodbye, cruel world\" string_field:\"hello world\""}),
 
         ),
     }

@@ -112,12 +112,15 @@ class LuceneQuery(object):
             field = self.schema.fields[field_name]
         else:
             field = self.schema.default_field
-        value = field.serialize(value)
-        if isinstance(field, SolrUnicodeField):
-            term_or_phrase = term_or_phrase or self.term_or_phrase(value)
-        else:
-            term_or_phrase = "terms"
-        getattr(self, term_or_phrase)[field_name].add(value)
+        values = field.serialize(value) # Might be multivalued
+        if isinstance(values, basestring):
+            values = [values]
+        for value in values:
+            if isinstance(field, SolrUnicodeField):
+                term_or_phrase = term_or_phrase or self.term_or_phrase(value)
+            else:
+                term_or_phrase = "terms"
+            getattr(self, term_or_phrase)[field_name].add(value)
 
     def add_range(self, field_name, rel, value):
         field = self.schema.fields[field_name]
