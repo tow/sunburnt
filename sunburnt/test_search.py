@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch
+from .search import SolrSearch, PaginateOptions
 
 schema_string = \
 """<schema name="timetric" version="1.1">
@@ -47,9 +47,10 @@ schema_string = \
   <uniqueKey>int_field</uniqueKey>
 </schema>"""
 
+schema = SolrSchema(StringIO(schema_string))
 
 class MockInterface(object):
-    schema = SolrSchema(StringIO(schema_string))
+    schema = schema
     def search(self, **kwargs):
         return kwargs
 
@@ -213,15 +214,16 @@ def test_bad_query_data():
 good_paginator_data = (
     ({"start":5, "rows":10},
      {"start":5, "rows":10}),
-    ({"start":5},
+    ({"start":5, "rows":None},
      {"start":5}),
-    ({"rows":10},
+    ({"start":None, "rows":10},
      {"rows":10}),
 )
 
 def check_paginator_data(kwargs, output):
-    solr_search = SolrSearch(interface)
-    assert solr_search.paginate(**kwargs).execute() == output
+    paginate = PaginateOptions(schema)
+    paginate.update(**kwargs)
+    assert paginate.options == output
 
 def test_paginator_data():
     for kwargs, output in good_paginator_data:
@@ -229,15 +231,14 @@ def test_paginator_data():
 
 
 bad_paginator_data = (
-    {"stop":5, "rows":10}, # bad arg
-    {"start":-1}, # negative start
-    {"rows":-1}, # negative rows
+    {"start":-1, "rows":None}, # negative start
+    {"start":None, "rows":-1}, # negative rows
 )
 
 def check_bad_paginator_data(kwargs):
-    solr_search = SolrSearch(interface)
+    paginate = PaginateOptions(schema)
     try:
-        solr_search.paginate(**kwargs).execute()
+        paginate.update(**kwargs)
     except SolrError:
         pass
     else:
