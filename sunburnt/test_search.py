@@ -275,6 +275,7 @@ def test_good_option_data():
             yield check_good_option_data, OptionClass, kwargs, output
 
 
+# All these tests should really nominate which exception they're going to throw.
 bad_option_data = {
     PaginateOptions:(
         {"start":-1, "rows":None}, # negative start
@@ -292,6 +293,13 @@ bad_option_data = {
         {"oops":True}, # undefined option
         {"snippets":"a"}, # invalid type
         {"alternateField":"yourarse"}, # another invalid option
+        ),
+    MoreLikeThisOptions:(
+        {"fields":"myarse"}, # Undefined field
+        {"fields":"text_field", "query_fields":{"text_field":0.25, "string_field":0.75}}, # string_field in query_fields, not fields
+        {"fields":"text_field", "query_fields":{"text_field":"a"}}, # Non-float value for boost
+        {"fields":"text_field", "oops":True}, # undefined option
+        {"fields":"text_field", "count":"a"} # Invalid value for option
         ),
     }
 
