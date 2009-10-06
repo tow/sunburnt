@@ -258,7 +258,10 @@ good_option_data = {
         ({"fields":["int_field", "text_field"]},
          {"mlt":True, "mlt.fl":"int_field,text_field"}),
         ({"fields":["text_field", "string_field"], "query_fields":{"text_field":0.25, "string_field":0.75}},
-         {"mlt":True, "mlt.fl":"string_field,text_field", "mlt.qf":"text_field^0.25 string_field^0.75"})),
+         {"mlt":True, "mlt.fl":"string_field,text_field", "mlt.qf":"text_field^0.25 string_field^0.75"}),
+        ({"fields":"text_field", "count":1},
+         {"mlt":True, "mlt.fl":"text_field", "mlt.count":1}),
+        ),
     }
 
 def check_good_option_data(OptionClass, kwargs, output):

@@ -336,9 +336,10 @@ class MoreLikeThisOptions(Options):
                         raise SolrError("'%s' has non-numerical boost value"% k)
             self.query_fields.update(query_fields)
 
-        for opt_name, opt_type in kwargs.items():
+        for opt_name, opt_value in kwargs.items():
             if opt_name not in self.opts:
                 raise SolrError("Invalid MLT option %s" % opt_name)
+            opt_type = self.opts[opt_name]
             try:
                 opt_type(opt_value)
             except (ValueError, TypeError):
