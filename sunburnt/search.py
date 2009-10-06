@@ -208,30 +208,60 @@ class Options(object):
     def invalid_value(self, msg=""):
         assert False, msg
 
+    def update(self, fields=None, **kwargs):
+        if fields:
+            self.schema.check_fields(fields)
+            if isinstance(fields, basestring):
+                fields = [fields]
+            for field in set(fields) - set(self.fields):
+                self.fields[field] = {}
+        elif kwargs:
+            fields = [None]
+        self.check_opts(fields, kwargs)
+
     def check_opts(self, fields, kwargs):
         for k, v in kwargs.items():
             if k not in self.opts:
                 raise SolrError("No such option for %s: %s" % (self.option_name, k))
             opt_type = self.opts[k]
-            if isinstance(opt_type, (list, tuple)):
-                if v not in opt_type:
-                    raise SolrError("Invalid value for %s option %s: %s" % (self.option_name, k, v))
-            else:
-                try:
+            try:
+                if isinstance(opt_type, (list, tuple)):
+                    assert v in opt_type
+                elif isinstance(opt_type, type):
                     v = opt_type(v)
-                except:
-                    raise SolrError("Invalid value for %s option %s: %s" % (self.option_name, k, v))
+                else:
+                    v = opt_type(self, v)
+            except:
+                raise SolrError("Invalid value for %s option %s: %s" % (self.option_name, k, v))
             for field in fields:
                 self.fields[field][k] = v
+
+    @property
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts[self.option_name] = True
+            facet_fields = [field for field in self.fields if field]
+            if facet_fields:
+                opts['%s.field'%self.option_name] = facet_fields
+        for field_name, field_opts in self.fields.items():
+            if not field_name:
+                for field_opt, v in field_opts.items():
+                    opts['%s.%s'%(self.option_name, field_opt)] = v
+            else:
+                for field_opt, v in field_opts.items():
+                    opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
+        return opts
+
 
 
 class FacetOptions(Options):
     option_name = "facet"
     opts = {"prefix":unicode,
             "sort":[True, False, "count", "index"],
-            "limit":lambda x: int(x) > 0 and int(x) or self.invalid_value(),
-            "offset":lambda x: int(x) > 0 and int(x) or self.invalid_value(),
-            "mincount":lambda x: int(x) > 0 and int(x) or self.invalid_value(),
+            "limit":int,
+            "offset":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
+            "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
             "missing":bool,
             "method":["enum", "fc"],
             "enum.cache.minDf":int,
@@ -239,73 +269,41 @@ class FacetOptions(Options):
 
     def __init__(self, schema):
         self.schema = schema
-        self.fields = {}
-        
-    def update(self, fields=None, **kwargs):
-        if fields:
-            self.schema.check_fields(fields)
-            if isinstance(fields, basestring):
-                fields = [fields]
-            for field in fields:
-                self.fields[field] = {}
-        elif kwargs:
-            fields = [None]
-            if None not in self.fields:
-                self.fields[None] = {}
-        self.check_opts(fields, kwargs)
+        self.fields = collections.defaultdict(dict)
 
-    @property
-    def options(self):
-        opts = {}
-        if self.fields:
-            opts['facet'] = True
-            facet_fields = [field for field in self.fields if field]
-            if facet_fields:
-                opts['facet.field'] = facet_fields
-        for field_name, field_opts in self.fields.items():
-            if not field_name:
-                for field_opt, v in field_opts.items():
-                    opts['facet.%s'%field_opt] = v
-            else:
-                for field_opt, v in field_opts.items():
-                    opts['f.%s.facet.%s'%(field_name, field_opt)] = v
-        return opts
+    def field_names_in_opts(self, opts):
+        facet_fields = [field for field in self.fields if field]
+        if facet_fields:
+            opts['facet.field'] = facet_fields
 
 
 class HighlightOptions(Options):
+    option_name = "hl"
+    opts = {"snippets":1,
+            "fragsize":1,
+            "mergeContinuous":bool,
+            "requireFieldMatch":bool,
+            "maxAnalyzedChars":int,
+            "alternateField":lambda self, x: x if x in self.schema.fields else self.invalid_value(),
+            "maxAlternateFieldLength":int,
+            "formatter":["simple"],
+            "simple.pre":unicode,
+            "simple.post":unicode,
+            "fragmenter":unicode,
+            "usePhraseHighlighter":bool,
+            "highlightMultiTerm":bool,
+            "regex.slop":float,
+            "regex.pattern":unicode,
+            "regex.maxAnalyzedChars":int
+            }
     def __init__(self, schema):
         self.schema = schema
-        self.fields = {}
-        self.snippets = None
-        self.fragsize = None
+        self.fields = collections.defaultdict(dict)
 
-    def update(self, fields=None, snippets=None, fragsize=None):
-        if fields:
-            self.schema.check_fields(fields)
-            for field in fields:
-                self.fields[field] = {'snippets':snippets, 'fragsize':fragsize}
-        else:
-            if snippets is not None:
-                self.snippets = snippets
-            if fragsize is not None:
-                self.fragsize = fragsize
-
-    @property
-    def options(self):
-        opts = {}
-        if self.fields:
-            opts['hl'] = True
-            opts["hl.fl"] = ','.join(fields)
-            if self.snippets is not None:
-                opts['hl.snippets'] = self.snippets
-            if self.fragsize is not None:
-                opts['hl.fragsize'] = self.fragsize
-        for field_name, field_opts in self.fields:
-            if field_opts.get('snippets') is not None:
-                opts["f.%s.hl.snippets" % field_name] = field_opts['snippets']
-            if field_opts.get('fragsize') is not None:
-                opts["f.%s.hl.fragsize" % field_name] = field_opts['fragsize']
-        return opts
+    def field_names_in_opts(self, opts):
+        hl_fields = [field for field in self.fields if field]
+        if hl_fields:
+            opts['hl.field'] = ",".join(hl_fields)
 
 
 class MoreLikeThisOptions(Options):
