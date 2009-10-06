@@ -105,10 +105,11 @@ def utf8_urlencode(params):
         if not hasattr(vs, "__iter__"):
             vs = [vs]
         for v in vs:
-            if isinstance(v, unicode):
-                v = v.encode('utf-8')
-            elif isinstance(v, bool):
-                v = "true" if v else "false"
+            if isinstance(v, bool):
+                v = u"true" if v else u"false"
+            else:
+                v = unicode(v)
+            v = v.encode('utf-8')
             utf8_params.append((k, v))
     return urllib.urlencode(utf8_params)
 
