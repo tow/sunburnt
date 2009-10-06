@@ -205,10 +205,25 @@ class SolrSearch(object):
 
 
 class Options(object):
-    pass
+    def check_opts(self, fields, kwargs):
+        for k, v in kwargs.items():
+            if k not in self.opts:
+                raise SolrError("No such option for %s: %s" % (self.option_name, k))
+            opt_type = self.opts[k]
+            if isinstance(opt_type, (list, tuple)):
+                if v not in opt_type:
+                    raise SolrError("Invalid value for %s option %s: %s" % (self.option_name, k, v))
+            else:
+                try:
+                    v = opt_type(v)
+                except:
+                    raise SolrError("Invalid value for %s option %s: %s" % (self.option_name, k, v))
+            for field in fields:
+                self.fields[field][k] = v
 
 
 class FacetOptions(Options):
+    option_name = "facet"
     opts = {"prefix":unicode,
             "sort":[True, False, "count", "index"],
             "limit":int,
@@ -235,22 +250,6 @@ class FacetOptions(Options):
             if None not in self.fields:
                 self.fields[None] = {}
         self.check_opts(fields, kwargs)
-
-    def check_opts(self, fields, kwargs):
-        for k, v in kwargs.items():
-            if k not in self.opts:
-                raise SolrError("No such option for facet: %s" % k)
-            opt_type = self.opts[k]
-            if isinstance(opt_type, (list, tuple)):
-                if v not in opt_type:
-                    raise SolrError("Invalid value for facet option %s: %s" % (k, v))
-            else:
-                try:
-                    v = opt_type(v)
-                except:
-                    raise SolrError("Invalid value for facet option %s: %s" % (k, v))
-            for field in fields:
-                self.fields[field][k] = v
 
     @property
     def options(self):

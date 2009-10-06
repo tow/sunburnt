@@ -258,6 +258,10 @@ good_faceter_data = (
      {"facet":True, "facet.prefix":"abc"}),
     ({"prefix":"abc", "sort":True, "limit":3, "offset":25, "mincount":1, "missing":False, "method":"enum"},
      {"facet":True, "facet.prefix":"abc", "facet.sort":True, "facet.limit":3, "facet.offset":25, "facet.mincount":1, "facet.missing":False, "facet.method":"enum"}),
+    ({"fields":"int_field", "prefix":"abc"},
+     {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc"}),
+    ({"fields":"int_field", "prefix":"abc", "limit":3},
+     {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3}),
 )
 
 def check_faceter_data(kwargs, output):
