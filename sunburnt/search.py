@@ -173,12 +173,12 @@ class SolrSearch(object):
         self.filter_obj.add(args, kwargs)
         return self
 
-    def facet_by(self, field, limit=None, mincount=None):
-        self.faceter.update(field, limit, mincount)
+    def facet_by(self, field, **kwargs):
+        self.faceter.update(field, **kwargs)
         return self
 
-    def highlight(self, fields=None, snippets=None, fragsize=None):
-        self.highlighter.update(fields, snippets, fragsize)
+    def highlight(self, fields=None, **kwargs):
+        self.highlighter.update(fields, **kwargs)
         return self
 
     def mlt(self, fields, query_fields=None, **kwargs):
