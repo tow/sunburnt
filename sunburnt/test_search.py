@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions, FacetOptions
+from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions
 
 schema_string = \
 """<schema name="timetric" version="1.1">
@@ -294,4 +294,52 @@ def check_bad_faceter_data(kwargs):
 def test_bad_faceter_data():
     for kwargs in bad_faceter_data:
         yield check_bad_faceter_data, kwargs
+
+
+good_highlighter_data = (
+    ({"fields":"int_field"},
+     {"hl":True, "hl.fl":"int_field"}),
+    ({"fields":["int_field", "text_field"]},
+     {"hl":True, "hl.fl":"int_field,text_field"}),
+    ({"snippets":3},
+     {"hl":True, "hl.snippets":3}),
+    ({"snippets":3, "fragsize":5, "mergeContinuous":True, "requireFieldMatch":True, "maxAnalyzedChars":500, "alternateField":"text_field", "maxAlternateFieldLength":50, "formatter":"simple", "simple.pre":"<b>", "simple.post":"</b>", "fragmenter":"regex", "usePhraseHighlighter":True, "highlightMultiTerm":True, "regex.slop":0.2, "regex.pattern":"\w", "regex.maxAnalyzedChars":100},
+    {"hl":True, "hl.snippets":3, "hl.fragsize":5, "hl.mergeContinuous":True, "hl.requireFieldMatch":True, "hl.maxAnalyzedChars":500, "hl.alternateField":"text_field", "hl.maxAlternateFieldLength":50, "hl.formatter":"simple", "hl.simple.pre":"<b>", "hl.simple.post":"</b>", "hl.fragmenter":"regex", "hl.usePhraseHighlighter":True, "hl.highlightMultiTerm":True, "hl.regex.slop":0.2, "hl.regex.pattern":"\w", "hl.regex.maxAnalyzedChars":100}),
+    ({"fields":"int_field", "snippets":"3"},
+     {"hl":True, "hl.fl":"int_field", "f.int_field.hl.snippets":3}),
+    ({"fields":"int_field", "snippets":3, "fragsize":5},
+     {"hl":True, "hl.fl":"int_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5}),
+    ({"fields":["int_field", "text_field"], "snippets":3, "fragsize":5},
+     {"hl":True, "hl.fl":"int_field,text_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5, "f.text_field.hl.snippets":3, "f.text_field.hl.fragsize":5}),
+)
+
+def check_highlighter_data(kwargs, output):
+    highlighter = HighlightOptions(schema)
+    highlighter.update(**kwargs)
+    assert highlighter.options == output
+
+def test_highlighter_data():
+    for kwargs, output in good_highlighter_data:
+        yield check_highlighter_data, kwargs, output
+
+
+bad_highlighter_data = (
+    {"fields":"myarse"}, # Undefined field
+    {"oops":True}, # undefined option
+    {"snippets":"a"}, # invalid type
+    {"alternateField":"yourarse"}, # another invalid option
+)
+
+def check_bad_highlighter_data(kwargs):
+    highlighter = HighlightOptions(schema)
+    try:
+        highlighter.update(**kwargs)
+    except SolrError:
+        pass
+    else:
+        assert False
+
+def test_bad_highlighter_data():
+    for kwargs in bad_highlighter_data:
+        yield check_bad_highlighter_data, kwargs
 

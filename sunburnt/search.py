@@ -241,9 +241,8 @@ class Options(object):
         opts = {}
         if self.fields:
             opts[self.option_name] = True
-            facet_fields = [field for field in self.fields if field]
-            if facet_fields:
-                opts['%s.field'%self.option_name] = facet_fields
+            fields = [field for field in self.fields if field]
+            self.field_names_in_opts(opts, fields)
         for field_name, field_opts in self.fields.items():
             if not field_name:
                 for field_opt, v in field_opts.items():
@@ -271,16 +270,15 @@ class FacetOptions(Options):
         self.schema = schema
         self.fields = collections.defaultdict(dict)
 
-    def field_names_in_opts(self, opts):
-        facet_fields = [field for field in self.fields if field]
-        if facet_fields:
-            opts['facet.field'] = facet_fields
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["facet.field"] = fields
 
 
 class HighlightOptions(Options):
     option_name = "hl"
-    opts = {"snippets":1,
-            "fragsize":1,
+    opts = {"snippets":int,
+            "fragsize":int,
             "mergeContinuous":bool,
             "requireFieldMatch":bool,
             "maxAnalyzedChars":int,
@@ -300,10 +298,9 @@ class HighlightOptions(Options):
         self.schema = schema
         self.fields = collections.defaultdict(dict)
 
-    def field_names_in_opts(self, opts):
-        hl_fields = [field for field in self.fields if field]
-        if hl_fields:
-            opts['hl.field'] = ",".join(hl_fields)
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["hl.fl"] = ",".join(fields)
 
 
 class MoreLikeThisOptions(Options):
