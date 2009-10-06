@@ -189,6 +189,19 @@ good_query_data = {
          {"q":u"int_field:[-3 TO 3]"}),
         ([], {"int_field__range":(3, -3)},
          {"q":u"int_field:[-3 TO 3]"}),
+        ([], {"date_field__lt":datetime.datetime(2009, 1, 1)},
+         {"q":u"date_field:{* TO 2009-01-01T00:00:00.000000Z}"}),
+        ([], {"date_field__gt":datetime.datetime(2009, 1, 1)},
+         {"q":u"date_field:{2009-01-01T00:00:00.000000Z TO *}"}),
+        ([], {"date_field__rangeexc":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
+         {"q":u"date_field:{2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z}"}),
+        ([], {"date_field__lte":datetime.datetime(2009, 1, 1)},
+         {"q":u"date_field:[* TO 2009-01-01T00:00:00.000000Z]"}),
+        ([], {"date_field__gte":datetime.datetime(2009, 1, 1)},
+         {"q":u"date_field:[2009-01-01T00:00:00.000000Z TO *]"}),
+        ([], {"date_field__range":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
+         {"q":u"date_field:[2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z]"}),
+
         ),
     }
 

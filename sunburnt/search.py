@@ -75,10 +75,6 @@ class LuceneQuery(object):
     def serialize_range_queries(self):
         s = []
         for name, rel, value in sorted(self.ranges):
-            if isinstance(value, tuple):
-                value = tuple(self.schema.serialize_value(name, v) for v in value)
-            else:
-                value = self.schema.serialize_value(name, value)
             range = self.range_query_templates[rel] % value
             s.append("%(name)s:%(range)s" % vars())
         return ' '.join(s)
@@ -127,20 +123,17 @@ class LuceneQuery(object):
         field = self.schema.fields[field_name]
         if isinstance(field, SolrBooleanField):
             raise ValueError("Cannot do a '%s' query on a bool field" % rel)
-        if rel.startswith('range'):
+        if rel not in self.range_query_templates:
+            raise SolrError("No such relation '%s' defined" % rel)
+        if rel in ('range', 'rangeexc'):
             try:
                 assert len(value) == 2
             except (AssertionError, TypeError):
                 raise ValueError("'%s__%s' argument must be a length-2 iterable"
                                  % (field_name, rel))
-        try:
-            if rel.startswith('range'):
-                value = tuple(sorted(field.serialize(v) for v in value))
-            else:
-                value = field.serialize(value)
-        except (ValueError, TypeError):
-                raise ValueError("'%s__%s' arguments of the wrong type"
-                                 % (field_name, rel))
+            value = tuple(sorted(field.serialize(v) for v in value))
+        else:
+            value = field.serialize(value)
         self.ranges.add((field_name, rel, value))
 
     def term_or_phrase(self, arg, force=None):
