@@ -97,15 +97,19 @@ class SolrInterface(object):
 
 
 def utf8_urlencode(params):
-    utf8_params = {}
-    for k, v in params.items():
+    utf8_params = []
+    for k, vs in params.items():
         if isinstance(k, unicode):
             k = k.encode('utf-8')
-        if isinstance(v, unicode):
-            v = v.encode('utf-8')
-        elif isinstance(v, bool):
-            v = "true" if v else "false"
-        utf8_params[k] = v
+        # We allow for multivalued options with lists.
+        if not hasattr(v, "__iter__"):
+            vs = [vs]
+        for v in vs:
+            if isinstance(v, unicode):
+                v = v.encode('utf-8')
+            elif isinstance(v, bool):
+                v = "true" if v else "false"
+            utf8_params.append((k, v))
     return urllib.urlencode(utf8_params)
 
 def grouper(iterable, n):

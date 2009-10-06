@@ -250,8 +250,10 @@ def test_bad_paginator_data():
 
 
 good_faceter_data = (
-    ({"field":"int_field"},
-     {"facet":True, "facet.field":"int_field"}),
+    ({"fields":"int_field"},
+     {"facet":True, "facet.field":set(["int_field"])}),
+    ({"fields":["int_field", "text_field"]},
+     {"facet":True, "facet.field":set(["int_field","text_field"])}),
 )
 
 def check_faceter_data(kwargs, output):
@@ -265,7 +267,7 @@ def test_faceter_data():
 
 
 bad_faceter_data = (
-    {"field":"myarse"}, # Undefined field
+    {"fields":"myarse"}, # Undefined field
 )
 
 def check_bad_faceter_data(kwargs):

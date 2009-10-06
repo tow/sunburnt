@@ -213,17 +213,21 @@ class FacetOptions(Options):
         self.schema = schema
         self.fields = {}
         
-    def update(self, field, limit=None, mincount=None):
-        self.schema.check_fields(field)
-        self.fields[field] = {"limit":limit, "mincount":mincount}
+    def update(self, fields, limit=None, mincount=None):
+        self.schema.check_fields(fields)
+        if isinstance(fields, basestring):
+            fields = [fields]
+        for field in fields:
+            self.fields[field] = {"limit":limit, "mincount":mincount}
 
     @property
     def options(self):
         opts = {}
         if self.fields:
             opts['facet'] = True
+            opts['facet.field'] = set()
         for field_name, field_opts in self.fields.items():
-            opts['facet.field'] = field_name
+            opts['facet.field'].add(field_name)
             
             if field_opts['limit'] is not None:
                 opts["f.%s.facet.limit" % field_name] = field_opts['limit']
