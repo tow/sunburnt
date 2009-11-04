@@ -396,6 +396,19 @@ def object_to_dict(o, names):
     return dict((name, getattr(o, name)) for name in names
                  if (hasattr(o, name) and getattr(o, name) is not None))
 
+# This is over twice the speed of the shorter one immediately above.
+# apparently hasattr is really slow; try/except is faster.
+def object_to_dict(o, names):
+    d = {}
+    for name in names:
+         try:
+             a = getattr(o, name)
+             if a is not None:
+                 d[name] = a
+         except AttributeError:
+             pass
+    return d
+
 def value_from_node(node):
     name = node.attrib.get('name')
     if node.tag in ('lst', 'arr'):
