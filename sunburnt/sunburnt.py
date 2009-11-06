@@ -60,6 +60,8 @@ class SolrInterface(object):
         self.schema = SolrSchema(schemadoc)
 
     def add(self, docs, chunk=100):
+        if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
+            docs = [docs]
         # to avoid making messages too large, we break the message every
         # chunk docs.
         for doc_chunk in grouper(docs, chunk):
@@ -69,6 +71,8 @@ class SolrInterface(object):
     def delete(self, docs=None, queries=None):
         if not docs and not queries:
             raise SolrError("No docs or query specified for deletion")
+        elif hasattr(docs, "items") or not hasattr(docs, "__iter__"):
+            docs = [docs]
         delete_message = self.schema.make_delete(docs, queries)
         self.conn.update(str(delete_message))
 

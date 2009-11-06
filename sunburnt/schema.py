@@ -278,8 +278,6 @@ class SolrUpdate(object):
                                      for name, values in doc.items()]))
 
     def add(self, docs):
-        if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
-            docs = [docs]
         schema_fields = self.schema.fields.keys()
         docs = [(doc if hasattr(doc, "items")
                  else object_to_dict(doc, schema_fields))
@@ -306,8 +304,6 @@ class SolrDelete(object):
         if docs is None:
             docs = []
         deletions = []
-        if not hasattr(docs, "__iter__") or hasattr(docs, "items"):
-            docs = [docs]
         for doc in docs:
             # Really this next should check the expected type of unique key
             if isinstance(doc, (basestring, int, long, float)):
