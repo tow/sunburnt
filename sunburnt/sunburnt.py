@@ -10,15 +10,15 @@ import httplib2
 from .schema import SolrSchema, SolrError
 from .search import SolrSearch
 
-h = httplib2.Http(".cache")
-
 
 class SolrConnection(object):
-    def __init__(self, url, h=h):
+    def __init__(self, url, http_connection=None):
+        if not http_connection:
+            http_connection = httplib2.Http()
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
-        self.request = h.request
+        self.request = http_connection.request
 
     def commit(self, wait_flush=True, wait_searcher=True):
         response = self.commit_or_optimize("commit",
@@ -55,8 +55,10 @@ class SolrConnection(object):
 
 
 class SolrInterface(object):
-    def __init__(self, url, schemadoc):
-        self.conn = SolrConnection(url)
+    def __init__(self, url, schemadoc, http_connection=None):
+        if not http_connection:
+            http_connection = httplib2.Http()
+        self.conn = SolrConnection(url, http_connection)
         self.schema = SolrSchema(schemadoc)
 
     def add(self, docs, chunk=100):
