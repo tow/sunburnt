@@ -380,8 +380,8 @@ class SolrResults(object):
 class SolrResult(object):
     def __init__(self, node):
         self.name = node.attrib['name']
-        self.numFound = node.attrib['numFound']
-        self.start = node.attrib['start']
+        self.numFound = int(node.attrib['numFound'])
+        self.start = int(node.attrib['start'])
         self.docs = [value_from_node(n) for n in node.xpath("doc")]
 
     def __str__(self):
