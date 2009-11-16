@@ -83,10 +83,10 @@ class LuceneQuery(object):
     def __unicode__(self):
         if hasattr(self, '_or'):
             _or = tuple(unicode(o) for o in self._or)
-            return "(%s) OR (%s)" % _or
+            return "((%s) OR (%s))" % _or
         elif hasattr(self, '_and'):
             _and = tuple(unicode(a) for a in self._and)
-            return "(%s) AND (%s)" % _and
+            return "((%s) AND (%s))" % _and
         else:
             u = [self.serialize_term_queries(),
                  self.serialize_phrase_queries(),
