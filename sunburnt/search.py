@@ -143,10 +143,10 @@ class LuceneQuery(object):
             values = [values]
         for value in values:
             if isinstance(field, SolrUnicodeField):
-                term_or_phrase = term_or_phrase or self.term_or_phrase(value)
+                this_term_or_phrase = term_or_phrase or self.term_or_phrase(value)
             else:
-                term_or_phrase = "terms"
-            getattr(self, term_or_phrase)[field_name].add(value)
+                this_term_or_phrase = "terms"
+            getattr(self, this_term_or_phrase)[field_name].add(value)
 
     def add_range(self, field_name, rel, value):
         field = self.schema.fields[field_name]
