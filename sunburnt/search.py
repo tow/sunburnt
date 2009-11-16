@@ -223,11 +223,14 @@ class SolrSearch(object):
         self.paginator.update(start, rows)
         return self
 
-    def execute(self):
+    def options(self):
         options = {}
         for option_module in self.option_modules:
             options.update(option_module.options)
-        return self.interface.search(**options)
+        return options
+
+    def execute(self):
+        return self.interface.search(**self.options())
 
 
 class Options(object):
