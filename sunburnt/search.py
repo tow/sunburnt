@@ -69,9 +69,8 @@ class LuceneQuery(object):
                 s += ['"%s"' % value for value in sorted(value_set)]
         return ' '.join(s)
 
-    phrase_special_chars = re.compile(r'"')
     def __phrase_escape(self, s):
-        return self.phrase_special_chars.sub(r'\\\1', s)
+        return s.replace('"', '\\"')
 
     def serialize_range_queries(self):
         s = []
