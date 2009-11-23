@@ -333,8 +333,8 @@ class HighlightOptions(Options):
 
 class MoreLikeThisOptions(Options):
     opts = {"count":int,
-            "mintf":float,
-            "mindf":float,
+            "mintf":int,
+            "mindf":int,
             "minwl":int,
             "maxwl":int,
             "maxqt":int,
