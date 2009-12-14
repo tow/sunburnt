@@ -414,7 +414,7 @@ def value_from_node(node):
     elif node.tag == 'null':
         value = None
     elif node.tag in ('str', 'byte'):
-        value = node.text
+        value = node.text or ""
     elif node.tag in ('short', 'int'):
         value = int(node.text)
     elif node.tag == 'long':
