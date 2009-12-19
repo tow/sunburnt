@@ -228,8 +228,11 @@ class SolrSearch(object):
             options.update(option_module.options)
         return options
 
-    def execute(self):
-        return self.interface.search(**self.options())
+    def execute(self, constructor=dict):
+        result = self.interface.search(**self.options())
+        if constructor is not dict:
+            result.result.docs = [constructor(**d) for d in result.result.docs]
+        return result
 
 
 class Options(object):
