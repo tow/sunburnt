@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import datetime
 import re
+import warnings
 
 try:
     import mx.DateTime
