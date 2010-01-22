@@ -86,6 +86,8 @@ class LuceneQuery(object):
         elif hasattr(self, '_and'):
             _and = tuple(unicode(a) for a in self._and)
             return "((%s) AND (%s))" % _and
+        elif hasattr(self, '_not'):
+            return "(NOT (%s))" % unicode(self._not)
         else:
             u = [self.serialize_term_queries(),
                  self.serialize_phrase_queries(),
@@ -106,6 +108,11 @@ class LuceneQuery(object):
         q._and = (self, other)
         return q
 
+    def __invert__(self):
+        q = LuceneQuery(self.schema)
+        q._not = self
+        return q
+        
     def add(self, args, kwargs, terms_or_phrases=None):
         _args = []
         for arg in args:
