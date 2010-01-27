@@ -87,7 +87,7 @@ class LuceneQuery(object):
             _and = tuple(unicode(a) for a in self._and)
             return "((%s) AND (%s))" % _and
         elif hasattr(self, '_not'):
-            return "(NOT (%s))" % unicode(self._not)
+            return "NOT (%s)" % unicode(self._not)
         else:
             u = [self.serialize_term_queries(),
                  self.serialize_phrase_queries(),
