@@ -73,7 +73,7 @@ class SolrInterface(object):
     def delete(self, docs=None, queries=None):
         if not docs and not queries:
             raise SolrError("No docs or query specified for deletion")
-        elif hasattr(docs, "items") or not hasattr(docs, "__iter__"):
+        elif docs is not None and (hasattr(docs, "items") or not hasattr(docs, "__iter__")):
             docs = [docs]
         delete_message = self.schema.make_delete(docs, queries)
         self.conn.update(str(delete_message))
