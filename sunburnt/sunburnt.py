@@ -87,6 +87,10 @@ class SolrInterface(object):
     def rollback(self):
         self.conn.rollback()
 
+    def clear_all(self):
+        # When deletion is fixed to escape query strings, this will need fixed.
+        self.delete(queries="*:*")
+
     def search(self, **kwargs):
         params = kwargs.copy()
         for k, v in kwargs.items():

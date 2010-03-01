@@ -321,6 +321,7 @@ class SolrDelete(object):
             return []
         if isinstance(queries, basestring):
             queries = [queries]
+        # FIXME no lucene string escaping going on here.
         return [self.QUERY(query) for query in queries]
 
     def __str__(self):
