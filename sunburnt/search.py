@@ -209,8 +209,16 @@ class SolrSearch(object):
         self.query_obj.add(args, kwargs)
         return self
 
+    def exclude(self, *args, **kwargs):
+        self.query(~self.Q(*args, **kwargs))
+        return self
+
     def filter(self, *args, **kwargs):
         self.filter_obj.add(args, kwargs)
+        return self
+
+    def filter_exclude(self, *args, **kwargs):
+        self.filter(~self.Q(*args, **kwargs))
         return self
 
     def facet_by(self, field, **kwargs):
