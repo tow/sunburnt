@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
-import collections
-import re
+import collections, copy, re
 
 from .schema import SolrError, SolrUnicodeField, SolrBooleanField
 
@@ -88,12 +87,18 @@ class LuceneQuery(object):
             return "((%s) AND (%s))" % _and
         elif hasattr(self, '_not'):
             return "NOT (%s)" % unicode(self._not)
+        elif hasattr(self, '_pow'):
+            q, v = self._pow
+            return "(%s)^%s" % (unicode(q), v)
         else:
             u = [self.serialize_term_queries(),
                  self.serialize_phrase_queries(),
                  self.serialize_range_queries()] + \
                  [unicode(q) for q in self.subqueries]
             return ' '.join(s for s in u if s)
+
+    def Q(self):
+        return LuceneQuery(self.schema)
 
     def __nonzero__(self):
         return bool(self.terms) or bool(self.phrases) or bool(self.ranges)
@@ -111,6 +116,15 @@ class LuceneQuery(object):
     def __invert__(self):
         q = LuceneQuery(self.schema)
         q._not = self
+        return q
+
+    def __pow__(self, value):
+        try:
+            float(value)
+        except ValueError:
+            raise ValueError("Non-numeric value supplied for boost")
+        q = LuceneQuery(self.schema)
+        q._pow = (self, value)
         return q
         
     def add(self, args, kwargs, terms_or_phrases=None):
@@ -176,6 +190,7 @@ class LuceneQuery(object):
 
 
 class SolrSearch(object):
+    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter')
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
@@ -185,8 +200,6 @@ class SolrSearch(object):
         self.more_like_this = MoreLikeThisOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
-        self.option_modules = [self.query_obj, self.filter_obj, self.paginator,
-                               self.more_like_this, self.highlighter, self.faceter]
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
@@ -237,10 +250,19 @@ class SolrSearch(object):
         self.paginator.update(start, rows)
         return self
 
+    def boost_relevancy(self, boost_score, **kwargs):
+        try:
+            float(boost_score)
+        except ValueError:
+            raise ValueError("Non-numeric boost value supplied")
+        old_query = self.query_obj
+        self.query_obj = LuceneQuery(self.schema, 'q')
+        return self.query(old_query | (copy.deepcopy(old_query) & self.Q(**kwargs)**boost_score))
+
     def options(self):
         options = {}
         for option_module in self.option_modules:
-            options.update(option_module.options)
+            options.update(getattr(self, option_module).options)
         return options
 
     def execute(self, constructor=dict):
