@@ -175,6 +175,7 @@ class SolrSchema(object):
         'solr.SortableDoubleField':SolrDoubleField,
         'solr.TrieDoubleField':SolrDoubleField,
         'solr.DateField':SolrDateField,
+        'solr.TrieDateField':SolrDateField,
         }
 
     def __init__(self, f):
