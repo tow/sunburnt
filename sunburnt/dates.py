@@ -13,7 +13,7 @@ except ImportError:
     mx = None
 
 
-year = r'[+/-]?\d*\d\d\d\d'
+year = r'[+/-]?\d+'
 tzd = r'Z|((?P<tzd_sign>[-+])(?P<tzd_hour>\d\d):(?P<tzd_minute>\d\d))'
 extended_iso_template = r'(?P<year>'+year+r""")
                (-(?P<month>\d\d)
