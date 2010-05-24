@@ -69,7 +69,10 @@ class LuceneQuery(object):
         return ' '.join(s)
 
     def __phrase_escape(self, s):
-        return s.replace('"', '\\"')
+        # For phrases, anything is allowed between double-quotes, except
+        # double-quotes themselves, which must be escaped with backslashes,
+        # and thus also backslashes must too be escaped.
+        return s.replace('\\', '\\\\').replace('"', '\\"')
 
     def serialize_range_queries(self):
         s = []
