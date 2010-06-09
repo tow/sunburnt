@@ -396,11 +396,19 @@ def object_to_dict(o, names):
 
 # This is over twice the speed of the shorter one immediately above.
 # apparently hasattr is really slow; try/except is faster.
+# Also, the one above doesn't and can't do callables with exception handling
 def object_to_dict(o, names):
     d = {}
     for name in names:
          try:
              a = getattr(o, name)
+             # Might be attribute or callable
+             if callable(a):
+                 try:
+                     a = a()
+                 except:
+                     # If any exception (whether TypeError or user error), throw the value away
+                     a = None
              if a is not None:
                  d[name] = a
          except AttributeError:
