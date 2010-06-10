@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 
 import cgi
+import cStringIO as StringIO
 from itertools import islice
-import urllib
+import urllib, urlparse
 import warnings
 
 import httplib2
@@ -55,10 +56,17 @@ class SolrConnection(object):
 
 
 class SolrInterface(object):
-    def __init__(self, url, schemadoc, http_connection=None):
+    remote_schema_file = "admin/file/?file=schema.xml"
+    def __init__(self, url, schemadoc=None, http_connection=None):
         if not http_connection:
             http_connection = httplib2.Http()
         self.conn = SolrConnection(url, http_connection)
+        if not schemadoc:
+            r, c = http_connection.request(
+                urlparse.urljoin(url, self.remote_schema_file))
+            if r.status != 200:
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
+            schemadoc = StringIO.StringIO(c)
         self.schema = SolrSchema(schemadoc)
 
     def add(self, docs, chunk=100):
