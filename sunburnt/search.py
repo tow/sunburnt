@@ -45,7 +45,7 @@ class LuceneQuery(object):
                 s += [u'%s:%s' % (name, value) for value in sorted(value_set)]
             else:
                 s += sorted(value_set)
-        return ' '.join(s)
+        return ' AND '.join(s)
 
     # I'm very much not sure we're doing the right thing here:
     lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
@@ -66,7 +66,7 @@ class LuceneQuery(object):
                       for value in sorted(value_set)]
             else:
                 s += ['"%s"' % value for value in sorted(value_set)]
-        return ' '.join(s)
+        return ' AND '.join(s)
 
     def __phrase_escape(self, s):
         # For phrases, anything is allowed between double-quotes, except
@@ -79,26 +79,80 @@ class LuceneQuery(object):
         for name, rel, value in sorted(self.ranges):
             range = self.range_query_templates[rel] % value
             s.append("%(name)s:%(range)s" % vars())
-        return ' '.join(s)
+        return ' AND '.join(s)
+
+    def child_needs_parens(self, child, op=None):
+        if child.is_single_query():
+            return False
+        elif hasattr(child, '_not'):
+            return False
+        elif hasattr(child, '_pow'):
+            return False
+        elif (hasattr(self, '_or') or op=='OR') and hasattr(child, '_or'):
+            return False
+        elif (hasattr(self, '_and') or op=='AND') and hasattr(child, '_and'):
+            return False
+        else:
+            return True
 
     def __unicode__(self):
         if hasattr(self, '_or'):
-            _or = tuple(unicode(o) for o in self._or)
-            return "((%s) OR (%s))" % _or
+            s = []
+            for o in self._or:
+                if self.child_needs_parens(o):
+                    s.append(u"(%s)"%o)
+                else:
+                    s.append(u"%s"%o)
+            return u" OR ".join(s)
         elif hasattr(self, '_and'):
-            _and = tuple(unicode(a) for a in self._and)
-            return "((%s) AND (%s))" % _and
+            s = []
+            for o in self._and:
+                if self.child_needs_parens(o):
+                    s.append(u"(%s)"%o)
+                else:
+                    s.append(u"%s"%o)
+            return u" AND ".join(s)
         elif hasattr(self, '_not'):
-            return "NOT (%s)" % unicode(self._not)
+            o = self._not
+            if hasattr(o, '_not'):
+                # they cancel out
+                self._not = self._not._not
+                return u"%s"%o
+            if self.child_needs_parens(o):
+                return u"NOT (%s)"%o
+            else:
+                return u"NOT %s"%o
         elif hasattr(self, '_pow'):
             q, v = self._pow
-            return "(%s)^%s" % (unicode(q), v)
+            if self.child_needs_parens(q):
+                return u"(%s)^%s"%(q,v)
+            else:
+                return u"%s^%s"%(q,v)
         else:
-            u = [self.serialize_term_queries(),
-                 self.serialize_phrase_queries(),
-                 self.serialize_range_queries()] + \
-                 [unicode(q) for q in self.subqueries]
-            return ' '.join(s for s in u if s)
+            u = [s for s in [self.serialize_term_queries(),
+                             self.serialize_phrase_queries(),
+                             self.serialize_range_queries()]
+                 if s]
+            if not u and len(self.subqueries) == 1:
+                # Only one subquery, no need for parens
+                u.append(u"%s"%self.subqueries[0])
+            else:
+                for q in self.subqueries:
+                    if self.child_needs_parens(q, 'AND'):
+                        u.append(u"(%s)"%q)
+                    else:
+                        u.append(u"%s"%q)
+            return ' AND '.join(u)
+
+    def stringify_with_optional_parens(self):
+        if self.is_single_query():
+            s = u"%s"
+        else:
+            s = u"(%s)"
+        return s % self
+
+    def is_single_query(self):
+        return sum([len(self.terms), len(self.phrases), len(self.ranges), len(self.subqueries)]) == 1
 
     def Q(self):
         return LuceneQuery(self.schema)
@@ -267,6 +321,9 @@ class SolrSearch(object):
         for option_module in self.option_modules:
             options.update(getattr(self, option_module).options)
         return options
+
+    def params(self):
+        return self.interface.params(**self.options())
 
     def execute(self, constructor=dict):
         result = self.interface.search(**self.options())

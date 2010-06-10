@@ -9,7 +9,7 @@ import warnings
 import httplib2
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch
+from .search import SolrSearch, LuceneQuery
 
 
 class SolrConnection(object):
@@ -120,6 +120,19 @@ class SolrInterface(object):
     def search(self, **kwargs):
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
+        params = self.params(**kwargs)
+        return self.schema.parse_results(self.conn.select(params))
+
+    def query(self, *args, **kwargs):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        q = SolrSearch(self)
+        if len(args) + len(kwargs) > 0:
+            return q.query(*args, **kwargs)
+        else:
+            return q
+
+    def params(self, **kwargs):
         params = kwargs.copy()
         for k, v in kwargs.items():
             if hasattr(v, "items"):
@@ -131,14 +144,13 @@ class SolrInterface(object):
                 warnings.warn("No query parameter in search, re-using filter query")
             else:
                 raise SolrError("No query parameter in search")
-        return self.schema.parse_results(self.conn.select(params))
+        return params
 
-    def query(self, *args, **kwargs):
-        q = SolrSearch(self)
-        if len(args) + len(kwargs) > 0:
-            return q.query(*args, **kwargs)
-        else:
-            return q
+    def Q(self, *args, **kwargs):
+        q = LuceneQuery(self.schema)
+        q.add(args, kwargs)
+        return q
+
 
 
 def utf8_urlencode(params):
