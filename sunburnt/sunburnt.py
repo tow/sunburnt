@@ -56,8 +56,10 @@ class SolrConnection(object):
 
 
 class SolrInterface(object):
+    readable = True
+    writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None):
+    def __init__(self, url, schemadoc=None, http_connection=None, mode=''):
         if not http_connection:
             http_connection = httplib2.Http()
         self.conn = SolrConnection(url, http_connection)
@@ -68,8 +70,14 @@ class SolrInterface(object):
                 raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
             schemadoc = StringIO.StringIO(c)
         self.schema = SolrSchema(schemadoc)
+        if mode == 'r':
+            self.writeable = False
+        elif mode == 'w':
+            self.readable = False
 
     def add(self, docs, chunk=100):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
             docs = [docs]
         # to avoid making messages too large, we break the message every
@@ -79,6 +87,8 @@ class SolrInterface(object):
             self.conn.update(str(update_message))
 
     def delete(self, docs=None, queries=None):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         if not docs and not queries:
             raise SolrError("No docs or query specified for deletion")
         elif docs is not None and (hasattr(docs, "items") or not hasattr(docs, "__iter__")):
@@ -87,19 +97,29 @@ class SolrInterface(object):
         self.conn.update(str(delete_message))
 
     def commit(self, *args, **kwargs):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         self.conn.commit(*args, **kwargs)
 
     def optimize(self, *args, **kwargs):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         self.conn.optimize(*args, **kwargs)
 
     def rollback(self):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         self.conn.rollback()
 
     def clear_all(self):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         # When deletion is fixed to escape query strings, this will need fixed.
         self.delete(queries="*:*")
 
     def search(self, **kwargs):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
         params = kwargs.copy()
         for k, v in kwargs.items():
             if hasattr(v, "items"):
