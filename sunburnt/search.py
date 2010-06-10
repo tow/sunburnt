@@ -49,7 +49,10 @@ class LuceneQuery(object):
 
     # I'm very much not sure we're doing the right thing here:
     lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
+    lucene_special_words = ("AND", "NOT", "OR")
     def __lqs_escape(self, s):
+        if s in self.lucene_special_words:
+            return u'"%s"'%s
         return self.lucene_special_chars.sub(r'\\\1', s)
 
     def serialize_phrase_queries(self):
