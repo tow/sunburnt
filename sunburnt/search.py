@@ -161,7 +161,7 @@ class LuceneQuery(object):
         return LuceneQuery(self.schema)
 
     def __nonzero__(self):
-        return bool(self.terms) or bool(self.phrases) or bool(self.ranges)
+        return bool(self.terms) or bool(self.phrases) or bool(self.ranges) or bool(self.subqueries)
 
     def __or__(self, other):
         q = LuceneQuery(self.schema)
@@ -311,6 +311,8 @@ class SolrSearch(object):
         return self
 
     def boost_relevancy(self, boost_score, **kwargs):
+        if not self.query_obj:
+            raise TypeError("Can't boost the relevancy of an empty query")
         try:
             float(boost_score)
         except ValueError:
