@@ -75,10 +75,27 @@ class solr_date(object):
 
 
 class SolrField(object):
-    def __init__(self, node):
+    def __init__(self, node, dynamic=False):
         self.name = node.attrib["name"]
         self.multi_valued = node.attrib.get("multiValued") == "true"
         self.required = node.attrib.get("required") == "true"
+        self.indexed = node.attrib.get("indexed", "true") == "true"
+        self.stored = node.attrib.get("stored") == "true"
+        self.dynamic = dynamic
+        if dynamic:
+            if self.name.startswith("*"):
+                self.wildcard_at_start = True
+            elif self.name.endswith("*"):
+                self.wildcard_at_start = False
+            else:
+                raise SolrError("Dynamic fields must have * at start or end of name")
+
+    def match(self, name):
+        if self.dynamic:
+            if self.wildcard_at_start:
+                return name.endswith(self.name[1:])
+            else:
+                return name.startswith(self.name[:-1])
 
     def serialize(self, value):
         if hasattr(value, "__iter__"):
@@ -156,6 +173,11 @@ class SolrDateField(SolrField):
         return solr_date(v)
 
 
+class SolrRandomField(SolrField):
+    def normalize(self, v):
+        raise TypeError("Don't try and store or index values in a RandomSortField")
+
+
 class SolrSchema(object):
     solr_data_types = {
         'solr.StrField':SolrUnicodeField,
@@ -176,12 +198,13 @@ class SolrSchema(object):
         'solr.TrieDoubleField':SolrDoubleField,
         'solr.DateField':SolrDateField,
         'solr.TrieDateField':SolrDateField,
+        'solr.RandomSortField':SolrRandomField,
         }
 
     def __init__(self, f):
         """initialize a schema object from a
         filename or file-like object."""
-        self.fields, self.default_field_name, self.unique_key \
+        self.fields, self.dynamic_fields, self.default_field_name, self.unique_key \
             = self.schema_parse(f)
         self.default_field = self.fields[self.default_field_name] \
             if self.default_field_name else None
@@ -208,12 +231,23 @@ class SolrSchema(object):
             except KeyError, e:
                 raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
             fields[name] = field_class(field_node)
+        dynamic_fields = []
+        for field_node in schemadoc.xpath("/schema/fields/dynamicField"):
+            try:
+                name, type = field_node.attrib['name'], field_node.attrib['type']
+            except KeyError, e:
+                raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.message)
+            try:
+                field_class = field_types[type]
+            except KeyError, e:
+                raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
+            dynamic_fields.append(field_class(field_node, dynamic=True))
         default_field_name = schemadoc.xpath("/schema/defaultSearchField")
         default_field_name = default_field_name[0].text \
             if default_field_name else None
         unique_key = schemadoc.xpath("/schema/uniqueKey")
         unique_key = unique_key[0].text if unique_key else None
-        return fields, default_field_name, unique_key
+        return fields, dynamic_fields, default_field_name, unique_key
 
     def missing_fields(self, field_names):
         return [name for name in set(self.fields.keys()) - set(field_names)
@@ -222,14 +256,30 @@ class SolrSchema(object):
     def check_fields(self, field_names):
         if isinstance(field_names, basestring):
             field_names = [field_names]
-        undefined_fields = set(field_names) - set(self.fields.keys())
-        if undefined_fields:
-            raise SolrError("Fields not defined in schema: %s" % list(undefined_fields))
+        undefined_field_names = []
+        for field_name in field_names:
+            if not self.match_field(field_name):
+                undefined_field_names.append(field_name)
+        if undefined_field_names:
+            raise SolrError("Fields not defined in schema: %s" % list(undefined_field_names))
+
+    def match_dynamic_field(self, name):
+        for field in self.dynamic_fields:
+            if field.match(name):
+                return field
+
+    def match_field(self, name):
+        try:
+            return self.fields[name]
+        except KeyError:
+            field = self.match_dynamic_field(name)
+        return field
 
     def serialize_value(self, k, v):
-        if not k in self.fields:
-            raise SolrError("No such field '%s' in current schema" % k)
-        return self.fields[k].serialize(v)
+        field = self.match_field(k)
+        if not field:
+            raise SolrError("No such field '%s' in current schema" % name)
+        return field.serialize(v)
 
     def get_id_for_doc(self, doc):
         if not self.unique_key:
@@ -279,9 +329,8 @@ class SolrUpdate(object):
                                      for name, values in doc.items()]))
 
     def add(self, docs):
-        schema_fields = self.schema.fields.keys()
         docs = [(doc if hasattr(doc, "items")
-                 else object_to_dict(doc, schema_fields))
+                 else object_to_dict(doc, self.schema))
                 for doc in docs]
         return self.ADD(*[self.doc(doc) for doc in docs])
 
@@ -313,7 +362,7 @@ class SolrDelete(object):
                 deletions.append(self.ID(v))
             else:
                 doc = doc if hasattr(doc, "items") \
-                    else object_to_dict(doc, self.schema.fields.keys())
+                    else object_to_dict(doc, self.schema)
                 deletions.append(self.ID(self.schema.get_id_for_doc(doc)))
         return deletions
 
@@ -397,23 +446,47 @@ def object_to_dict(o, names):
 # This is over twice the speed of the shorter one immediately above.
 # apparently hasattr is really slow; try/except is faster.
 # Also, the one above doesn't and can't do callables with exception handling
-def object_to_dict(o, names):
+def object_to_dict(o, schema):
     d = {}
+    for name in schema.fields.keys():
+        a = get_attribute_or_callable(o, name)
+        if a is not None:
+            d[name] = a
+    # and now try for dynamicFields:
+    try:
+        names = o.__dict__.keys()
+    except AttributeError:
+        names = []
     for name in names:
-         try:
-             a = getattr(o, name)
-             # Might be attribute or callable
-             if callable(a):
-                 try:
-                     a = a()
-                 except:
-                     # If any exception (whether TypeError or user error), throw the value away
-                     a = None
-             if a is not None:
-                 d[name] = a
-         except AttributeError:
-             pass
+        field = schema.match_dynamic_field(name)
+        if field:
+            a = get_attribute_or_callable(o, name)
+            if a is not None:
+                d[name] = a
+    try:
+        names = o.__class__.__dict__.keys()
+    except AttributeError:
+        names = []
+    for name in names:
+        field = schema.match_dynamic_field(name)
+        if field:
+            a = get_attribute_or_callable(o, name)
+            if a is not None:
+                d[name] = a
     return d
+
+def get_attribute_or_callable(o, name):
+    try:
+        a = getattr(o, name)
+        # Might be attribute or callable
+        if callable(a):
+            try:
+                a = a()
+            except TypeError:
+                a = None
+    except AttributeError:
+        a = None
+    return a
 
 def value_from_node(node):
     name = node.attrib.get('name')

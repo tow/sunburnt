@@ -36,7 +36,7 @@ class LuceneQuery(object):
         s = []
         for name, value_set in sorted(self.terms.items()):
             if name:
-                field = self.schema.fields[name]
+                field = self.schema.match_field(name)
             else:
                 field = self.schema.default_field
             if isinstance(field, SolrUnicodeField):
@@ -59,7 +59,7 @@ class LuceneQuery(object):
         s = []
         for name, value_set in sorted(self.phrases.items()):
             if name:
-                field = self.schema.fields[name]
+                field = self.schema.match_field(name)
             else:
                 field = self.schema.default_field
             if isinstance(field, SolrUnicodeField):
@@ -206,7 +206,8 @@ class LuceneQuery(object):
                 field_name, rel = k.split("__")
             except ValueError:
                 field_name, rel = k, 'eq'
-            if field_name not in self.schema.fields:
+            field = self.schema.match_field(field_name)
+            if not field:
                 raise ValueError("%s is not a valid field name" % k)
             if rel == 'eq':
                 self.add_exact(field_name, v, terms_or_phrases)
@@ -215,7 +216,7 @@ class LuceneQuery(object):
 
     def add_exact(self, field_name, value, term_or_phrase):
         if field_name:
-            field = self.schema.fields[field_name]
+            field = self.schema.match_field(field_name)
         else:
             field = self.schema.default_field
         values = field.serialize(value) # Might be multivalued
@@ -229,7 +230,7 @@ class LuceneQuery(object):
             getattr(self, this_term_or_phrase)[field_name].add(value)
 
     def add_range(self, field_name, rel, value):
-        field = self.schema.fields[field_name]
+        field = self.schema.match_field(field_name)
         if isinstance(field, SolrBooleanField):
             raise ValueError("Cannot do a '%s' query on a bool field" % rel)
         if rel not in self.range_query_templates:
@@ -250,7 +251,7 @@ class LuceneQuery(object):
 
 
 class SolrSearch(object):
-    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter')
+    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter')
     def __init__(self, interface):
         self.interface = interface
         self.schema = interface.schema
@@ -260,6 +261,7 @@ class SolrSearch(object):
         self.more_like_this = MoreLikeThisOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
+        self.sorter = SortOptions(self.schema)
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
@@ -308,6 +310,10 @@ class SolrSearch(object):
 
     def paginate(self, start=None, rows=None):
         self.paginator.update(start, rows)
+        return self
+
+    def sort_by(self, field):
+        self.sorter.update(field)
         return self
 
     def boost_relevancy(self, boost_score, **kwargs):
@@ -527,3 +533,37 @@ class PaginateOptions(Options):
         if self.rows is not None:
             opts['rows'] = self.rows
         return opts
+
+
+class SortOptions(Options):
+    option_name = "sort"
+    def __init__(self, schema):
+        self.schema = schema
+        self.fields = []
+
+    def update(self, field):
+        # We're not allowing function queries a la Solr1.5
+        if field.startswith('-'):
+            order = "desc"
+            field = field[1:]
+        elif field.startswith('+'):
+            order = "asc"
+            field = field[1:]
+        else:
+            order = "asc"
+        if field != 'score':
+            f = self.schema.match_field(field)
+            if not f:
+                raise SolrError("No such field %s" % field)
+            elif f.multi_valued:
+                raise SolrError("Cannot sort on a multivalued field")
+            elif not f.indexed:
+                raise SolrError("Cannot sort on an un-indexed field")
+        self.fields.append([order, field])
+
+    @property
+    def options(self):
+        if self.fields:
+            return {"sort":", ".join("%s %s" % (field, order) for order, field in self.fields)}
+        else:
+            return {}
