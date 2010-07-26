@@ -23,6 +23,16 @@ class LuceneQuery(object):
         self.ranges = set()
         self.subqueries = []
 
+    def clone(self):
+        newself = LuceneQuery.__new__(LuceneQuery)
+        newself.schema = self.schema
+        newself.option_flag = self.option_flag
+        newself.terms = copy.copy(self.terms)
+        newself.phrases = copy.copy(self.phrases)
+        newself.ranges = copy.copy(self.ranges)
+        newself.subqueries = [q.clone() for q in self.subqueries]
+        return newself
+
     @property
     def options(self):
         opts = {}
@@ -252,16 +262,23 @@ class LuceneQuery(object):
 
 class SolrSearch(object):
     option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter')
-    def __init__(self, interface):
+    def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
-        self.query_obj = LuceneQuery(self.schema, 'q')
-        self.filter_obj = LuceneQuery(self.schema, 'fq')
-        self.paginator = PaginateOptions(self.schema)
-        self.more_like_this = MoreLikeThisOptions(self.schema)
-        self.highlighter = HighlightOptions(self.schema)
-        self.faceter = FacetOptions(self.schema)
-        self.sorter = SortOptions(self.schema)
+        if original:
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+        else:
+            self.query_obj = LuceneQuery(self.schema, 'q')
+            self.filter_obj = LuceneQuery(self.schema, 'fq')
+            self.paginator = PaginateOptions(self.schema)
+            self.more_like_this = MoreLikeThisOptions(self.schema)
+            self.highlighter = HighlightOptions(self.schema)
+            self.faceter = FacetOptions(self.schema)
+            self.sorter = SortOptions(self.schema)
+
+    def clone(self):
+        return SolrSearch(interface=self.interface, original=self)
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
@@ -281,39 +298,48 @@ class SolrSearch(object):
         return self.filter(__terms_or_phrases="phrases", *args, **kwargs)
 
     def query(self, *args, **kwargs):
-        self.query_obj.add(args, kwargs)
-        return self
+        newself = self.clone()
+        newself.query_obj.add(args, kwargs)
+        return newself
 
     def exclude(self, *args, **kwargs):
-        self.query(~self.Q(*args, **kwargs))
+        newself = self.clone()
+        newself.query(~newself.Q(*args, **kwargs))
         return self
 
     def filter(self, *args, **kwargs):
-        self.filter_obj.add(args, kwargs)
+        newself = self.clone()
+        newself.filter_obj.add(args, kwargs)
         return self
 
     def filter_exclude(self, *args, **kwargs):
-        self.filter(~self.Q(*args, **kwargs))
+        newself = self.clone()
+        newself.filter(~newself.Q(*args, **kwargs))
         return self
 
     def facet_by(self, field, **kwargs):
-        self.faceter.update(field, **kwargs)
+        newself = self.clone()
+        newself.faceter.update(field, **kwargs)
         return self
 
     def highlight(self, fields=None, **kwargs):
-        self.highlighter.update(fields, **kwargs)
+        newself = self.clone()
+        newself.highlighter.update(fields, **kwargs)
         return self
 
     def mlt(self, fields, query_fields=None, **kwargs):
-        self.more_like_this.update(fields, query_fields, **kwargs)
+        newself = self.clone()
+        newself.more_like_this.update(fields, query_fields, **kwargs)
         return self
 
     def paginate(self, start=None, rows=None):
-        self.paginator.update(start, rows)
+        newself = self.clone()
+        newself.paginator.update(start, rows)
         return self
 
     def sort_by(self, field):
-        self.sorter.update(field)
+        newself = self.clone()
+        newself.sorter.update(field)
         return self
 
     def boost_relevancy(self, boost_score, **kwargs):
@@ -323,9 +349,13 @@ class SolrSearch(object):
             float(boost_score)
         except ValueError:
             raise ValueError("Non-numeric boost value supplied")
-        old_query = self.query_obj
-        self.query_obj = LuceneQuery(self.schema, 'q')
-        return self.query(old_query | (copy.deepcopy(old_query) & self.Q(**kwargs)**boost_score))
+
+        # Clone all of self *except* query, which we'll take care of directly
+        newself = self.clone()
+        newself.query_obj = LuceneQuery(self.schema, 'q')
+
+        return newself.query(self.query_obj |
+                             (self.query_obj & self.Q(**kwargs)**boost_score))
 
     def options(self):
         options = {}
@@ -409,6 +439,11 @@ class FacetOptions(Options):
         self.schema = schema
         self.fields = collections.defaultdict(dict)
 
+    def clone(self):
+        newself = FacetOptions.__new__(FacetOptions)
+        newself.fields = copy.copy(self.fields)
+        return newself
+
     def field_names_in_opts(self, opts, fields):
         if fields:
             opts["facet.field"] = sorted(fields)
@@ -437,6 +472,11 @@ class HighlightOptions(Options):
         self.schema = schema
         self.fields = collections.defaultdict(dict)
 
+    def clone(self):
+        newself = HighlightOptions.__new__(HighlightOptions)
+        newself.fields = copy.copy(self.fields)
+        return newself
+
     def field_names_in_opts(self, opts, fields):
         if fields:
             opts["hl.fl"] = ",".join(sorted(fields))
@@ -457,6 +497,13 @@ class MoreLikeThisOptions(Options):
         self.fields = set()
         self.query_fields = {}
         self.kwargs = {}
+
+    def clone(self):
+        newself = MoreLikeThisOptions.__new__(MoreLikeThisOptions)
+        newself.fields = copy.copy(self.fields)
+        newself.query_fields = copy.copy(self.query_fields)
+        newself.kwargs = copy.copy(self.kwargs)
+        return newself
 
     def update(self, fields, query_fields=None, **kwargs):
         self.schema.check_fields(fields)
@@ -515,6 +562,12 @@ class PaginateOptions(Options):
         self.start = None
         self.rows = None
 
+    def clone(self):
+        newself = PaginateOptions.__new__(PaginateOptions)
+        newself.start = self.start
+        newself.rows = self.rows
+        return newself
+
     def update(self, start, rows):
         if start is not None:
             if start < 0:
@@ -540,6 +593,11 @@ class SortOptions(Options):
     def __init__(self, schema):
         self.schema = schema
         self.fields = []
+
+    def clone(self):
+        newself = SortOptions.__new__(SortOptions)
+        newself.fields = copy.copy(self.fields)
+        return newself
 
     def update(self, field):
         # We're not allowing function queries a la Solr1.5
