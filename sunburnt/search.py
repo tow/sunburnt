@@ -15,23 +15,23 @@ class LuceneQuery(object):
         "rangeexc": "{%s TO %s}",
         "range": "[%s TO %s]",
     }
-    def __init__(self, schema, option_flag=None):
+    def __init__(self, schema, option_flag=None, original=None):
         self.schema = schema
-        self.option_flag = option_flag
-        self.terms = collections.defaultdict(set)
-        self.phrases = collections.defaultdict(set)
-        self.ranges = set()
-        self.subqueries = []
+        if original is None:
+            self.option_flag = option_flag
+            self.terms = collections.defaultdict(set)
+            self.phrases = collections.defaultdict(set)
+            self.ranges = set()
+            self.subqueries = []
+        else:
+            self.option_flag = original.option_flag
+            self.terms = copy.copy(original.terms)
+            self.phrases = copy.copy(original.phrases)
+            self.ranges = copy.copy(original.ranges)
+            self.subqueries = [q.clone() for q in original.subqueries]
 
     def clone(self):
-        newself = LuceneQuery.__new__(LuceneQuery)
-        newself.schema = self.schema
-        newself.option_flag = self.option_flag
-        newself.terms = copy.copy(self.terms)
-        newself.phrases = copy.copy(self.phrases)
-        newself.ranges = copy.copy(self.ranges)
-        newself.subqueries = [q.clone() for q in self.subqueries]
-        return newself
+        return LuceneQuery(self.schema, original=self)
 
     @property
     def options(self):
@@ -265,10 +265,7 @@ class SolrSearch(object):
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
-        if original:
-            for opt in self.option_modules:
-                setattr(self, opt, getattr(original, opt).clone())
-        else:
+        if original is None:
             self.query_obj = LuceneQuery(self.schema, 'q')
             self.filter_obj = LuceneQuery(self.schema, 'fq')
             self.paginator = PaginateOptions(self.schema)
@@ -276,6 +273,9 @@ class SolrSearch(object):
             self.highlighter = HighlightOptions(self.schema)
             self.faceter = FacetOptions(self.schema)
             self.sorter = SortOptions(self.schema)
+        else:
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
 
     def clone(self):
         return SolrSearch(interface=self.interface, original=self)
@@ -374,6 +374,9 @@ class SolrSearch(object):
 
 
 class Options(object):
+    def clone(self):
+        return self.__class__(self.schema, self)
+
     def invalid_value(self, msg=""):
         assert False, msg
 
@@ -435,14 +438,12 @@ class FacetOptions(Options):
             "enum.cache.minDf":int,
             }
 
-    def __init__(self, schema):
+    def __init__(self, schema, original=None):
         self.schema = schema
-        self.fields = collections.defaultdict(dict)
-
-    def clone(self):
-        newself = FacetOptions.__new__(FacetOptions)
-        newself.fields = copy.copy(self.fields)
-        return newself
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
 
     def field_names_in_opts(self, opts, fields):
         if fields:
@@ -468,14 +469,12 @@ class HighlightOptions(Options):
             "regex.pattern":unicode,
             "regex.maxAnalyzedChars":int
             }
-    def __init__(self, schema):
+    def __init__(self, schema, original=None):
         self.schema = schema
-        self.fields = collections.defaultdict(dict)
-
-    def clone(self):
-        newself = HighlightOptions.__new__(HighlightOptions)
-        newself.fields = copy.copy(self.fields)
-        return newself
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
 
     def field_names_in_opts(self, opts, fields):
         if fields:
@@ -492,18 +491,16 @@ class MoreLikeThisOptions(Options):
             "maxntp":int,
             "boost":bool,
             }
-    def __init__(self, schema):
+    def __init__(self, schema, original=None):
         self.schema = schema
-        self.fields = set()
-        self.query_fields = {}
-        self.kwargs = {}
-
-    def clone(self):
-        newself = MoreLikeThisOptions.__new__(MoreLikeThisOptions)
-        newself.fields = copy.copy(self.fields)
-        newself.query_fields = copy.copy(self.query_fields)
-        newself.kwargs = copy.copy(self.kwargs)
-        return newself
+        if original is None:
+            self.fields = set()
+            self.query_fields = {}
+            self.kwargs = {}
+        else:
+            self.fields = copy.copy(original.fields)
+            self.query_fields = copy.copy(original.query_fields)
+            self.kwargs = copy.copy(original.kwargs)
 
     def update(self, fields, query_fields=None, **kwargs):
         self.schema.check_fields(fields)
@@ -557,16 +554,14 @@ class MoreLikeThisOptions(Options):
 
 
 class PaginateOptions(Options):
-    def __init__(self, schema):
+    def __init__(self, schema, original=None):
         self.schema = schema
-        self.start = None
-        self.rows = None
-
-    def clone(self):
-        newself = PaginateOptions.__new__(PaginateOptions)
-        newself.start = self.start
-        newself.rows = self.rows
-        return newself
+        if original is None:
+            self.start = None
+            self.rows = None
+        else:
+            self.start = original.start
+            self.rows = original.rows
 
     def update(self, start, rows):
         if start is not None:
@@ -590,14 +585,12 @@ class PaginateOptions(Options):
 
 class SortOptions(Options):
     option_name = "sort"
-    def __init__(self, schema):
+    def __init__(self, schema, original=None):
         self.schema = schema
-        self.fields = []
-
-    def clone(self):
-        newself = SortOptions.__new__(SortOptions)
-        newself.fields = copy.copy(self.fields)
-        return newself
+        if original is None:
+            self.fields = []
+        else:
+            self.fields = copy.copy(original.fields)
 
     def update(self, field):
         # We're not allowing function queries a la Solr1.5
