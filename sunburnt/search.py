@@ -29,6 +29,14 @@ class LuceneQuery(object):
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
             self.subqueries = [q.clone() for q in original.subqueries]
+            if hasattr(original, '_or'):
+                self._or = original._or
+            if hasattr(original, '_and'):
+                self._anandd = original._and
+            if hasattr(original, '_not'):
+                self._not = original._not
+            if hasattr(original, '_pow'):
+                self._pow = original.pow_
 
     def clone(self):
         return LuceneQuery(self.schema, original=self)
@@ -305,42 +313,42 @@ class SolrSearch(object):
     def exclude(self, *args, **kwargs):
         newself = self.clone()
         newself.query(~newself.Q(*args, **kwargs))
-        return self
+        return newself
 
     def filter(self, *args, **kwargs):
         newself = self.clone()
         newself.filter_obj.add(args, kwargs)
-        return self
+        return newself
 
     def filter_exclude(self, *args, **kwargs):
         newself = self.clone()
         newself.filter(~newself.Q(*args, **kwargs))
-        return self
+        return newself
 
     def facet_by(self, field, **kwargs):
         newself = self.clone()
         newself.faceter.update(field, **kwargs)
-        return self
+        return newself
 
     def highlight(self, fields=None, **kwargs):
         newself = self.clone()
         newself.highlighter.update(fields, **kwargs)
-        return self
+        return newself
 
     def mlt(self, fields, query_fields=None, **kwargs):
         newself = self.clone()
         newself.more_like_this.update(fields, query_fields, **kwargs)
-        return self
+        return newself
 
     def paginate(self, start=None, rows=None):
         newself = self.clone()
         newself.paginator.update(start, rows)
-        return self
+        return newself
 
     def sort_by(self, field):
         newself = self.clone()
         newself.sorter.update(field)
-        return self
+        return newself
 
     def boost_relevancy(self, boost_score, **kwargs):
         if not self.query_obj:
