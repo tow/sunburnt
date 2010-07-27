@@ -23,20 +23,17 @@ class LuceneQuery(object):
             self.phrases = collections.defaultdict(set)
             self.ranges = set()
             self.subqueries = []
+            self._or = self._and = self._not = self._pow = None
         else:
             self.option_flag = original.option_flag
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
             self.subqueries = [q.clone() for q in original.subqueries]
-            if hasattr(original, '_or'):
-                self._or = original._or
-            if hasattr(original, '_and'):
-                self._anandd = original._and
-            if hasattr(original, '_not'):
-                self._not = original._not
-            if hasattr(original, '_pow'):
-                self._pow = original.pow_
+            self._or = original._or
+            self._and = original._and
+            self._not = original._not
+            self._pow = original._pow
 
     def clone(self):
         return LuceneQuery(self.schema, original=self)
@@ -105,19 +102,17 @@ class LuceneQuery(object):
     def child_needs_parens(self, child, op=None):
         if child.is_single_query():
             return False
-        elif hasattr(child, '_not'):
+        elif child._not is not None or child._pow is not None:
             return False
-        elif hasattr(child, '_pow'):
+        elif (self._or is not None or op=='OR') and child._or is not None:
             return False
-        elif (hasattr(self, '_or') or op=='OR') and hasattr(child, '_or'):
-            return False
-        elif (hasattr(self, '_and') or op=='AND') and hasattr(child, '_and'):
+        elif (self._and is not None or op=='AND') and child._and is not None:
             return False
         else:
             return True
 
     def __unicode__(self):
-        if hasattr(self, '_or'):
+        if self._or is not None:
             s = []
             for o in self._or:
                 if self.child_needs_parens(o):
@@ -125,7 +120,7 @@ class LuceneQuery(object):
                 else:
                     s.append(u"%s"%o)
             return u" OR ".join(s)
-        elif hasattr(self, '_and'):
+        elif self._and is not None:
             s = []
             for o in self._and:
                 if self.child_needs_parens(o):
@@ -133,9 +128,9 @@ class LuceneQuery(object):
                 else:
                     s.append(u"%s"%o)
             return u" AND ".join(s)
-        elif hasattr(self, '_not'):
+        elif self._not is not None:
             o = self._not
-            if hasattr(o, '_not'):
+            if o._not is not None:
                 # they cancel out
                 self._not = self._not._not
                 return u"%s"%o
@@ -143,7 +138,7 @@ class LuceneQuery(object):
                 return u"NOT (%s)"%o
             else:
                 return u"NOT %s"%o
-        elif hasattr(self, '_pow'):
+        elif self._pow is not None:
             q, v = self._pow
             if self.child_needs_parens(q):
                 return u"(%s)^%s"%(q,v)
