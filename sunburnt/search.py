@@ -384,10 +384,12 @@ class SolrSearch(object):
         options = {}
         for option_module in self.option_modules:
             options.update(getattr(self, option_module).options)
+        if 'q' not in options:
+            options['q'] = '*' # search everything
         return options
 
     def params(self):
-        return self.interface.params(**self.options())
+        return self.interface.params_from_dict(**self.options())
 
     def execute(self, constructor=dict):
         result = self.interface.search(**self.options())

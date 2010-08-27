@@ -47,7 +47,7 @@ class SolrConnection(object):
             raise SolrError(r, c)
 
     def select(self, params):
-        qs = utf8_urlencode(params)
+        qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         r, c = self.request(url)
         if r.status != 200:
@@ -120,7 +120,7 @@ class SolrInterface(object):
     def search(self, **kwargs):
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
-        params = self.params(**kwargs)
+        params = self.params_from_dict(**kwargs)
         return self.schema.parse_results(self.conn.select(params))
 
     def query(self, *args, **kwargs):
@@ -132,39 +132,29 @@ class SolrInterface(object):
         else:
             return q
 
-    def params(self, **kwargs):
-        params = kwargs.copy()
-        if 'q' not in params:
-            if 'fq' in params:
-                params['q'] = params['fq']
-                warnings.warn("No query parameter in search, re-using filter query")
-            else:
-                raise SolrError("No query parameter in search")
-        return params
+    @staticmethod
+    def params_from_dict(**kwargs):
+        utf8_params = []
+        for k, vs in kwargs.items():
+            if isinstance(k, unicode):
+                k = k.encode('utf-8')
+            # We allow for multivalued options with lists.
+            if not hasattr(vs, "__iter__"):
+                vs = [vs]
+            for v in vs:
+                if isinstance(v, bool):
+                    v = u"true" if v else u"false"
+                else:
+                    v = unicode(v)
+                v = v.encode('utf-8')
+                utf8_params.append((k, v))
+        return utf8_params
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
         q.add(args, kwargs)
         return q
 
-
-
-def utf8_urlencode(params):
-    utf8_params = []
-    for k, vs in params.items():
-        if isinstance(k, unicode):
-            k = k.encode('utf-8')
-        # We allow for multivalued options with lists.
-        if not hasattr(vs, "__iter__"):
-            vs = [vs]
-        for v in vs:
-            if isinstance(v, bool):
-                v = u"true" if v else u"false"
-            else:
-                v = unicode(v)
-            v = v.encode('utf-8')
-            utf8_params.append((k, v))
-    return urllib.urlencode(utf8_params)
 
 def grouper(iterable, n):
     "grouper('ABCDEFG', 3) --> [['ABC'], ['DEF'], ['G']]"
