@@ -134,10 +134,6 @@ class SolrInterface(object):
 
     def params(self, **kwargs):
         params = kwargs.copy()
-        for k, v in kwargs.items():
-            if hasattr(v, "items"):
-                del params[k]
-                params.update(v)
         if 'q' not in params:
             if 'fq' in params:
                 params['q'] = params['fq']
