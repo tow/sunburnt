@@ -282,7 +282,7 @@ class LuceneQuery(object):
 
 
 class SolrSearch(object):
-    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter')
+    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier')
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
@@ -294,6 +294,7 @@ class SolrSearch(object):
             self.highlighter = HighlightOptions(self.schema)
             self.faceter = FacetOptions(self.schema)
             self.sorter = SortOptions(self.schema)
+            self.facet_querier = FacetQueryOptions(self.schema)
         else:
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
@@ -339,6 +340,11 @@ class SolrSearch(object):
     def facet_by(self, field, **kwargs):
         newself = self.clone()
         newself.faceter.update(field, **kwargs)
+        return newself
+
+    def facet_query(self, *args, **kwargs):
+        newself = self.clone()
+        newself.facet_querier.update(self.Q(*args, **kwargs))
         return newself
 
     def highlight(self, fields=None, **kwargs):
@@ -633,5 +639,25 @@ class SortOptions(Options):
     def options(self):
         if self.fields:
             return {"sort":", ".join("%s %s" % (field, order) for order, field in self.fields)}
+        else:
+            return {}
+
+
+class FacetQueryOptions(Options):
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.queries = []
+        else:
+            self.queries = [q.clone() for q in original.queries]
+
+    def update(self, query):
+        self.queries.append(query)
+
+    @property
+    def options(self):
+        if self.queries:
+            return {'facet.query':[unicode(q) for q in self.queries],
+                    'facet':True}
         else:
             return {}
