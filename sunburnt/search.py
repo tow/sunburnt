@@ -40,7 +40,6 @@ class LuceneQuery(object):
     def clone(self):
         return LuceneQuery(self.schema, original=self)
 
-    @property
     def options(self):
         opts = {}
         s = unicode(self)
@@ -383,7 +382,7 @@ class SolrSearch(object):
     def options(self):
         options = {}
         for option_module in self.option_modules:
-            options.update(getattr(self, option_module).options)
+            options.update(getattr(self, option_module).options())
         if 'q' not in options:
             options['q'] = '*' # search everything
         return options
@@ -433,7 +432,6 @@ class Options(object):
             for field in fields:
                 self.fields[field][k] = v
 
-    @property
     def options(self):
         opts = {}
         if self.fields:
@@ -555,7 +553,6 @@ class MoreLikeThisOptions(Options):
                                 (opt_name, opt_type.__name__))
         self.kwargs.update(kwargs)
 
-    @property
     def options(self):
         opts = {}
         if self.fields:
@@ -598,7 +595,6 @@ class PaginateOptions(Options):
                 raise SolrError("paginator rows must be 0 or greater")
             self.rows = rows
 
-    @property
     def options(self):
         opts = {}
         if self.start is not None:
@@ -637,7 +633,6 @@ class SortOptions(Options):
                 raise SolrError("Cannot sort on an un-indexed field")
         self.fields.append([order, field])
 
-    @property
     def options(self):
         if self.fields:
             return {"sort":", ".join("%s %s" % (field, order) for order, field in self.fields)}
@@ -656,7 +651,6 @@ class FacetQueryOptions(Options):
     def update(self, query):
         self.queries.append(query)
 
-    @property
     def options(self):
         if self.queries:
             return {'facet.query':[unicode(q) for q in self.queries],
