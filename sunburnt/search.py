@@ -306,9 +306,8 @@ class SolrSearch(object):
         return newself
 
     def exclude(self, *args, **kwargs):
-        newself = self.clone()
-        newself.query(~newself.Q(*args, **kwargs))
-        return newself
+        # cloning will be done by query
+        return self.query(~self.Q(*args, **kwargs))
 
     def filter(self, *args, **kwargs):
         newself = self.clone()
@@ -316,9 +315,8 @@ class SolrSearch(object):
         return newself
 
     def filter_exclude(self, *args, **kwargs):
-        newself = self.clone()
-        newself.filter(~newself.Q(*args, **kwargs))
-        return newself
+        # cloning will be done by filter
+        return self.filter(~self.Q(*args, **kwargs))
 
     def facet_by(self, field, **kwargs):
         newself = self.clone()
