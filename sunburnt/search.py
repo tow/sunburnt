@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-import collections, copy, re
+import collections, copy, operator, re
 
 from .schema import SolrError, SolrUnicodeField, SolrBooleanField
 
@@ -24,6 +24,7 @@ class LuceneQuery(object):
             self.ranges = set()
             self.subqueries = []
             self._or = self._and = self._not = self._pow = None
+            self.boosts = []
         else:
             self.option_flag = original.option_flag
             self.terms = copy.copy(original.terms)
@@ -34,6 +35,7 @@ class LuceneQuery(object):
             self._and = original._and
             self._not = original._not
             self._pow = original._pow
+            self.boosts = original.boosts
 
     def clone(self):
         return LuceneQuery(self.schema, original=self)
@@ -112,6 +114,14 @@ class LuceneQuery(object):
             return True
 
     def __unicode__(self):
+        if self.boosts:
+            # Clone and rewrite to effect the boosts.
+            newself = self.clone()
+            newself.boosts = []
+            boost_queries = [self.Q(**kwargs)**boost_score
+                             for kwargs, boost_score in self.boosts]
+            newself = newself | (newself & reduce(operator.or_, boost_queries))
+            return unicode(newself)
         if self._or is not None:
             s = []
             for o in self._or:
@@ -170,8 +180,10 @@ class LuceneQuery(object):
     def is_single_query(self):
         return sum([len(self.terms), len(self.phrases), len(self.ranges), len(self.subqueries)]) == 1
 
-    def Q(self):
-        return LuceneQuery(self.schema)
+    def Q(self, *args, **kwargs):
+        q = LuceneQuery(self.schema)
+        q.add(args, kwargs)
+        return q
 
     def __nonzero__(self):
         return bool(self.terms) or bool(self.phrases) or bool(self.ranges) or bool(self.subqueries)
@@ -261,6 +273,12 @@ class LuceneQuery(object):
 
     def term_or_phrase(self, arg, force=None):
         return 'terms' if self.default_term_re.match(arg) else 'phrases'
+
+    def add_boost(self, kwargs, boost_score):
+        for k, v in kwargs.items():
+            field = self.schema.match_field(k)
+            value = field.serialize(v)
+        self.boosts.append((kwargs, boost_score))
 
 
 class SolrSearch(object):
@@ -353,10 +371,8 @@ class SolrSearch(object):
 
         # Clone all of self *except* query, which we'll take care of directly
         newself = self.clone()
-        newself.query_obj = LuceneQuery(self.schema, 'q')
-
-        return newself.query(self.query_obj |
-                             (self.query_obj & self.Q(**kwargs)**boost_score))
+        newself.query_obj.add_boost(kwargs, boost_score)
+        return newself
 
     def options(self):
         options = {}
