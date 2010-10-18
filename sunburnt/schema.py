@@ -278,7 +278,7 @@ class SolrSchema(object):
     def serialize_value(self, k, v):
         field = self.match_field(k)
         if not field:
-            raise SolrError("No such field '%s' in current schema" % name)
+            raise SolrError("No such field '%s' in current schema" % k)
         return field.serialize(v)
 
     def get_id_for_doc(self, doc):
