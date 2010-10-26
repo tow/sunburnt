@@ -101,7 +101,7 @@ class LuceneQuery(object):
         return ' AND '.join(s)
 
     def child_needs_parens(self, child, op=None):
-        if child.is_single_query():
+        if len(child) == 1:
             return False
         elif child._not is not None or child._pow is not None:
             return False
@@ -170,14 +170,19 @@ class LuceneQuery(object):
             return ' AND '.join(u)
 
     def stringify_with_optional_parens(self):
-        if self.is_single_query():
+        if len(self) == 1:
             s = u"%s"
         else:
             s = u"(%s)"
         return s % self
 
-    def is_single_query(self):
-        return sum([len(self.terms), len(self.phrases), len(self.ranges), len(self.subqueries)]) == 1
+    def __len__(self):
+        # How many terms in this (sub) query?
+        if len(self.subqueries) == 1:
+            subquery_length = len(self.subqueries[0])
+        else:
+            subquery_length = len(self.subqueries)
+        return sum([len(self.terms), len(self.phrases), len(self.ranges), subquery_length])
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
