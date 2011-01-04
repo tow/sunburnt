@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import collections, copy, operator, re
 
 from .schema import SolrError, SolrUnicodeField, SolrBooleanField
+from .strings import WildcardString
 
 
 class LuceneQuery(object):
@@ -56,20 +57,12 @@ class LuceneQuery(object):
             else:
                 field = self.schema.default_field
             if isinstance(field, SolrUnicodeField):
-                value_set = [self.__lqs_escape(value) for value in value_set]
+                value_set = [value.escape_for_lqs_term() for value in value_set]
             if name:
                 s += [u'%s:%s' % (name, value) for value in sorted(value_set)]
             else:
                 s += sorted(value_set)
         return ' AND '.join(s)
-
-    # I'm very much not sure we're doing the right thing here:
-    lucene_special_chars = re.compile(r'([+\-&|!\(\){}\[\]\^\"~\*\?:\\])')
-    lucene_special_words = ("AND", "NOT", "OR")
-    def __lqs_escape(self, s):
-        if s in self.lucene_special_words:
-            return u'"%s"'%s
-        return self.lucene_special_chars.sub(r'\\\1', s)
 
     def serialize_phrase_queries(self):
         s = []
@@ -79,19 +72,13 @@ class LuceneQuery(object):
             else:
                 field = self.schema.default_field
             if isinstance(field, SolrUnicodeField):
-                value_set = [self.__phrase_escape(value) for value in value_set]
+                value_set = [value.escape_for_lqs_term() for value in value_set]
             if name:
                 s += [u'%s:"%s"' % (name, value)
                       for value in sorted(value_set)]
             else:
                 s += ['"%s"' % value for value in sorted(value_set)]
         return ' AND '.join(s)
-
-    def __phrase_escape(self, s):
-        # For phrases, anything is allowed between double-quotes, except
-        # double-quotes themselves, which must be escaped with backslashes,
-        # and thus also backslashes must too be escaped.
-        return s.replace('\\', '\\\\').replace('"', '\\"')
 
     def serialize_range_queries(self):
         s = []
@@ -254,6 +241,7 @@ class LuceneQuery(object):
         for value in values:
             if isinstance(field, SolrUnicodeField):
                 this_term_or_phrase = term_or_phrase or self.term_or_phrase(value)
+                value = WildcardString(value)
             else:
                 this_term_or_phrase = "terms"
             getattr(self, this_term_or_phrase)[field_name].add(value)
