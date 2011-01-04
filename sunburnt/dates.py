@@ -1,8 +1,6 @@
 from __future__ import absolute_import
 
-import datetime
-import re
-import warnings
+import datetime, math, re, warnings
 
 try:
     import mx.DateTime
@@ -76,6 +74,11 @@ if mx:
             raise DateTimeRangeError(e.args[0])
 else:
     def datetime_factory(**kwargs):
+        second = kwargs.get('second')
+        if second is not None:
+            f, i = math.modf(second)
+            kwargs['second'] = int(i)
+            kwargs['microsecond'] = int(f * 1000000)
         try:
             return datetime.datetime(**kwargs)
         except ValueError, e:
