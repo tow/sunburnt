@@ -11,4 +11,11 @@ distutils.core.setup(
     packages=['sunburnt'],
     requires=['httplib2', 'lxml', 'pytz'],
     license='WTFPL',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'License :: DFSG approved',
+        'Programming Language :: Python',
+        'Topic :: Internet :: WWW/HTTP :: Indexing/Search',
+        'Topic :: Software Development :: Libraries'],
     )
