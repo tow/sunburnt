@@ -49,9 +49,9 @@ class LuceneQuery(object):
         return opts
 
     # Below, we sort all our value_sets - this is for predictability when testing.
-    def serialize_term_queries(self):
+    def serialize_term_queries(self, terms):
         s = []
-        for name, value_set in sorted(self.terms.items()):
+        for name, value_set in sorted(terms.items()):
             if name:
                 field = self.schema.match_field(name)
             else:
@@ -62,22 +62,6 @@ class LuceneQuery(object):
                 s += [u'%s:%s' % (name, value) for value in sorted(value_set)]
             else:
                 s += sorted(value_set)
-        return ' AND '.join(s)
-
-    def serialize_phrase_queries(self):
-        s = []
-        for name, value_set in sorted(self.phrases.items()):
-            if name:
-                field = self.schema.match_field(name)
-            else:
-                field = self.schema.default_field
-            if isinstance(field, SolrUnicodeField):
-                value_set = [value.escape_for_lqs_term() for value in value_set]
-            if name:
-                s += [u'%s:"%s"' % (name, value)
-                      for value in sorted(value_set)]
-            else:
-                s += ['"%s"' % value for value in sorted(value_set)]
         return ' AND '.join(s)
 
     def serialize_range_queries(self):
@@ -141,8 +125,8 @@ class LuceneQuery(object):
             else:
                 return u"%s^%s"%(q,v)
         else:
-            u = [s for s in [self.serialize_term_queries(),
-                             self.serialize_phrase_queries(),
+            u = [s for s in [self.serialize_term_queries(self.terms),
+                             self.serialize_term_queries(self.phrases),
                              self.serialize_range_queries()]
                  if s]
             if not u and len(self.subqueries) == 1:

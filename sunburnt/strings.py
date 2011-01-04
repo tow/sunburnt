@@ -39,7 +39,7 @@ class WildcardString(unicode):
     # either have a very specialized queryparser, or you're not going to get
     # the results you expect. Any halfway normal Solr query parser will end up
     # losing most of these special characters before they hit Lucene anyway.
-    lucene_special_chars = r'+-&|!(){}[]^"~*?:\\'
+    lucene_special_chars = '+-&|!(){}[]^"~*?: \t\v\\'
     def escape_for_lqs_term(self):
         chars = []
         for c in self.chars:
