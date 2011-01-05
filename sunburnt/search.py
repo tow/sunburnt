@@ -66,10 +66,14 @@ class LuceneQuery(object):
         if self.subqueries:
             if self._and:
                 print '%sAND:' % indentspace
-            if self._or:
+            elif self._or:
                 print '%sOR:' % indentspace
-            if self._not:
+            elif self._not:
                 print '%sNOT:' % indentspace
+            elif self._pow is not False:
+                print '%sPOW %s:' % (indentspace, self._pow)
+            else:
+                raise ValueError
             for subquery in self.subqueries:
                 subquery.serialize_debug(indent+2)
         print '%s%s' % (indentspace, '}')
@@ -150,13 +154,17 @@ class LuceneQuery(object):
             if not len(self.subqueries):
                 newself = self.clone(deep=False)
                 newself._not = False
-                newself = self
+                newself._and = True
+                self = newself
+                mutated = True
             elif len(self.subqueries) == 1:
                 if self.subqueries[0]._not:
                     newself = self.clone(deep=False)
                     newself.subqueries = self.subqueries[0].subqueries
                     newself._not = False
-                    newself = False
+                    newself._and = True
+                    self = newself
+                    mutated = True
             else:
                 raise ValueError
         elif self._pow:
@@ -164,6 +172,12 @@ class LuceneQuery(object):
                 newself = self.clone(deep=False)
                 newself._pow = False
                 self = newself
+                mutated = True
+        elif self._and or self._or:
+            if not self.terms and not self.phrases and not self.ranges:
+                if len(self.subqueries) == 1:
+                    self = self.subqueries[0]
+                    mutated = True
         self.normalized = True
         return self, mutated
 
@@ -207,7 +221,6 @@ class LuceneQuery(object):
                 assert len(u) == 1
                 return u"%s^%s"%(u[0], self._pow)
             else:
-                import pdb;pdb.set_trace()
                 raise ValueError
 
     def __len__(self):
