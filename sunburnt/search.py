@@ -217,7 +217,7 @@ class LuceneQuery(object):
             elif self._not:
                 assert len(u) == 1
                 return u'NOT %s'%u[0]
-            elif self._pow:
+            elif self._pow is not False:
                 assert len(u) == 1
                 return u"%s^%s"%(u[0], self._pow)
             else:
@@ -264,6 +264,7 @@ class LuceneQuery(object):
         except ValueError:
             raise ValueError("Non-numeric value supplied for boost")
         q = LuceneQuery(self.schema)
+        q.subqueries = [self]
         q._and = False
         q._pow = value
         return q
