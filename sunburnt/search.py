@@ -16,7 +16,7 @@ class LuceneQuery(object):
         "rangeexc": "{%s TO %s}",
         "range": "[%s TO %s]",
     }
-    def __init__(self, schema, option_flag=None, original=None):
+    def __init__(self, schema, option_flag=None, original=None, deep_clone=True):
         self.schema = schema
         self.normalized = False
         if original is None:
@@ -33,15 +33,18 @@ class LuceneQuery(object):
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
-            self.subqueries = [q.clone() for q in original.subqueries]
+            if deep_clone:
+                self.subqueries = [q.clone() for q in original.subqueries]
+            else:
+                self.subqueries = [q for q in original.subqueries]
             self._or = original._or
             self._and = original._and
             self._not = original._not
             self._pow = original._pow
             self.boosts = original.boosts
 
-    def clone(self):
-        return LuceneQuery(self.schema, original=self)
+    def clone(self, deep=True):
+        return LuceneQuery(self.schema, original=self, deep_clone=deep)
 
     def options(self):
         opts = {}
@@ -52,23 +55,24 @@ class LuceneQuery(object):
 
     def serialize_debug(self, indent=0):
         indentspace = indent * ' '
-        print '%s%s' % (indentspace, repr(self))
+        print '%s%s (%s)' % (indentspace, repr(self), "Normalized" if self.normalized else "Not normalized")
+        print '%s%s' % (indentspace, '{')
         for term in self.terms.items():
             print '%s%s' % (indentspace, term)
         for phrase in self.phrases.items():
             print '%s%s' % (indentspace, phrase)
         for range in self.ranges:
             print '%s%s' % (indentspace, range)
-        if not self.subqueries:
-            return
-        if self._and:
-            print '%sAND:' % indentspace
-        if self._or:
-            print '%sOR:' % indentspace
-        if self._not:
-            print '%sNOT:' % indentspace
-        for subquery in self.subqueries:
-            subquery.serialize_debug(indent+2)
+        if self.subqueries:
+            if self._and:
+                print '%sAND:' % indentspace
+            if self._or:
+                print '%sOR:' % indentspace
+            if self._not:
+                print '%sNOT:' % indentspace
+            for subquery in self.subqueries:
+                subquery.serialize_debug(indent+2)
+        print '%s%s' % (indentspace, '}')
 
     # Below, we sort all our value_sets - this is for predictability when testing.
     def serialize_term_queries(self, terms):
@@ -106,47 +110,66 @@ class LuceneQuery(object):
             return True
 
     @staticmethod
-    def add_terms(terms1, terms2):
-        terms = terms1.copy()
-        terms1.update(terms2)
-        return terms
+    def merge_term_dicts(*args):
+        d = collections.defaultdict(set)
+        for arg in args:
+            for k, v in arg.items():
+                d[k].update(v)
+        return dict((k, v) for k, v in d.items())
 
     def normalize(self):
-        import pdb;pdb.set_trace()
         if self.normalized:
-            return self
+            return self, False
+        mutated = False
         _subqueries = []
+        _terms = self.terms
+        _phrases = self.phrases
+        _ranges = self.ranges
         for s in self.subqueries:
-            _s = s.normalize()
+            _s, changed = s.normalize()
+            if not _s or changed:
+                mutated = True
             if _s:
-                if _s._and and self._and:
-                    self.terms = self.add_terms()
-                    # and all the terms and all the phrases and all the ranges
-                    _subqueries.extend(_s.subqueries)
-                elif _s._or and self._or:
-                    # and all the terms and all the phrases and all the ranges
+                if (_s._and and self._and) or (_s._or and self._or):
+                    mutated = True
+                    _terms = self.merge_term_dicts(_terms, _s.terms)
+                    _phrases = self.merge_term_dicts(_phrases, _s.phrases)
+                    _ranges = _ranges.union(_s.ranges)
                     _subqueries.extend(_s.subqueries)
                 else:
                     _subqueries.append(_s)
-        self.subqueries = _subqueries
+        if mutated:
+            newself = self.clone(deep=False)
+            newself.terms = _terms
+            newself.phrases = _phrases
+            newself.ranges = _ranges
+            newself.subqueries = _subqueries
+            self = newself
+
         if self._not:
             if not len(self.subqueries):
-                self._not = False            
+                newself = self.clone(deep=False)
+                newself._not = False
+                newself = self
             elif len(self.subqueries) == 1:
                 if self.subqueries[0]._not:
-                    self.subqueries = self.subqueries[0].subqueries
-                    self._not = False
+                    newself = self.clone(deep=False)
+                    newself.subqueries = self.subqueries[0].subqueries
+                    newself._not = False
+                    newself = False
             else:
                 raise ValueError
         elif self._pow:
             if not len(self.subqueries):
-                self._pow = False
+                newself = self.clone(deep=False)
+                newself._pow = False
+                self = newself
         self.normalized = True
-        return self
+        return self, mutated
 
     def __unicode__(self):
         if not self.normalized:
-            self.normalize()
+            self, _ = self.normalize()
         if self.boosts:
             # Clone and rewrite to effect the boosts.
             newself = self.clone()
