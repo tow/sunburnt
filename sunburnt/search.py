@@ -18,13 +18,15 @@ class LuceneQuery(object):
     }
     def __init__(self, schema, option_flag=None, original=None):
         self.schema = schema
+        self.normalized = False
         if original is None:
             self.option_flag = option_flag
             self.terms = collections.defaultdict(set)
             self.phrases = collections.defaultdict(set)
             self.ranges = set()
             self.subqueries = []
-            self._or = self._and = self._not = self._pow = None
+            self._and = True
+            self._or = self._not = self._pow = False
             self.boosts = []
         else:
             self.option_flag = original.option_flag
@@ -47,6 +49,26 @@ class LuceneQuery(object):
         if s:
             opts[self.option_flag] = s
         return opts
+
+    def serialize_debug(self, indent=0):
+        indentspace = indent * ' '
+        print '%s%s' % (indentspace, repr(self))
+        for term in self.terms.items():
+            print '%s%s' % (indentspace, term)
+        for phrase in self.phrases.items():
+            print '%s%s' % (indentspace, phrase)
+        for range in self.ranges:
+            print '%s%s' % (indentspace, range)
+        if not self.subqueries:
+            return
+        if self._and:
+            print '%sAND:' % indentspace
+        if self._or:
+            print '%sOR:' % indentspace
+        if self._not:
+            print '%sNOT:' % indentspace
+        for subquery in self.subqueries:
+            subquery.serialize_debug(indent+2)
 
     # Below, we sort all our value_sets - this is for predictability when testing.
     def serialize_term_queries(self, terms):
@@ -74,16 +96,57 @@ class LuceneQuery(object):
     def child_needs_parens(self, child, op=None):
         if len(child) == 1:
             return False
-        elif child._not is not None or child._pow is not None:
+        elif child._not or child._pow:
             return False
-        elif (self._or is not None or op=='OR') and child._or is not None:
+        elif (self._or or op=='OR') and child._or:
             return False
-        elif (self._and is not None or op=='AND') and child._and is not None:
+        elif (self._and or op=='AND') and child._and:
             return False
         else:
             return True
 
+    @staticmethod
+    def add_terms(terms1, terms2):
+        terms = terms1.copy()
+        terms1.update(terms2)
+        return terms
+
+    def normalize(self):
+        import pdb;pdb.set_trace()
+        if self.normalized:
+            return self
+        _subqueries = []
+        for s in self.subqueries:
+            _s = s.normalize()
+            if _s:
+                if _s._and and self._and:
+                    self.terms = self.add_terms()
+                    # and all the terms and all the phrases and all the ranges
+                    _subqueries.extend(_s.subqueries)
+                elif _s._or and self._or:
+                    # and all the terms and all the phrases and all the ranges
+                    _subqueries.extend(_s.subqueries)
+                else:
+                    _subqueries.append(_s)
+        self.subqueries = _subqueries
+        if self._not:
+            if not len(self.subqueries):
+                self._not = False            
+            elif len(self.subqueries) == 1:
+                if self.subqueries[0]._not:
+                    self.subqueries = self.subqueries[0].subqueries
+                    self._not = False
+            else:
+                raise ValueError
+        elif self._pow:
+            if not len(self.subqueries):
+                self._pow = False
+        self.normalized = True
+        return self
+
     def __unicode__(self):
+        if not self.normalized:
+            self.normalize()
         if self.boosts:
             # Clone and rewrite to effect the boosts.
             newself = self.clone()
@@ -92,38 +155,6 @@ class LuceneQuery(object):
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             return unicode(newself)
-        if self._or is not None:
-            s = []
-            for o in self._or:
-                if self.child_needs_parens(o):
-                    s.append(u"(%s)"%o)
-                else:
-                    s.append(u"%s"%o)
-            return u" OR ".join(s)
-        elif self._and is not None:
-            s = []
-            for o in self._and:
-                if self.child_needs_parens(o):
-                    s.append(u"(%s)"%o)
-                else:
-                    s.append(u"%s"%o)
-            return u" AND ".join(s)
-        elif self._not is not None:
-            o = self._not
-            if o._not is not None:
-                # they cancel out
-                self._not = self._not._not
-                return u"%s"%o
-            if self.child_needs_parens(o):
-                return u"NOT (%s)"%o
-            else:
-                return u"NOT %s"%o
-        elif self._pow is not None:
-            q, v = self._pow
-            if self.child_needs_parens(q):
-                return u"(%s)^%s"%(q,v)
-            else:
-                return u"%s^%s"%(q,v)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
@@ -133,19 +164,28 @@ class LuceneQuery(object):
                 # Only one subquery, no need for parens
                 u.append(u"%s"%self.subqueries[0])
             else:
+                if self._or:
+                    op = 'OR'
+                else:
+                    op = 'AND'
                 for q in self.subqueries:
-                    if self.child_needs_parens(q, 'AND'):
+                    if self.child_needs_parens(q, op):
                         u.append(u"(%s)"%q)
                     else:
                         u.append(u"%s"%q)
-            return ' AND '.join(u)
-
-    def stringify_with_optional_parens(self):
-        if len(self) == 1:
-            s = u"%s"
-        else:
-            s = u"(%s)"
-        return s % self
+            if self._and:
+                return u' AND '.join(u)
+            elif self._or:
+                return u' OR '.join(u)
+            elif self._not:
+                assert len(u) == 1
+                return u'NOT %s'%u[0]
+            elif self._pow:
+                assert len(u) == 1
+                return u"%s^%s"%(u[0], self._pow)
+            else:
+                import pdb;pdb.set_trace()
+                raise ValueError
 
     def __len__(self):
         # How many terms in this (sub) query?
@@ -165,17 +205,21 @@ class LuceneQuery(object):
 
     def __or__(self, other):
         q = LuceneQuery(self.schema)
-        q._or = (self, other)
+        q._and = False
+        q._or = True
+        q.subqueries = [self, other]
         return q
 
     def __and__(self, other):
         q = LuceneQuery(self.schema)
-        q._and = (self, other)
+        q.subqueries = [self, other]
         return q
 
     def __invert__(self):
         q = LuceneQuery(self.schema)
-        q._not = self
+        q._and = False
+        q._not = True
+        q.subqueries = [self]
         return q
 
     def __pow__(self, value):
@@ -184,10 +228,12 @@ class LuceneQuery(object):
         except ValueError:
             raise ValueError("Non-numeric value supplied for boost")
         q = LuceneQuery(self.schema)
-        q._pow = (self, value)
+        q._and = False
+        q._pow = value
         return q
         
     def add(self, args, kwargs, terms_or_phrases=None):
+        self.normalized = False
         _args = []
         for arg in args:
             if isinstance(arg, LuceneQuery):
