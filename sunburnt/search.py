@@ -336,6 +336,8 @@ class LuceneQuery(object):
     def add_boost(self, kwargs, boost_score):
         for k, v in kwargs.items():
             field = self.schema.match_field(k)
+            if not field:
+                raise ValueError("%s is not a valid field name" % k)
             value = field.serialize(v)
         self.boosts.append((kwargs, boost_score))
 
