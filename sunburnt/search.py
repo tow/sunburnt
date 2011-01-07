@@ -104,8 +104,6 @@ class LuceneQuery(object):
     def child_needs_parens(self, child, op=None):
         if len(child) == 1:
             return False
-        elif child._not or child._pow:
-            return False
         elif (self._or or op=='OR') and child._or:
             return False
         elif (self._and or op=='AND') and child._and:
@@ -197,19 +195,11 @@ class LuceneQuery(object):
                              self.serialize_term_queries(self.phrases),
                              self.serialize_range_queries()]
                  if s]
-            if not u and len(self.subqueries) == 1:
-                # Only one subquery, no need for parens
-                u.append(u"%s"%self.subqueries[0])
-            else:
-                if self._or:
-                    op = 'OR'
+            for q in self.subqueries:
+                if self.child_needs_parens(q, 'OR' if self._or else 'AND'):
+                    u.append(u"(%s)"%q)
                 else:
-                    op = 'AND'
-                for q in self.subqueries:
-                    if self.child_needs_parens(q, op):
-                        u.append(u"(%s)"%q)
-                    else:
-                        u.append(u"%s"%q)
+                    u.append(u"%s"%q)
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
