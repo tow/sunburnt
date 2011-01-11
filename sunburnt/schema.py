@@ -225,7 +225,7 @@ class SolrSchema(object):
             try:
                 name, type = field_node.attrib['name'], field_node.attrib['type']
             except KeyError, e:
-                raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.message)
+                raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.args[0])
             try:
                 field_class = field_types[type]
             except KeyError, e:
@@ -236,7 +236,7 @@ class SolrSchema(object):
             try:
                 name, type = field_node.attrib['name'], field_node.attrib['type']
             except KeyError, e:
-                raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.message)
+                raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.args[0])
             try:
                 field_class = field_types[type]
             except KeyError, e:
