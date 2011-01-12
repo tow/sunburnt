@@ -11,7 +11,7 @@ import mx.DateTime
 from .schema import SolrSchema, SolrError
 from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 
-debug = True
+debug = False
 
 schema_string = \
 """<schema name="timetric" version="1.1">
@@ -358,7 +358,7 @@ def test_bad_option_data():
 
 
 complex_boolean_queries = (
-    (lambda q: q.query("hello world").filter(q.Q(text_field="tow") | q.Q(boolean_field=False, int_field__gt=3)), 
+    (lambda q: q.query("hello world").filter(q.Q(text_field="tow") | q.Q(boolean_field=False, int_field__gt=3)),
      [('fq', u'text_field:tow OR (boolean_field:false AND int_field:{3 TO *})'), ('q', u'hello\\ world')]),
     (lambda q: q.query("hello world").filter(q.Q(text_field="tow") & q.Q(boolean_field=False, int_field__gt=3)),
      [('fq', u'boolean_field:false AND text_field:tow AND int_field:{3 TO *}'), ('q',  u'hello\\ world')]),
@@ -406,7 +406,17 @@ complex_boolean_queries = (
 # Test escaping of AND, OR, NOT
     (lambda q: q.query("AND", "OR", "NOT"),
      [('q', u'"AND" AND "NOT" AND "OR"')]),
-)    
+# Test exclude (rather than explicit NOT
+    (lambda q: q.query("blah").exclude(q.Q("abc") | q.Q("def") | q.Q("ghi")),
+     [('q', u'blah AND NOT (abc OR def OR ghi)')]),
+# Try boosts
+    (lambda q: q.query("blah").query(q.Q("def")**1.5),
+     [('q', u'blah AND def^1.5')]),
+    (lambda q: q.query("blah").query((q.Q("def") | q.Q("ghi"))**1.5),
+     [('q', u'blah AND (def OR ghi)^1.5')]),
+    (lambda q: q.query("blah").query(q.Q("def", ~q.Q("pqr") | q.Q("mno"))**1.5),
+     [('q', u'blah AND (def AND ((*:* AND NOT pqr) OR mno))^1.5')]),
+)
 
 def check_complex_boolean_query(solr_search, query, output):
     try:

@@ -101,13 +101,15 @@ class LuceneQuery(object):
             s.append("%(name)s:%(range)s" % vars())
         return ' AND '.join(s)
 
-    def child_needs_parens(self, child, op=None):
+    def child_needs_parens(self, child):
         if len(child) == 1:
             return False
-        elif (self._or or op=='OR') and child._or:
+        elif self._or and (child._or or child._pow):
             return False
-        elif (self._and or op=='AND') and (child._and or child._not):
+        elif (self._and or self._not) and (child._and or child._not or child._pow):
             return False
+        elif self._pow is not False:
+            return True
         else:
             return True
 
@@ -197,7 +199,7 @@ class LuceneQuery(object):
                  if s]
             for q in self.subqueries:
                 op_ = 'OR' if self._or else 'AND'
-                if self.child_needs_parens(q, op):
+                if self.child_needs_parens(q):
                     u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
                 else:
                     u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
