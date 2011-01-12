@@ -35,12 +35,13 @@ class WildcardString(unicode):
             chars.append('\\')
         return chars
 
-    # If any of your queries rely on the exact behaviour below, you'd better
-    # either have a very specialized queryparser, or you're not going to get
-    # the results you expect. Any halfway normal Solr query parser will end up
-    # losing most of these special characters before they hit Lucene anyway.
+    # The behaviour below is only really relevant for String fields rather
+    # than Text fields - most queryparsers will strip these characters out
+    # for a text field anyway.
     lucene_special_chars = '+-&|!(){}[]^"~*?: \t\v\\'
     def escape_for_lqs_term(self):
+        if self in ["AND", "OR", "NOT"]:
+            return '"%s"' % self
         chars = []
         for c in self.chars:
             if isinstance(c, basestring) and c in self.lucene_special_chars:
