@@ -106,7 +106,7 @@ class LuceneQuery(object):
             return False
         elif (self._or or op=='OR') and child._or:
             return False
-        elif (self._and or op=='AND') and child._and:
+        elif (self._and or op=='AND') and (child._and or child._not):
             return False
         else:
             return True
