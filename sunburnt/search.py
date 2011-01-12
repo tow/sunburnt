@@ -179,7 +179,7 @@ class LuceneQuery(object):
         self.normalized = True
         return self, mutated
 
-    def __unicode__(self):
+    def __unicode__(self, level=0, op=None):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -189,24 +189,28 @@ class LuceneQuery(object):
             boost_queries = [self.Q(**kwargs)**boost_score
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
-            return unicode(newself)
+            return unicode(newself, level=level)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
                              self.serialize_range_queries()]
                  if s]
             for q in self.subqueries:
-                if self.child_needs_parens(q, 'OR' if self._or else 'AND'):
-                    u.append(u"(%s)"%q)
+                op_ = 'OR' if self._or else 'AND'
+                if self.child_needs_parens(q, op):
+                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
                 else:
-                    u.append(u"%s"%q)
+                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
                 return u' OR '.join(u)
             elif self._not:
                 assert len(u) == 1
-                return u'NOT %s'%u[0]
+                if level == 0 or (level == 1 and op == "AND"):
+                    return u'NOT %s'%u[0]
+                else:
+                    return u'(*:* AND NOT %s)'%u[0]
             elif self._pow is not False:
                 assert len(u) == 1
                 return u"%s^%s"%(u[0], self._pow)
