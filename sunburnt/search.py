@@ -9,6 +9,7 @@ from .strings import WildcardString
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
     range_query_templates = {
+        "any": "[* TO *]%s",
         "lt": "{* TO %s}",
         "lte": "[* TO %s]",
         "gt": "{%s TO *}",
@@ -319,6 +320,10 @@ class LuceneQuery(object):
                 raise SolrError("'%s__%s' argument must be a length-2 iterable"
                                  % (field_name, rel))
             value = tuple(sorted(field.serialize(v) for v in value))
+        elif rel == 'any':
+            if value is not True:
+                raise SolrError("'%s__%s' argument must be True")
+            value = ''
         else:
             value = field.serialize(value)
         self.ranges.add((field_name, rel, value))

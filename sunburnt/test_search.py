@@ -173,6 +173,8 @@ good_query_data = {
         ),
 
     "query":(
+        ([], {"int_field__any":True},
+         [("q", u"int_field:[* TO *]")]),
         ([], {"int_field__lt":3},
          [("q", u"int_field:{* TO 3}")]),
         ([], {"int_field__gt":3},
@@ -419,6 +421,11 @@ complex_boolean_queries = (
 # And boost_relevancy
     (lambda q: q.query("blah").boost_relevancy(1.5, int_field=3),
      [('q', u'blah OR (blah AND int_field:3^1.5)')]),
+# And ranges
+    (lambda q: q.query(int_field__any=True),
+     [('q', u'int_field:[* TO *]')]),
+    (lambda q: q.query("blah", ~q.Q(int_field__any=True)),
+     [('q', u'blah AND NOT int_field:[* TO *]')]),
 )
 
 def check_complex_boolean_query(solr_search, query, output):
