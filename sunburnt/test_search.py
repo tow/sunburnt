@@ -11,6 +11,8 @@ import mx.DateTime
 from .schema import SolrSchema, SolrError
 from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 
+debug = True
+
 schema_string = \
 """<schema name="timetric" version="1.1">
   <types>
@@ -355,23 +357,72 @@ def test_bad_option_data():
             yield check_bad_option_data, OptionClass, kwargs
 
 
-class TestAndOrSyntax(object):
-    # I'm not completely sure of the syntax for this yet ...
-    def setUp(self):
-        solr_search = SolrSearch(interface)
-        self.q = solr_search.query()
+complex_boolean_queries = (
+    (lambda q: q.query("hello world").filter(q.Q(text_field="tow") | q.Q(boolean_field=False, int_field__gt=3)), 
+     [('fq', u'text_field:tow OR (boolean_field:false AND int_field:{3 TO *})'), ('q', u'hello\\ world')]),
+    (lambda q: q.query("hello world").filter(q.Q(text_field="tow") & q.Q(boolean_field=False, int_field__gt=3)),
+     [('fq', u'boolean_field:false AND text_field:tow AND int_field:{3 TO *}'), ('q',  u'hello\\ world')]),
+# Test various combinations of NOTs at the top level.
+# Sometimes we need to do the *:* trick, sometimes not.
+    (lambda q: q.query(~q.Q("hello world")),
+     [('q',  u'NOT hello\\ world')]),
+    (lambda q: q.query(~q.Q("hello world") & ~q.Q(int_field=3)),
+     [('q',  u'NOT hello\\ world AND NOT int_field:3')]),
+    (lambda q: q.query("hello world", ~q.Q(int_field=3)),
+     [('q', u'hello\\ world AND NOT int_field:3')]),
+    (lambda q: q.query("abc", q.Q("def"), ~q.Q(int_field=3)),
+     [('q', u'abc AND def AND NOT int_field:3')]),
+    (lambda q: q.query("abc", q.Q("def") & ~q.Q(int_field=3)),
+     [('q', u'abc AND def AND NOT int_field:3')]),
+    (lambda q: q.query("abc", q.Q("def") | ~q.Q(int_field=3)),
+     [('q', u'abc AND (def OR (*:* AND NOT int_field:3))')]),
+    (lambda q: q.query(q.Q("abc") | ~q.Q("def")),
+     [('q', u'abc OR (*:* AND NOT def)')]),
+    (lambda q: q.query(q.Q("abc") | q.Q(~q.Q("def"))),
+     [('q', u'abc OR (*:* AND NOT def)')]),
+# Make sure that ANDs are flattened
+    (lambda q: q.query("def", q.Q("abc"), q.Q(q.Q("xyz"))),
+     [('q', u'abc AND def AND xyz')]),
+# Make sure that ORs are flattened
+    (lambda q: q.query(q.Q("def") | q.Q(q.Q("xyz"))),
+     [('q', u'def OR xyz')]),
+# Make sure that empty queries are discarded in ANDs
+    (lambda q: q.query("def", q.Q("abc"), q.Q(), q.Q(q.Q() & q.Q("xyz"))),
+     [('q', u'abc AND def AND xyz')]),
+# Make sure that empty queries are discarded in ORs
+    (lambda q: q.query(q.Q() | q.Q("def") | q.Q(q.Q() | q.Q("xyz"))),
+     [('q', u'def OR xyz')]),
+# Test cancellation of NOTs.
+    (lambda q: q.query(~q.Q(~q.Q("def"))),
+     [('q', u'def')]),
+    (lambda q: q.query(~q.Q(~q.Q(~q.Q("def")))),
+     [('q', u'NOT def')]),
+# Test it works through sub-sub-queries
+    (lambda q: q.query(~q.Q(q.Q(q.Q(~q.Q(~q.Q("def")))))),
+     [('q', u'NOT def')]),
+# Even with empty queries in there
+    (lambda q: q.query(~q.Q(q.Q(q.Q() & q.Q(q.Q() | ~q.Q(~q.Q("def")))))),
+     [('q', u'NOT def')]),
+# Test escaping of AND, OR, NOT
+    (lambda q: q.query("AND", "OR", "NOT"),
+     [('q', u'"AND" AND "NOT" AND "OR"')]),
+)    
 
-    def test_or_example(self):
-        Q = self.q.Q
-        q = self.q.query("hello world").filter(Q(text_field="tow") | Q(boolean_field=False, int_field__gt=3))
-        assert q.params() == \
-            [('fq', u'text_field:tow OR (boolean_field:false AND int_field:{3 TO *})'), ('q', u'hello\\ world')]
+def check_complex_boolean_query(solr_search, query, output):
+    try:
+        assert query(solr_search).params() == output
+    except AssertionError:
+        if debug:
+            print query(solr_search).params()
+            print output
+            import pdb;pdb.set_trace()
+        else:
+            raise
 
-    def test_and_example(self):
-        Q = self.q.Q
-        q = self.q.query("hello world").filter(Q(text_field="tow") & Q(boolean_field=False, int_field__gt=3))
-        assert q.params() == \
-            [('fq', u'boolean_field:false AND text_field:tow AND int_field:{3 TO *}'), ('q',  u'hello\\ world')]
+def test_complex_boolean_queries():
+    solr_search = SolrSearch(interface)
+    for query, output in complex_boolean_queries:
+        yield check_complex_boolean_query, solr_search, query, output
 
 
 param_encode_data = (
