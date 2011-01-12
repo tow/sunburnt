@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions
+from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 
 schema_string = \
 """<schema name="timetric" version="1.1">
@@ -51,8 +51,6 @@ schema = SolrSchema(StringIO(schema_string))
 
 class MockInterface(object):
     schema = schema
-    def search(self, **kwargs):
-        return kwargs
 
 
 interface = MockInterface()
@@ -61,76 +59,74 @@ interface = MockInterface()
 good_query_data = {
     "query_by_term":(
         (["hello"], {},
-         {"q":u"hello"}),
+         [("q", u"hello")]),
         (["hello"], {"int_field":3},
-         {"q":u"hello int_field:3"}),
+         [("q", u"hello AND int_field:3")]),
         (["hello", "world"], {},
-         {"q":u"hello world"}),
+         [("q", u"hello AND world")]),
         # NB this next is not really what we want,
         # probably this should warn
         (["hello world"], {},
-         {"q":u"hello world"}),
+         [("q", u"hello\\ world")]),
         ),
 
     "query_by_phrase":(
         (["hello"], {},
-         # Do we actually want this many quotes in here?
-         {"q":u"\"hello\""}),
+         [("q", u"hello")]),
         (["hello"], {"int_field":3},
-         {"q":u"int_field:3 \"hello\""}), # Non-text data is always taken to be a term, and terms come before phrases, so order is reversed
+         [("q", u"int_field:3 AND hello")]), # Non-text data is always taken to be a term, and terms come before phrases, so order is reversed
         (["hello", "world"], {},
-         {"q":u"\"hello\" \"world\""}),
+         [("q", u"hello AND world")]),
         (["hello world"], {},
-         {"q":u"\"hello world\""}),
+         [("q", u"hello\\ world")]),
         ([], {'string_field':['hello world', 'goodbye, cruel world']},
-         {"q":u"string_field:\"goodbye, cruel world\" string_field:\"hello world\""}),
+         [("q", u"string_field:goodbye,\\ cruel\\ world AND string_field:hello\\ world")]),
         ),
 
     "filter_by_term":(
         (["hello"], {},
-         {"fq":u"hello"}),
+         [("fq", u"hello"), ("q", "*")]),
         (["hello"], {"int_field":3},
-         {"fq":u"hello int_field:3"}),
+         [("fq", u"hello AND int_field:3"), ("q", "*")]),
         (["hello", "world"], {},
-         {"fq":u"hello world"}),
+         [("fq", u"hello AND world"), ("q", "*")]),
         # NB this next is not really what we want,
         # probably this should warn
         (["hello world"], {},
-         {"fq":u"hello world"}),
+         [("fq", u"hello\\ world"), ("q", "*")]),
         ),
 
     "filter_by_phrase":(
         (["hello"], {},
-         # Do we actually want this many quotes in here?
-         {"fq":u"\"hello\""}),
+         [("fq", u"hello"), ("q", "*")]),
         (["hello"], {"int_field":3},
-         {"fq":u"int_field:3 \"hello\""}),
+         [("fq", u"int_field:3 AND hello"), ("q", "*")]),
         (["hello", "world"], {},
-         {"fq":u"\"hello\" \"world\""}),
+         [("fq", u"hello AND world"), ("q", "*")]),
         (["hello world"], {},
-         {"fq":u"\"hello world\""}),
+         [("fq", u"hello\\ world"), ("q", "*")]),
         ),
 
     "query":(
         (["hello"], {},
-         {"q":u"hello"}),
+         [("q", u"hello")]),
         (["hello"], {"int_field":3},
-         {"q":u"hello int_field:3"}),
+         [("q", u"hello AND int_field:3")]),
         (["hello", "world"], {},
-         {"q":u"hello world"}),
+         [("q", u"hello AND world")]),
         (["hello world"], {},
          {"q":u"\"hello world\""}),
         ),
 
     "filter":(
         (["hello"], {},
-         {"fq":u"hello"}),
+         [("fq", u"hello"), ("q", "*")]),
         (["hello"], {"int_field":3},
-         {"fq":u"hello int_field:3"}),
+         [("fq", u"hello AND int_field:3"), ("q", "*")]),
         (["hello", "world"], {},
-         {"fq":u"hello world"}),
+         [("fq", u"hello AND world"), ("q", "*")]),
         (["hello world"], {},
-         {"fq":u"\"hello world\""}),
+         [("fq", u"hello\\ world"), ("q", "*")]),
         ),
 
     "query":(
@@ -176,42 +172,42 @@ good_query_data = {
 
     "query":(
         ([], {"int_field__lt":3},
-         {"q":u"int_field:{* TO 3}"}),
+         [("q", u"int_field:{* TO 3}")]),
         ([], {"int_field__gt":3},
-         {"q":u"int_field:{3 TO *}"}),
+         [("q", u"int_field:{3 TO *}")]),
         ([], {"int_field__rangeexc":(-3, 3)},
-         {"q":u"int_field:{-3 TO 3}"}),
+         [("q", u"int_field:{-3 TO 3}")]),
         ([], {"int_field__rangeexc":(3, -3)},
-         {"q":u"int_field:{-3 TO 3}"}),
+         [("q", u"int_field:{-3 TO 3}")]),
         ([], {"int_field__lte":3},
-         {"q":u"int_field:[* TO 3]"}),
+         [("q", u"int_field:[* TO 3]")]),
         ([], {"int_field__gte":3},
-         {"q":u"int_field:[3 TO *]"}),
+         [("q", u"int_field:[3 TO *]")]),
         ([], {"int_field__range":(-3, 3)},
-         {"q":u"int_field:[-3 TO 3]"}),
+         [("q", u"int_field:[-3 TO 3]")]),
         ([], {"int_field__range":(3, -3)},
-         {"q":u"int_field:[-3 TO 3]"}),
+         [("q", u"int_field:[-3 TO 3]")]),
         ([], {"date_field__lt":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:{* TO 2009-01-01T00:00:00.000000Z}"}),
+         [("q", u"date_field:{* TO 2009-01-01T00:00:00.000000Z}")]),
         ([], {"date_field__gt":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:{2009-01-01T00:00:00.000000Z TO *}"}),
+         [("q", u"date_field:{2009-01-01T00:00:00.000000Z TO *}")]),
         ([], {"date_field__rangeexc":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
-         {"q":u"date_field:{2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z}"}),
+         [("q", "date_field:{2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z}")]),
         ([], {"date_field__lte":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:[* TO 2009-01-01T00:00:00.000000Z]"}),
+         [("q", u"date_field:[* TO 2009-01-01T00:00:00.000000Z]")]),
         ([], {"date_field__gte":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:[2009-01-01T00:00:00.000000Z TO *]"}),
+         [("q", u"date_field:[2009-01-01T00:00:00.000000Z TO *]")]),
         ([], {"date_field__range":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
-         {"q":u"date_field:[2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z]"}),
+         [("q", u"date_field:[2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z]")]),
         ([], {'string_field':['hello world', 'goodbye, cruel world']},
-         {"q":u"string_field:\"goodbye, cruel world\" string_field:\"hello world\""}),
+         [("q", u"string_field:goodbye,\\ cruel\\ world AND string_field:hello\\ world")]),
 
         ),
     }
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
-    assert getattr(solr_search, method)(*args, **kwargs).execute() == output
+    assert getattr(solr_search, method)(*args, **kwargs).params() == output
 
 def test_query_data():
     for method, data in good_query_data.items():
@@ -241,7 +237,7 @@ bad_query_data = (
 def check_bad_query_data(kwargs):
     solr_search = SolrSearch(interface)
     try:
-        solr_search.query(**kwargs).execute()
+        solr_search.query(**kwargs).params()
     except SolrError:
         pass
     else:
@@ -308,7 +304,7 @@ good_option_data = {
 def check_good_option_data(OptionClass, kwargs, output):
     optioner = OptionClass(schema)
     optioner.update(**kwargs)
-    assert optioner.options == output
+    assert optioner.options() == output
 
 def test_good_option_data():
     for OptionClass, option_data in good_option_data.items():
@@ -367,13 +363,33 @@ class TestAndOrSyntax(object):
 
     def test_or_example(self):
         Q = self.q.Q
-        self.q.query("hello world").filter(Q(text_field="tow") | Q(boolean_field=False, int_field__gt=3))
-        assert self.q.execute() == \
-            {'q': u'"hello world"', 'fq': u'(text_field:tow) OR (boolean_field:false int_field:{3 TO *})'}
+        q = self.q.query("hello world").filter(Q(text_field="tow") | Q(boolean_field=False, int_field__gt=3))
+        assert q.params() == \
+            [('fq', u'text_field:tow OR (boolean_field:false AND int_field:{3 TO *})'), ('q', u'hello\\ world')]
 
     def test_and_example(self):
         Q = self.q.Q
-        self.q.query("hello world").filter(Q(text_field="tow") & Q(boolean_field=False, int_field__gt=3))
-        assert self.q.execute() == \
-            {'q': u'"hello world"', 'fq': u'(text_field:tow) AND (boolean_field:false int_field:{3 TO *})'}
+        q = self.q.query("hello world").filter(Q(text_field="tow") & Q(boolean_field=False, int_field__gt=3))
+        assert q.params() == \
+            [('fq', u'boolean_field:false AND text_field:tow AND int_field:{3 TO *}'), ('q',  u'hello\\ world')]
 
+
+param_encode_data = (
+    ({"int":3, "string":"string", "unicode":u"unicode"},
+     [("int", "3"), ("string", "string"), ("unicode", "unicode")]),
+    ({"int":3, "string":"string", "unicode":u"\N{UMBRELLA}nicode"},
+     [("int", "3"), ("string", "string"), ("unicode", "\xe2\x98\x82nicode")]),
+    ({"int":3, "string":"string", u"\N{UMBRELLA}nicode":u"\N{UMBRELLA}nicode"},
+     [("int", "3"), ("string", "string"), ("\xe2\x98\x82nicode", "\xe2\x98\x82nicode")]),
+    ({"true":True, "false":False},
+     [("false", "false"), ("true", "true")]),
+    ({"list":["first", "second", "third"]},
+     [("list", "first"), ("list", "second"), ("list", "third")]),
+)
+
+def check_url_encode_data(kwargs, output):
+    assert params_from_dict(**kwargs) == output
+
+def test_url_encode_data():
+    for kwargs, output in param_encode_data:
+        yield check_url_encode_data, kwargs, output

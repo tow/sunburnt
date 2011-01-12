@@ -329,6 +329,9 @@ class SolrUpdate(object):
                                      for name, values in doc.items()]))
 
     def add(self, docs):
+        if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
+            # is a dictionary, or anything else except a list
+            docs = [docs]
         docs = [(doc if hasattr(doc, "items")
                  else object_to_dict(doc, self.schema))
                 for doc in docs]
@@ -353,6 +356,9 @@ class SolrDelete(object):
             raise SolrError("This schema has no unique key - you can only delete by query")
         if docs is None:
             docs = []
+        if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
+            # is a dictionary, or anything else except a list
+            docs = [docs]
         deletions = []
         for doc in docs:
             # Really this next should check the expected type of unique key

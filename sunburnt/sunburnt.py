@@ -3,13 +3,14 @@ from __future__ import absolute_import
 import cgi
 import cStringIO as StringIO
 from itertools import islice
+import logging
 import urllib, urlparse
 import warnings
 
 import httplib2
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, LuceneQuery
+from .search import LuceneQuery, SolrSearch, params_from_dict
 
 
 class SolrConnection(object):
@@ -131,24 +132,6 @@ class SolrInterface(object):
             return q.query(*args, **kwargs)
         else:
             return q
-
-    @staticmethod
-    def params_from_dict(**kwargs):
-        utf8_params = []
-        for k, vs in kwargs.items():
-            if isinstance(k, unicode):
-                k = k.encode('utf-8')
-            # We allow for multivalued options with lists.
-            if not hasattr(vs, "__iter__"):
-                vs = [vs]
-            for v in vs:
-                if isinstance(v, bool):
-                    v = u"true" if v else u"false"
-                else:
-                    v = unicode(v)
-                v = v.encode('utf-8')
-                utf8_params.append((k, v))
-        return utf8_params
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)

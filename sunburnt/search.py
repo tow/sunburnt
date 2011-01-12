@@ -440,7 +440,7 @@ class SolrSearch(object):
         return options
 
     def params(self):
-        return self.interface.params_from_dict(**self.options())
+        return params_from_dict(**self.options())
 
     def execute(self, constructor=dict):
         result = self.interface.search(**self.options())
@@ -709,3 +709,20 @@ class FacetQueryOptions(Options):
                     'facet':True}
         else:
             return {}
+
+def params_from_dict(**kwargs):
+    utf8_params = []
+    for k, vs in kwargs.items():
+        if isinstance(k, unicode):
+            k = k.encode('utf-8')
+        # We allow for multivalued options with lists.
+        if not hasattr(vs, "__iter__"):
+            vs = [vs]
+        for v in vs:
+            if isinstance(v, bool):
+                v = u"true" if v else u"false"
+            else:
+                v = unicode(v)
+            v = v.encode('utf-8')
+            utf8_params.append((k, v))
+    return sorted(utf8_params)
