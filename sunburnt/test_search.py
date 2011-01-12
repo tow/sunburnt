@@ -416,18 +416,31 @@ complex_boolean_queries = (
      [('q', u'blah AND (def OR ghi)^1.5')]),
     (lambda q: q.query("blah").query(q.Q("def", ~q.Q("pqr") | q.Q("mno"))**1.5),
      [('q', u'blah AND (def AND ((*:* AND NOT pqr) OR mno))^1.5')]),
+# And boost_relevancy
+    (lambda q: q.query("blah").boost_relevancy(1.5, int_field=3),
+     [('q', u'blah OR (blah AND int_field:3^1.5)')]),
 )
 
 def check_complex_boolean_query(solr_search, query, output):
+    p = query(solr_search).params()
     try:
-        assert query(solr_search).params() == output
+        assert p == output
     except AssertionError:
         if debug:
-            print query(solr_search).params()
+            print p
             print output
             import pdb;pdb.set_trace()
         else:
             raise
+    # And check no mutation of the base object
+    q = query(solr_search).params()
+    try:
+        assert p == q
+    except AssertionError:
+        if debug:
+            print p
+            print q
+            import pdb;pdb.set_trace()
 
 def test_complex_boolean_queries():
     solr_search = SolrSearch(interface)
