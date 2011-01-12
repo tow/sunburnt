@@ -16,7 +16,7 @@ class LuceneQuery(object):
         "rangeexc": "{%s TO %s}",
         "range": "[%s TO %s]",
     }
-    def __init__(self, schema, option_flag=None, original=None, deep_clone=True):
+    def __init__(self, schema, option_flag=None, original=None):
         self.schema = schema
         self.normalized = False
         if original is None:
@@ -33,18 +33,15 @@ class LuceneQuery(object):
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
-            if deep_clone:
-                self.subqueries = [q.clone() for q in original.subqueries]
-            else:
-                self.subqueries = copy.copy(original.subqueries)
+            self.subqueries = copy.copy(original.subqueries)
             self._or = original._or
             self._and = original._and
             self._not = original._not
             self._pow = original._pow
             self.boosts = copy.copy(original.boosts)
 
-    def clone(self, deep=True):
-        return LuceneQuery(self.schema, original=self, deep_clone=deep)
+    def clone(self):
+        return LuceneQuery(self.schema, original=self)
 
     def options(self):
         opts = {}
@@ -143,7 +140,7 @@ class LuceneQuery(object):
                 else:
                     _subqueries.append(_s)
         if mutated:
-            newself = self.clone(deep=False)
+            newself = self.clone()
             newself.terms = _terms
             newself.phrases = _phrases
             newself.ranges = _ranges
@@ -152,14 +149,14 @@ class LuceneQuery(object):
 
         if self._not:
             if not len(self.subqueries):
-                newself = self.clone(deep=False)
+                newself = self.clone()
                 newself._not = False
                 newself._and = True
                 self = newself
                 mutated = True
             elif len(self.subqueries) == 1:
                 if self.subqueries[0]._not:
-                    newself = self.clone(deep=False)
+                    newself = self.clone()
                     newself.subqueries = self.subqueries[0].subqueries
                     newself._not = False
                     newself._and = True
@@ -169,7 +166,7 @@ class LuceneQuery(object):
                 raise ValueError
         elif self._pow:
             if not len(self.subqueries):
-                newself = self.clone(deep=False)
+                newself = self.clone()
                 newself._pow = False
                 self = newself
                 mutated = True
