@@ -36,12 +36,12 @@ class LuceneQuery(object):
             if deep_clone:
                 self.subqueries = [q.clone() for q in original.subqueries]
             else:
-                self.subqueries = [q for q in original.subqueries]
+                self.subqueries = copy.copy(original.subqueries)
             self._or = original._or
             self._and = original._and
             self._not = original._not
             self._pow = original._pow
-            self.boosts = original.boosts
+            self.boosts = copy.copy(original.boosts)
 
     def clone(self, deep=True):
         return LuceneQuery(self.schema, original=self, deep_clone=deep)
@@ -191,7 +191,7 @@ class LuceneQuery(object):
             boost_queries = [self.Q(**kwargs)**boost_score
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
-            return unicode(newself, level=level)
+            return newself.__unicode__(level=level)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
@@ -432,7 +432,6 @@ class SolrSearch(object):
         except ValueError:
             raise ValueError("Non-numeric boost value supplied")
 
-        # Clone all of self *except* query, which we'll take care of directly
         newself = self.clone()
         newself.query_obj.add_boost(kwargs, boost_score)
         return newself
