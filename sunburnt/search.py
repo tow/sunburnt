@@ -263,7 +263,7 @@ class LuceneQuery(object):
         q._pow = value
         return q
         
-    def add(self, args, kwargs, terms_or_phrases=None):
+    def add(self, args, kwargs):
         self.normalized = False
         _args = []
         for arg in args:
