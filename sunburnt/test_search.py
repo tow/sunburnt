@@ -421,6 +421,8 @@ complex_boolean_queries = (
 # And boost_relevancy
     (lambda q: q.query("blah").boost_relevancy(1.5, int_field=3),
      [('q', u'blah OR (blah AND int_field:3^1.5)')]),
+    (lambda q: q.query("blah").query("blah2").boost_relevancy(1.5, int_field=3),
+     [('q', u'(blah AND blah2) OR (blah AND blah2 AND int_field:3^1.5)')]),
 # And ranges
     (lambda q: q.query(int_field__any=True),
      [('q', u'int_field:[* TO *]')]),

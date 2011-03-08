@@ -102,10 +102,10 @@ class LuceneQuery(object):
     def child_needs_parens(self, child):
         if len(child) == 1:
             return False
-        elif self._or and (child._or or child._pow):
-            return False
-        elif (self._and or self._not) and (child._and or child._not or child._pow):
-            return False
+        elif self._or:
+            return not (child._or or child._pow)
+        elif (self._and or self._not):
+            return not (child._and or child._not or child._pow)
         elif self._pow is not False:
             return True
         else:
@@ -189,6 +189,7 @@ class LuceneQuery(object):
             boost_queries = [self.Q(**kwargs)**boost_score
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
+            newself, _ = newself.normalize()
             return newself.__unicode__(level=level)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
@@ -223,7 +224,10 @@ class LuceneQuery(object):
             subquery_length = len(self.subqueries[0])
         else:
             subquery_length = len(self.subqueries)
-        return sum([len(self.terms), len(self.phrases), len(self.ranges), subquery_length])
+        return sum([sum(len(v) for v in self.terms.values()),
+                    sum(len(v) for v in self.phrases.values()),
+                    len(self.ranges),
+                    subquery_length])
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
