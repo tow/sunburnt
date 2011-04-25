@@ -345,7 +345,7 @@ class LuceneQuery(object):
 
 
 class SolrSearch(object):
-    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier')
+    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier', 'field_limit', )
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
@@ -358,6 +358,7 @@ class SolrSearch(object):
             self.faceter = FacetOptions(self.schema)
             self.sorter = SortOptions(self.schema)
             self.facet_querier = FacetQueryOptions(self.schema)
+            self.field_limit = FieldLimitOptions(self.schema)
         else:
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
@@ -428,6 +429,11 @@ class SolrSearch(object):
     def sort_by(self, field):
         newself = self.clone()
         newself.sorter.update(field)
+        return newself
+
+    def limit(self, fields, **kwargs):
+        newself = self.clone()
+        newself.field_limit.update(fields, **kwargs)
         return newself
 
     def boost_relevancy(self, boost_score, **kwargs):
@@ -720,6 +726,28 @@ class FacetQueryOptions(Options):
                     'facet':True}
         else:
             return {}
+
+class FieldLimitOptions(Options):
+    option_name = "fl"
+
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = set()
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def update(self, fields, **kwargs):
+        self.schema.check_fields(fields)
+        if isinstance(fields, basestring):
+            fields = [fields]
+        self.fields.update(fields)
+
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts['fl'] = ','.join(sorted(self.fields))
+        return opts
 
 def params_from_dict(**kwargs):
     utf8_params = []
