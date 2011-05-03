@@ -447,7 +447,7 @@ class SolrSearch(object):
         for option_module in self.option_modules:
             options.update(getattr(self, option_module).options())
         if 'q' not in options:
-            options['q'] = '*' # search everything
+            options['q'] = '*:*' # search everything
         return options
 
     def params(self):
