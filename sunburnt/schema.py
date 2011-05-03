@@ -218,7 +218,8 @@ class SolrSchema(object):
             raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
         field_types = {}
         for data_type, field_class in self.solr_data_types.items():
-            for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type):
+            for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type) \
+                            + schemadoc.xpath("/schema/types/fieldtype[@class='%s']/@name" % data_type):
                 field_types[field_type] = field_class
         fields = {}
         for field_node in schemadoc.xpath("/schema/fields/field"):
