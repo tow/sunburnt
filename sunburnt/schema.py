@@ -73,6 +73,35 @@ class solr_date(object):
         return u"%s.%sZ" % (self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S"),
                             "%06d" % self.microsecond)
 
+def solr_point_factory(dimension):
+    if dimension < 1:
+        raise ValueError("dimension of PointType must be greater than one")
+    class solr_point(object):
+        dim = int(dimension)
+        def __init__(self, *args):
+            if dimension > 1 and len(args) == 1:
+                v = args[0]
+                if isinstance(v, basestring):
+                    v_arr = v.split(',')
+                else:
+                    try:
+                        v_arr = list(v)
+                    except TypeError:
+                        raise ValueError("bad value provided for point list")
+            else:
+                v_arr = args
+            if len(v_arr) != self.dim:
+                raise ValueError("point has wrong number of dimensions")
+            self.pointlist = tuple(float(v) for v in v_arr)
+
+        def __repr__(self):
+            return "solr_point(%s)" % str(self)
+
+        def __unicode__(self):
+            return ','.join(str(p) for p in self.pointlist)
+
+    return solr_point
+
 
 class SolrField(object):
     def __init__(self, node, dynamic=False):
@@ -178,6 +207,15 @@ class SolrRandomField(SolrField):
         raise TypeError("Don't try and store or index values in a RandomSortField")
 
 
+def SolrPointFieldFactory(dimension, **kwargs):
+    class SolrPoint(SolrField):
+        dim = dimension
+        value_class = solr_point_factory(dim)
+        def normalize(self, v):
+            return self.value_class(v)
+    return SolrPoint
+
+
 class SolrSchema(object):
     solr_data_types = {
         'solr.StrField':SolrUnicodeField,
@@ -199,6 +237,9 @@ class SolrSchema(object):
         'solr.DateField':SolrDateField,
         'solr.TrieDateField':SolrDateField,
         'solr.RandomSortField':SolrRandomField,
+        'solr.PointType':SolrPointFieldFactory,
+        'solr.LatLonType':SolrPointFieldFactory(2),
+        'solr.GeoHashField':SolrPointFieldFactory(2),
         }
 
     def __init__(self, f):
@@ -217,31 +258,39 @@ class SolrSchema(object):
         except lxml.etree.XMLSyntaxError, e:
             raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
         field_types = {}
-        for data_type, field_class in self.solr_data_types.items():
-            for field_type in schemadoc.xpath("/schema/types/fieldType[@class='%s']/@name" % data_type) \
-                            + schemadoc.xpath("/schema/types/fieldtype[@class='%s']/@name" % data_type):
-                field_types[field_type] = field_class
+        for field_type in schemadoc.xpath("/schema/types/fieldType|/schema/types/fieldtype"):
+            try:
+                name, class_name = field_type.attrib['name'], field_type.attrib['class']
+            except KeyError, e:
+                raise SolrError("Invalid schema.xml: missing %s attribute on fieldType" % e.args[0])
+            try:
+                field_class = self.solr_data_types[class_name]
+            except KeyError:
+                raise SolrError("Unknown field_class '%s'" % class_name)
+            if not isinstance(field_class, type):
+                field_class = field_class(**field_type.attrib)
+            field_types[name] = field_class
         fields = {}
         for field_node in schemadoc.xpath("/schema/fields/field"):
             try:
-                name, type = field_node.attrib['name'], field_node.attrib['type']
+                name, field_type = field_node.attrib['name'], field_node.attrib['type']
             except KeyError, e:
                 raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.args[0])
             try:
-                field_class = field_types[type]
+                field_class = field_types[field_type]
             except KeyError, e:
-                raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
+                raise SolrError("Invalid schema.xml: %s field_type undefined" % field_type)
             fields[name] = field_class(field_node)
         dynamic_fields = []
         for field_node in schemadoc.xpath("/schema/fields/dynamicField"):
             try:
-                name, type = field_node.attrib['name'], field_node.attrib['type']
+                name, field_type = field_node.attrib['name'], field_node.attrib['type']
             except KeyError, e:
                 raise SolrError("Invalid schema.xml: missing %s attribute on field" % e.args[0])
             try:
-                field_class = field_types[type]
+                field_class = field_types[field_type]
             except KeyError, e:
-                raise SolrError("Invalid schema.xml: %s field_type undefined" % type)
+                raise SolrError("Invalid schema.xml: %s field_type undefined" % field_type)
             dynamic_fields.append(field_class(field_node, dynamic=True))
         default_field_name = schemadoc.xpath("/schema/defaultSearchField")
         default_field_name = default_field_name[0].text \
