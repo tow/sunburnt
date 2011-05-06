@@ -92,10 +92,10 @@ def solr_point_factory(dimension):
                 v_arr = args
             if len(v_arr) != self.dim:
                 raise ValueError("point has wrong number of dimensions")
-            self.pointlist = tuple(float(v) for v in v_arr)
+            self.point = tuple(float(v) for v in v_arr)
 
         def __repr__(self):
-            return "solr_point(%s)" % str(self)
+            return "solr_point(%s)" % unicode(self)
 
         def __unicode__(self):
             return ','.join(str(p) for p in self.pointlist)
@@ -133,6 +133,9 @@ class SolrField(object):
             return [self.serialize(v) for v in value]
         return self.as_unicode(self.normalize(value))
 
+    def deserialize(self, value):
+        return self.normalize(value)
+
     def as_unicode(self, value):
         return unicode(value)
 
@@ -154,6 +157,20 @@ class SolrBooleanField(SolrField):
 
     def as_unicode(self, value):
         return u"true" if value else u"false"
+
+
+class SolrBinaryField(SolrField):
+    def normalize(self, value):
+        try:
+            return str(value)
+        except TypeError:
+            raise SolrError("could not coerce value to a bytestring")
+
+    def as_unicode(self, value):
+        return unicode(value.encode('base64'))
+
+    def deserialize(self, value):
+        return value.decode('base64')
 
 
 class SolrNumericalField(SolrField):
@@ -201,6 +218,9 @@ class SolrDateField(SolrField):
     def normalize(self, v):
         return solr_date(v)
 
+    def deserialize(self, v):
+        return solr_date(v)._dt_obj
+
 
 class SolrRandomField(SolrField):
     def normalize(self, v):
@@ -213,6 +233,8 @@ def SolrPointFieldFactory(dimension, **kwargs):
         value_class = solr_point_factory(dim)
         def normalize(self, v):
             return self.value_class(v)
+        def deserialize(self, v):
+            return self.value_class(v).point
     return SolrPoint
 
 
@@ -237,6 +259,7 @@ class SolrSchema(object):
         'solr.DateField':SolrDateField,
         'solr.TrieDateField':SolrDateField,
         'solr.RandomSortField':SolrRandomField,
+        'solr.BinaryField':SolrBinaryField,
         'solr.PointType':SolrPointFieldFactory,
         'solr.LatLonType':SolrPointFieldFactory(2),
         'solr.GeoHashField':SolrPointFieldFactory(2),
@@ -349,6 +372,20 @@ class SolrSchema(object):
     def parse_results(self, msg):
         return SolrResults(self, msg)
 
+    def parse_result_doc(self, doc, name=None):
+        if name is None:
+            name = doc.attrib.get('name')
+        if doc.tag in ('lst', 'arr'):
+            values = [self.parse_result_doc(n, name) for n in doc.getchildren()]
+            return name, tuple(v[1] for v in values)
+        if doc.tag in 'doc':
+            return dict(self.parse_result_doc(n) for n in doc.getchildren())
+        try:
+            field_class = self.match_field(name)
+        except KeyError:
+            raise SolrError("unexpected field found in result")
+        return name, field_class.deserialize(doc.text or '')
+
 
 class SolrUpdate(object):
     ADD = E.add
@@ -459,13 +496,13 @@ class SolrResults(object):
         if self.status != 0:
             raise ValueError("Response indicates an error")
         result_node = doc.xpath("/response/result")[0]
-        self.result = SolrResult(result_node)
+        self.result = SolrResult(schema, result_node)
         self.facet_counts = SolrFacetCounts.from_response(details)
         self.highlighting = dict((k, dict(v))
                                  for k, v in details.get("highlighting", ()))
         more_like_these_nodes = \
             doc.xpath("/response/lst[@name='moreLikeThis']/result")
-        more_like_these_results = [SolrResult(node)
+        more_like_these_results = [SolrResult(schema, node)
                                   for node in more_like_these_nodes]
         self.more_like_these = dict((n.name, n)
                                          for n in more_like_these_results)
@@ -485,11 +522,12 @@ class SolrResults(object):
 
 
 class SolrResult(object):
-    def __init__(self, node):
+    def __init__(self, schema, node):
+        self.schema = schema
         self.name = node.attrib['name']
         self.numFound = int(node.attrib['numFound'])
         self.start = int(node.attrib['start'])
-        self.docs = [value_from_node(n) for n in node.xpath("doc")]
+        self.docs = [schema.parse_result_doc(n) for n in node.xpath("doc")]
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
