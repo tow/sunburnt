@@ -369,8 +369,8 @@ class SolrSchema(object):
     def make_delete(self, docs, query):
         return SolrDelete(self, docs, query)
 
-    def parse_results(self, msg):
-        return SolrResults(self, msg)
+    def parse_response(self, msg):
+        return SolrResponse(self, msg)
 
     def parse_result_doc(self, doc, name=None):
         if name is None:
@@ -484,7 +484,7 @@ class SolrFacetCounts(object):
         return SolrFacetCounts(**facet_counts_dict)
 
 
-class SolrResults(object):
+class SolrResponse(object):
     def __init__(self, schema, xmlmsg):
         self.schema = schema
         doc = lxml.etree.fromstring(xmlmsg)

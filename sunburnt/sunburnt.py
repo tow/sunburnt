@@ -122,7 +122,7 @@ class SolrInterface(object):
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
         params = params_from_dict(**kwargs)
-        return self.schema.parse_results(self.conn.select(params))
+        return self.schema.parse_response(self.conn.select(params))
 
     def query(self, *args, **kwargs):
         if not self.readable:
