@@ -40,7 +40,7 @@ class WildcardString(unicode):
     # for a text field anyway.
     lucene_special_chars = '+-&|!(){}[]^"~*?: \t\v\\'
     def escape_for_lqs_term(self):
-        if self in ["AND", "OR", "NOT"]:
+        if self in ["AND", "OR", "NOT", ""]:
             return '"%s"' % self
         chars = []
         for c in self.chars:
