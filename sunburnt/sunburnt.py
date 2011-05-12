@@ -4,7 +4,7 @@ import cgi
 import cStringIO as StringIO
 from itertools import islice
 import logging
-import urllib, urlparse
+import socket, time, urllib, urlparse
 import warnings
 
 import httplib2
@@ -14,13 +14,24 @@ from .search import LuceneQuery, SolrSearch, params_from_dict
 
 
 class SolrConnection(object):
-    def __init__(self, url, http_connection=None):
-        if not http_connection:
-            http_connection = httplib2.Http()
+    def __init__(self, url, http_connection=None, retry_timeout=-1):
+        if http_connection:
+            self.http_connection = http_connection
+        else:
+            self.http_connection = httplib2.Http()
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
-        self.request = http_connection.request
+        self.retry_timeout = retry_timeout
+
+    def request(self, *args, **kwargs):
+        try:
+            return self.http_connection.request(*args, **kwargs)
+        except socket.error:
+            if self.retry_timeout < 0:
+                raise
+            time.sleep(self.retry_timeout)
+            return self.http_connection.request(*args, **kwargs)
 
     def commit(self, wait_flush=True, wait_searcher=True):
         response = self.commit_or_optimize("commit",
@@ -60,21 +71,25 @@ class SolrInterface(object):
     readable = True
     writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None, mode=''):
-        if not http_connection:
-            http_connection = httplib2.Http()
-        self.conn = SolrConnection(url, http_connection)
-        if not schemadoc:
-            r, c = http_connection.request(
-                urlparse.urljoin(url, self.remote_schema_file))
-            if r.status != 200:
-                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
-            schemadoc = StringIO.StringIO(c)
-        self.schema = SolrSchema(schemadoc)
+    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1):
+        self.conn = SolrConnection(url, http_connection, retry_timeout)
+        self.schemadoc = schemadoc
         if mode == 'r':
             self.writeable = False
         elif mode == 'w':
             self.readable = False
+        self.init_schema()
+
+    def init_schema(self):
+        if self.schemadoc:
+            schemadoc = self.schemadoc
+        else:
+            r, c = self.conn.request(
+                urlparse.urljoin(self.conn.url, self.remote_schema_file))
+            if r.status != 200:
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
+            schemadoc = StringIO.StringIO(c)
+        self.schema = SolrSchema(schemadoc)
 
     def add(self, docs, chunk=100):
         if not self.writeable:
