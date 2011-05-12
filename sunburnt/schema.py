@@ -153,6 +153,13 @@ class SolrUnicodeField(SolrField):
 
 class SolrBooleanField(SolrField):
     def normalize(self, value):
+        if isinstance(value, basestring):
+            if value.lower() == "true":
+                return True
+            elif value.lower() == "false":
+                return False
+            else:
+                raise ValueError("sorry, I only understand simple boolean strings")
         return bool(value)
 
     def as_unicode(self, value):
