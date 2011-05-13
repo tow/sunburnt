@@ -289,7 +289,9 @@ class LuceneQuery(object):
                 field_name, rel = k, 'eq'
             field = self.schema.match_field(field_name)
             if not field:
-                raise ValueError("%s is not a valid field name" % k)
+                if (k, v) != ("*", "*"):
+                    # the only case where wildcards in field names are allowed
+                    raise ValueError("%s is not a valid field name" % k)
             if rel == 'eq':
                 self.add_exact(field_name, v, terms_or_phrases)
             else:
@@ -300,6 +302,10 @@ class LuceneQuery(object):
             field = self.schema.match_field(field_name)
         else:
             field = self.schema.default_field
+        if (field_name, value) == ("*", "*"):
+            # Get the wildcard out of the way first
+            self.terms["*"].add(WildcardString("*"))
+            return
         values = field.serialize(value) # Might be multivalued
         if isinstance(values, basestring):
             values = [values]
