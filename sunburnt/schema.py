@@ -126,6 +126,12 @@ class SolrField(object):
             else:
                 return name.startswith(self.name[:-1])
 
+    def instance_from_user_data(self, data):
+        return SolrFieldInstance(self, data)
+
+    def from_user_data(self, value):
+        return self.normalize(value)
+
     def serialize(self, value):
         if hasattr(value, "__iter__"):
             if not self.multi_valued:
@@ -245,6 +251,15 @@ def SolrPointFieldFactory(dimension, **kwargs):
     return SolrPoint
 
 
+class SolrFieldInstance(object):
+    def __init__(self, field, data):
+        self.field = field
+        self.value = self.field.from_user_data(data)
+
+    def to_solr(self):
+        return self.field.as_unicode(self.value)
+
+
 class SolrSchema(object):
     solr_data_types = {
         'solr.StrField':SolrUnicodeField,
@@ -355,11 +370,11 @@ class SolrSchema(object):
             field = self.match_dynamic_field(name)
         return field
 
-    def serialize_value(self, k, v):
+    def field_from_user_data(self, k, v):
         field = self.match_field(k)
         if not field:
             raise SolrError("No such field '%s' in current schema" % k)
-        return field.serialize(v)
+        return field.instance_from_user_data(v)
 
     def get_id_for_doc(self, doc):
         if not self.unique_key:
@@ -404,11 +419,13 @@ class SolrUpdate(object):
         self.xml = self.add(docs)
 
     def fields(self, name, values):
-        values = self.schema.serialize_value(name, values)
-        # Distinguish lists and strings
-        if isinstance(values, basestring):
-            values = [values]
-        return [self.FIELD({'name':name}, value) for value in values]
+        field_values = self.schema.field_from_user_data(name, values)
+        # Probably a string, but might be a multivalued list,
+        # so we have to do this dance:
+        if not hasattr(field_values, "__iter__"):
+            field_values = [field_values]
+        return [self.FIELD({'name':name}, field_value.to_solr())
+            for field_value in field_values]
 
     def doc(self, doc):
         missing_fields = self.schema.missing_fields(doc.keys())
