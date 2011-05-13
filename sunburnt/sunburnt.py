@@ -131,7 +131,7 @@ class SolrInterface(object):
         if not self.writeable:
             raise TypeError("This Solr instance is only for reading")
         # When deletion is fixed to escape query strings, this will need fixed.
-        self.delete(queries="*:*")
+        self.delete(queries=self.Q(**{"*":"*"}))
 
     def search(self, **kwargs):
         if not self.readable:

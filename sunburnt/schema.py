@@ -469,10 +469,9 @@ class SolrDelete(object):
     def delete_queries(self, queries):
         if queries is None:
             return []
-        if isinstance(queries, basestring):
+        if not hasattr(queries, "__iter__"):
             queries = [queries]
-        # FIXME no lucene string escaping going on here.
-        return [self.QUERY(query) for query in queries]
+        return [self.QUERY(unicode(query)) for query in queries]
 
     def __str__(self):
         return lxml.etree.tostring(self.xml, encoding='utf-8')
