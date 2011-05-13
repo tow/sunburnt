@@ -376,14 +376,8 @@ class SolrSchema(object):
             raise SolrError("No such field '%s' in current schema" % k)
         return field.instance_from_user_data(v)
 
-    def get_id_for_doc(self, doc):
-        if not self.unique_key:
-            raise SolrError("Schema has no unique key")
-        if self.unique_key not in doc:
-            raise SolrError("doc doesn't contain unique_key %s"
-                            % self.unique_key)
-        id = doc[self.unique_key]
-        return self.unique_field.serialize(id)
+    def unique_field_from_user_data(self, v):
+        return self.unique_field.instance_from_user_data(v)
 
     def make_update(self, docs):
         return SolrUpdate(self, docs)
@@ -472,15 +466,31 @@ class SolrDelete(object):
             docs = [docs]
         deletions = []
         for doc in docs:
-            # Really this next should check the expected type of unique key
+            import pdb;pdb.set_trace()
+            # Is this a dictionary, or an document object, or a thing
+            # that can be cast to a uniqueKey? (which could also be an
+            # arbitrary object.
             if isinstance(doc, (basestring, int, long, float)):
-                # and what about dates?
-                v = self.schema.unique_field.serialize(doc)
-                deletions.append(self.ID(v))
+                # It's obviously not a document object, just coerce to appropriate type
+                doc_id_inst = self.schema.unique_field_from_user_data(doc)
+            elif hasattr(doc, "items"):
+                # It's obviously a dictionary
+                try:
+                    doc_id_inst = doc[self.schema.unique_key]
+                except KeyError:
+                    raise SolrError("No unique key on this document")
             else:
-                doc = doc if hasattr(doc, "items") \
-                    else object_to_dict(doc, self.schema)
-                deletions.append(self.ID(self.schema.get_id_for_doc(doc)))
+                doc_id = get_attribute_or_callable(doc, self.schema.unique_key)
+                if doc_id is not None:
+                     doc_id_inst = self.schema.unique_field_from_user_data(doc_id)
+                else:
+                    # Well, we couldn't get an ID from it; let's try
+                    # coercing the doc to the type of an ID field.
+                    try:
+                        doc_id_inst = self.schema.unique_field_from_user_data(doc)
+                    except SolrError:
+                        raise SolrError("Could not parse argument as object or document id")
+            deletions.append(self.ID(doc_id_inst.to_solr()))
         return deletions
 
     def delete_queries(self, queries):
