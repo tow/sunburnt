@@ -8,7 +8,8 @@ import warnings
 import lxml.builder
 import lxml.etree
 
-from . import dates
+from .dates import datetime_from_w3_datestring
+from .strings import WildcardString
 
 try:
     import pytz
@@ -35,7 +36,7 @@ class solr_date(object):
             self._dt_obj = v._dt_obj
         elif isinstance(v, basestring):
             try:
-                self._dt_obj = dates.datetime_from_w3_datestring(v)
+                self._dt_obj = datetime_from_w3_datestring(v)
             except ValueError, e:
                 raise SolrError(*e.args)
         elif hasattr(v, "strftime"):
@@ -132,6 +133,9 @@ class SolrField(object):
     def from_user_data(self, value):
         return self.normalize(value)
 
+    def to_solr(self, value):
+        return self.as_unicode(value)
+
     def serialize(self, value):
         if hasattr(value, "__iter__"):
             if not self.multi_valued:
@@ -147,6 +151,12 @@ class SolrField(object):
 
 
 class SolrUnicodeField(SolrField):
+    def from_user_data(self, value):
+        return WildcardString(value)
+
+    def to_solr(self, value):
+        return value.escape_for_lqs_term()
+
     def normalize(self, value):
         try:
             return unicode(value)
@@ -190,7 +200,7 @@ class SolrNumericalField(SolrField):
     def normalize(self, value):
         try:
             v = self.base_type(value)
-        except (OverflowError, ValueError):
+        except (OverflowError, TypeError, ValueError):
             raise SolrError("%s is invalid value for %s" % (value, self.__class__))
         if v < self.min or v > self.max:
             raise SolrError("%s out of range for a %s" % (value, self.__class__))
@@ -257,7 +267,7 @@ class SolrFieldInstance(object):
         self.value = self.field.from_user_data(data)
 
     def to_solr(self):
-        return self.field.as_unicode(self.value)
+        return self.field.to_solr(self.value)
 
 
 class SolrSchema(object):
@@ -296,6 +306,12 @@ class SolrSchema(object):
             if self.default_field_name else None
         self.unique_field = self.fields[self.unique_key] \
             if self.unique_key else None
+
+    def Q(self, *args, **kwargs):
+        from .search import LuceneQuery
+        q = LuceneQuery(self)
+        q.add(args, kwargs)
+        return q
 
     def schema_parse(self, f):
         try:
@@ -376,9 +392,6 @@ class SolrSchema(object):
             raise SolrError("No such field '%s' in current schema" % k)
         return field.instance_from_user_data(v)
 
-    def unique_field_from_user_data(self, v):
-        return self.unique_field.instance_from_user_data(v)
-
     def make_update(self, docs):
         return SolrUpdate(self, docs)
 
@@ -413,11 +426,10 @@ class SolrUpdate(object):
         self.xml = self.add(docs)
 
     def fields(self, name, values):
-        field_values = self.schema.field_from_user_data(name, values)
-        # Probably a string, but might be a multivalued list,
-        # so we have to do this dance:
-        if not hasattr(field_values, "__iter__"):
-            field_values = [field_values]
+        # values may be multivalued - so we treat that as the default case
+        if not hasattr(values, "__iter__"):
+            values = [values]
+        field_values = [self.schema.field_from_user_data(name, value) for value in values]
         return [self.FIELD({'name':name}, field_value.to_solr())
             for field_value in field_values]
 
@@ -452,50 +464,48 @@ class SolrDelete(object):
     QUERY = E.query
     def __init__(self, schema, docs=None, queries=None):
         self.schema = schema
-        deletions = self.delete_docs(docs)
-        deletions += self.delete_queries(queries)
+        deletions = []
+        if docs is not None:
+            deletions += self.delete_docs(docs)
+        if queries is not None:
+            deletions += self.delete_queries(queries)
         self.xml = self.DELETE(*deletions)
 
     def delete_docs(self, docs):
         if not self.schema.unique_key:
             raise SolrError("This schema has no unique key - you can only delete by query")
-        if docs is None:
-            docs = []
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
-            # is a dictionary, or anything else except a list
+            # docs is a dictionary, or an object which is not a list
             docs = [docs]
-        deletions = []
-        for doc in docs:
-            import pdb;pdb.set_trace()
-            # Is this a dictionary, or an document object, or a thing
-            # that can be cast to a uniqueKey? (which could also be an
-            # arbitrary object.
-            if isinstance(doc, (basestring, int, long, float)):
-                # It's obviously not a document object, just coerce to appropriate type
-                doc_id_inst = self.schema.unique_field_from_user_data(doc)
-            elif hasattr(doc, "items"):
-                # It's obviously a dictionary
-                try:
-                    doc_id_inst = doc[self.schema.unique_key]
-                except KeyError:
-                    raise SolrError("No unique key on this document")
-            else:
-                doc_id = get_attribute_or_callable(doc, self.schema.unique_key)
-                if doc_id is not None:
-                     doc_id_inst = self.schema.unique_field_from_user_data(doc_id)
-                else:
-                    # Well, we couldn't get an ID from it; let's try
-                    # coercing the doc to the type of an ID field.
-                    try:
-                        doc_id_inst = self.schema.unique_field_from_user_data(doc)
-                    except SolrError:
-                        raise SolrError("Could not parse argument as object or document id")
-            deletions.append(self.ID(doc_id_inst.to_solr()))
-        return deletions
+        doc_id_insts = [self.doc_id_from_doc(doc) for doc in docs]
+        return [self.ID(doc_id_inst.to_solr()) for doc_id_inst in doc_id_insts]
+
+    def doc_id_from_doc(self, doc):
+        # Is this a dictionary, or an document object, or a thing
+        # that can be cast to a uniqueKey? (which could also be an
+        # arbitrary object.
+        if isinstance(doc, (basestring, int, long, float)):
+            # It's obviously not a document object, just coerce to appropriate type
+            doc_id = doc
+        elif hasattr(doc, "items"):
+            # It's obviously a dictionary
+            try:
+                doc_id = doc[self.schema.unique_key]
+            except KeyError:
+                raise SolrError("No unique key on this document")
+        else:
+            doc_id = get_attribute_or_callable(doc, self.schema.unique_key)
+            if doc_id is None:
+                # Well, we couldn't get an ID from it; let's try
+                # coercing the doc to the type of an ID field.
+                doc_id = doc
+        try:
+            doc_id_inst = self.schema.unique_field.instance_from_user_data(doc_id)
+        except SolrError:
+            raise SolrError("Could not parse argument as object or document id")
+        return doc_id_inst
 
     def delete_queries(self, queries):
-        if queries is None:
-            return []
         if not hasattr(queries, "__iter__"):
             queries = [queries]
         return [self.QUERY(unicode(query)) for query in queries]

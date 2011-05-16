@@ -7,6 +7,9 @@ import mx.DateTime
 import pytz
 
 from .schema import solr_date, SolrSchema, SolrError, SolrUpdate, SolrDelete
+from .search import LuceneQuery
+
+debug = False
 
 not_utc = pytz.timezone('Etc/GMT-3')
 
@@ -105,15 +108,7 @@ class TestReadingSchema(object):
                          ('text_field', 'text', u'text'),
                          ('text_field', u'text', u'text'),
                          ('boolean_field', True, u'true')):
-                             assert self.s.serialize_value(k, v) == v2
-
-    def test_serialize_value_fails(self):
-        try:
-            self.s.serialize_value('my_arse', 3)
-        except SolrError:
-            pass
-        else:
-            assert False
+                             assert self.s.field_from_user_data(k, v).to_solr() == v2
 
     def test_missing_fields(self):
         assert set(self.s.missing_fields([])) \
@@ -122,21 +117,17 @@ class TestReadingSchema(object):
             == set(['int_field', 'text_field'])
         assert set(self.s.missing_fields(['int_field'])) == set(['text_field'])
 
-    def test_serialize_value_list(self):
-        assert self.s.serialize_value('text_field', ["a", "b", "c"]) \
-            == [u"a", u"b", u"c"]
-
     def test_serialize_value_list_fails_with_bad_field_name(self):
         try:
-            self.s.serialize_value('text_field2', ["a", "b", "c"])
+            self.s.field_from_user_data('text_field2', "a")
         except SolrError:
             pass
         else:
             assert False
 
-    def test_serialize_value_list_fails_when_not_multivalued(self):
+    def test_serialize_value_list_fails_when_wrong_datatype(self):
         try:
-            self.s.serialize_value('int_field', ["a", "b", "c"])
+            self.s.field_from_user_data('int_field', "a")
         except SolrError:
             pass
         else:
@@ -236,7 +227,16 @@ update_docs = [
     ]
 
 def check_update_serialization(s, obj, xml_string):
-    assert str(SolrUpdate(s, obj)) == xml_string
+    p = str(SolrUpdate(s, obj))
+    if debug:
+        try:
+            assert p == xml_string
+        except AssertionError:
+            print p
+            print xml_string
+            import pdb;pdb.set_trace()
+    else:
+        assert p == xml_string
 
 def test_update_serialization():
     s = SolrSchema(StringIO.StringIO(good_schema))
@@ -306,16 +306,26 @@ def test_delete_docs():
 
 
 delete_queries = [
-    ("search",
+    (["search"],
      """<delete><query>search</query></delete>"""),
     (["search1", "search2"],
      """<delete><query>search1</query><query>search2</query></delete>"""),
     ]
 
-def check_delete_queries(s, query, xml_string):
-    assert str(SolrDelete(s, queries=query)) == xml_string
+def check_delete_queries(s, queries, xml_string):
+    p = str(SolrDelete(s, queries=[s.Q(query) for query in queries]))
+    if debug:
+        try:
+            assert p == xml_string
+        except AssertionError:
+            print p
+            print xml_string
+            import pdb;pdb.set_trace()
+            raise
+    else:
+        assert p == xml_string
 
 def test_delete_queries():
     s = SolrSchema(StringIO.StringIO(good_schema))
-    for query, xml_string in delete_queries:
-        yield check_delete_queries, s, query, xml_string
+    for queries, xml_string in delete_queries:
+        yield check_delete_queries, s, queries, xml_string

@@ -87,26 +87,26 @@ good_query_data = {
 
     "filter_by_term":(
         (["hello"], {},
-         [("fq", u"hello"), ("q", "*")]),
+         [("fq", u"hello"), ("q", "*:*")]),
         (["hello"], {"int_field":3},
-         [("fq", u"hello AND int_field:3"), ("q", "*")]),
+         [("fq", u"hello AND int_field:3"), ("q", "*:*")]),
         (["hello", "world"], {},
-         [("fq", u"hello AND world"), ("q", "*")]),
+         [("fq", u"hello AND world"), ("q", "*:*")]),
         # NB this next is not really what we want,
         # probably this should warn
         (["hello world"], {},
-         [("fq", u"hello\\ world"), ("q", "*")]),
+         [("fq", u"hello\\ world"), ("q", "*:*")]),
         ),
 
     "filter_by_phrase":(
         (["hello"], {},
-         [("fq", u"hello"), ("q", "*")]),
+         [("fq", u"hello"), ("q", "*:*")]),
         (["hello"], {"int_field":3},
-         [("fq", u"int_field:3 AND hello"), ("q", "*")]),
+         [("fq", u"int_field:3 AND hello"), ("q", "*:*")]),
         (["hello", "world"], {},
-         [("fq", u"hello AND world"), ("q", "*")]),
+         [("fq", u"hello AND world"), ("q", "*:*")]),
         (["hello world"], {},
-         [("fq", u"hello\\ world"), ("q", "*")]),
+         [("fq", u"hello\\ world"), ("q", "*:*")]),
         ),
 
     "query":(
@@ -122,13 +122,13 @@ good_query_data = {
 
     "filter":(
         (["hello"], {},
-         [("fq", u"hello"), ("q", "*")]),
+         [("fq", u"hello"), ("q", "*:*")]),
         (["hello"], {"int_field":3},
-         [("fq", u"hello AND int_field:3"), ("q", "*")]),
+         [("fq", u"hello AND int_field:3"), ("q", "*:*")]),
         (["hello", "world"], {},
-         [("fq", u"hello AND world"), ("q", "*")]),
+         [("fq", u"hello AND world"), ("q", "*:*")]),
         (["hello world"], {},
-         [("fq", u"hello\\ world"), ("q", "*")]),
+         [("fq", u"hello\\ world"), ("q", "*:*")]),
         ),
 
     "query":(
@@ -211,7 +211,16 @@ good_query_data = {
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
-    assert getattr(solr_search, method)(*args, **kwargs).params() == output
+    p = getattr(solr_search, method)(*args, **kwargs).params()
+    try:
+        assert p == output
+    except AssertionError:
+        if debug:
+            print p
+            print output
+            import pdb;pdb.set_trace()
+        else:
+            raise
 
 def test_query_data():
     for method, data in good_query_data.items():
