@@ -173,6 +173,12 @@ class SolrBooleanField(SolrField):
 
 
 class SolrBinaryField(SolrField):
+    def from_user_data(self, value):
+        try:
+            return str(value)
+        except (TypeError, ValueError):
+            raise SolrError("Could not convert data to binary string")
+
     def to_solr(self, value):
         return unicode(value.encode('base64'))
 

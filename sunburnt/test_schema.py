@@ -331,3 +331,35 @@ def test_delete_queries():
     s = SolrSchema(StringIO.StringIO(good_schema))
     for queries, xml_string in delete_queries:
         yield check_delete_queries, s, queries, xml_string
+
+
+new_field_types_schema = \
+"""
+<schema name="timetric" version="1.1">
+  <types>
+    <fieldType name="binary" class="solr.BinaryField"/>
+    <fieldType name="point" class="solr.PointType" dimension="2" subFieldSuffix="_d"/>
+    <fieldType name="location" class="solr.LatLonType" subFieldSuffix="_coordinate"/>
+    <fieldtype name="geohash" class="solr.GeoHashField"/>
+    <!-- And just to check it works: -->
+    <fieldType name="point3" class="solr.PointType" dimension="3" subFieldSuffix="_d"/>
+  </types>
+  <fields>
+    <field name="binary_field" required="false" type="binary"/>
+    <field name="point_field" required="false" type="point"/>
+    <field name="location_field" required="false" type="location"/>
+    <field name="geohash_field" required="false" type="geohash"/>
+    <field name="point3_field" required="false" type="point3"/>
+  </fields>
+ </schema>
+"""
+
+def test_binary_data_understood_ok():
+    s = SolrSchema(StringIO.StringIO(new_field_types_schema))
+    blob = "jkgh"
+    coded_blob = blob.encode('base64')
+    field_inst = s.field_from_user_data("binary_field", blob)
+    assert field_inst.value == blob
+    assert field_inst.to_solr() == coded_blob
+    binary_field = s.match_field("binary_field")
+    assert binary_field.from_solr(coded_blob) == blob
