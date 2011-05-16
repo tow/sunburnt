@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .search import SolrSearch, PaginateOptions, SortOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
 
 debug = False
@@ -290,6 +290,12 @@ good_option_data = {
         ({"fields":["int_field", "text_field"], "prefix":"abc", "limit":3},
          {"facet":True, "facet.field":["int_field", "text_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3, "f.text_field.facet.prefix":"abc", "f.text_field.facet.limit":3, }),
         ),
+    SortOptions:(
+        ({"field":"int_field"},
+         {"sort":"int_field asc"}),
+        ({"field":"-int_field"},
+         {"sort":"int_field desc"}),
+    ),
     HighlightOptions:(
         ({"fields":"int_field"},
          {"hl":True, "hl.fl":"int_field"}),
@@ -342,6 +348,9 @@ bad_option_data = {
         {"sort":"yes"}, # invalid choice
         {"offset":-1}, # invalid value
         ),
+    SortOptions:(
+        {"field":"myarse"}, # Undefined field
+        ),
     HighlightOptions:(
         {"fields":"myarse"}, # Undefined field
         {"oops":True}, # undefined option
@@ -358,9 +367,9 @@ bad_option_data = {
     }
 
 def check_bad_option_data(OptionClass, kwargs):
-    paginate = OptionClass(schema)
+    option = OptionClass(schema)
     try:
-        paginate.update(**kwargs)
+        option.update(**kwargs)
     except SolrError:
         pass
     else:
