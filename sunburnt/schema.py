@@ -9,7 +9,7 @@ import lxml.builder
 import lxml.etree
 
 from .dates import datetime_from_w3_datestring
-from .strings import WildcardString
+from .strings import SolrString, WildcardString
 
 try:
     import pytz
@@ -152,7 +152,10 @@ class SolrField(object):
 
 class SolrUnicodeField(SolrField):
     def from_user_data(self, value):
-        return WildcardString(value)
+        if isinstance(value, SolrString):
+            return value
+        else:
+            return WildcardString(value)
 
     def to_solr(self, value):
         return value.escape_for_lqs_term()

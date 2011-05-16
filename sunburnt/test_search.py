@@ -10,6 +10,7 @@ import mx.DateTime
 
 from .schema import SolrSchema, SolrError
 from .search import SolrSearch, PaginateOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .strings import RawString
 
 debug = False
 
@@ -205,7 +206,9 @@ good_query_data = {
          [("q", u"date_field:[2009-01-01T00:00:00.000000Z TO 2009-01-02T00:00:00.000000Z]")]),
         ([], {'string_field':['hello world', 'goodbye, cruel world']},
          [("q", u"string_field:goodbye,\\ cruel\\ world AND string_field:hello\\ world")]),
-
+        # Raw strings
+        ([], {'string_field':RawString("abc*???")},
+         [("q", "string_field:abc\\*\\?\\?\\?")]),
         ),
     }
 

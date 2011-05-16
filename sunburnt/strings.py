@@ -19,7 +19,8 @@ class SolrString(unicode):
 
 
 class RawString(SolrString):
-    pass
+    def __init__(self, s):
+        self.chars = self
 
 
 class WildcardString(SolrString):
@@ -30,9 +31,9 @@ class WildcardString(SolrString):
         def __unicode__(self):
             return unicode(self.char)
     class Asterisk(SpecialChar):
-        char = '*'
+        char = u'*'
     class QuestionMark(SpecialChar):
-        char = '?'
+        char = u'?'
 
     def get_wildcards(self, s):
         backslash = False
@@ -44,14 +45,14 @@ class WildcardString(SolrString):
                 chars.append(c)
                 continue
             i += 1
-            if c == '\\':
+            if c == u'\\':
                 backslash = True
-            elif c == '*':
+            elif c == u'*':
                 chars.append(self.Asterisk())
-            elif c == '?':
+            elif c == u'?':
                 chars.append(self.QuestionMark())
             else:
                 chars.append(c)
         if backslash:
-            chars.append('\\')
+            chars.append(u'\\')
         return chars
