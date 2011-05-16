@@ -150,7 +150,7 @@ class SolrUnicodeField(SolrField):
     def to_solr(self, value):
         return value.escape_for_lqs_term()
 
-    def normalize(self, value):
+    def from_solr(self, value):
         try:
             return unicode(value)
         except UnicodeError:
@@ -158,6 +158,9 @@ class SolrUnicodeField(SolrField):
 
 
 class SolrBooleanField(SolrField):
+    def to_solr(self, value):
+        return u"true" if value else u"false"
+
     def normalize(self, value):
         if isinstance(value, basestring):
             if value.lower() == "true":
@@ -168,17 +171,8 @@ class SolrBooleanField(SolrField):
                 raise ValueError("sorry, I only understand simple boolean strings")
         return bool(value)
 
-    def to_solr(self, value):
-        return u"true" if value else u"false"
-
 
 class SolrBinaryField(SolrField):
-    def normalize(self, value):
-        try:
-            return str(value)
-        except TypeError:
-            raise SolrError("could not coerce value to a bytestring")
-
     def to_solr(self, value):
         return unicode(value.encode('base64'))
 
@@ -231,9 +225,6 @@ class SolrDateField(SolrField):
     def normalize(self, v):
         return solr_date(v)
 
-    def from_solr(self, v):
-        return solr_date(v)._dt_obj
-
 
 class SolrRandomField(SolrField):
     def normalize(self, v):
@@ -244,8 +235,8 @@ def SolrPointFieldFactory(dimension, **kwargs):
     class SolrPoint(SolrField):
         dim = dimension
         value_class = solr_point_factory(dim)
-        def normalize(self, v):
-            return self.value_class(v)
+        def to_solr(self, v):
+            return self.value_class(v) # This looks wrong
         def from_solr(self, v):
             return self.value_class(v).point
     return SolrPoint
