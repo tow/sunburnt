@@ -99,7 +99,7 @@ def solr_point_factory(dimension):
             return "solr_point(%s)" % unicode(self)
 
         def __unicode__(self):
-            return ','.join(str(p) for p in self.pointlist)
+            return ','.join(str(p) for p in self.point)
 
     return solr_point
 
@@ -242,8 +242,8 @@ def SolrPointFieldFactory(dimension, **kwargs):
         dim = dimension
         value_class = solr_point_factory(dim)
         def to_solr(self, v):
-            return self.value_class(v) # This looks wrong
-        def from_solr(self, v):
+            return unicode(self.value_class(v))
+        def normalize(self, v):
             return self.value_class(v).point
     return SolrPoint
 

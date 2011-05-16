@@ -363,3 +363,25 @@ def test_binary_data_understood_ok():
     assert field_inst.to_solr() == coded_blob
     binary_field = s.match_field("binary_field")
     assert binary_field.from_solr(coded_blob) == blob
+
+
+def test_2point_data_understood_ok():
+    s = SolrSchema(StringIO.StringIO(new_field_types_schema))
+    user_data = (3.5, -2.5)
+    solr_data = "3.5,-2.5"
+    field_inst = s.field_from_user_data("geohash_field", user_data)
+    assert field_inst.value == user_data
+    assert field_inst.to_solr() == solr_data
+    point_field = s.match_field("geohash_field")
+    assert point_field.from_solr(solr_data) == user_data
+
+
+def test_3point_data_understood_ok():
+    s = SolrSchema(StringIO.StringIO(new_field_types_schema))
+    user_data = (3.5, -2.5, 1.0)
+    solr_data = "3.5,-2.5,1.0"
+    field_inst = s.field_from_user_data("point3_field", user_data)
+    assert field_inst.value == user_data
+    assert field_inst.to_solr() == solr_data
+    point_field = s.match_field("point3_field")
+    assert point_field.from_solr(solr_data) == user_data
