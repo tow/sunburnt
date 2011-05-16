@@ -219,6 +219,7 @@ def check_query_data(method, args, kwargs, output):
             print p
             print output
             import pdb;pdb.set_trace()
+            raise
         else:
             raise
 
@@ -448,6 +449,7 @@ def check_complex_boolean_query(solr_search, query, output):
             print p
             print output
             import pdb;pdb.set_trace()
+            raise
         else:
             raise
     # And check no mutation of the base object
@@ -459,6 +461,7 @@ def check_complex_boolean_query(solr_search, query, output):
             print p
             print q
             import pdb;pdb.set_trace()
+            raise
 
 def test_complex_boolean_queries():
     solr_search = SolrSearch(interface)

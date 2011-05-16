@@ -270,6 +270,16 @@ class SolrFieldInstance(object):
         return self.field.to_solr(self.value)
 
 
+class SolrWildcardField(SolrUnicodeField):
+    def __init__(self):
+        pass
+
+
+class WildcardFieldInstance(SolrFieldInstance):
+    def __init__(self):
+        return super(WildcardFieldInstance, self).__init__(SolrWildcardField(), "*")
+
+
 class SolrSchema(object):
     solr_data_types = {
         'solr.StrField':SolrUnicodeField,

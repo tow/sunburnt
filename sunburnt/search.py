@@ -2,8 +2,7 @@ from __future__ import absolute_import
 
 import collections, copy, operator, re
 
-from .schema import SolrError, SolrUnicodeField, SolrBooleanField
-from .strings import WildcardString
+from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
 
 
 class LuceneQuery(object):
@@ -79,24 +78,24 @@ class LuceneQuery(object):
                 s += [u'%s:%s' % (name, value.to_solr()) for value in value_set]
             else:
                 s += [value.to_solr() for value in value_set]
-        return ' AND '.join(sorted(s))
+        return u' AND '.join(sorted(s))
 
     range_query_templates = {
-        "any": "[* TO *]",
-        "lt": "{* TO %s}",
-        "lte": "[* TO %s]",
-        "gt": "{%s TO *}",
-        "gte": "[%s TO *]",
-        "rangeexc": "{%s TO %s}",
-        "range": "[%s TO %s]",
+        "any": u"[* TO *]",
+        "lt": u"{* TO %s}",
+        "lte": u"[* TO %s]",
+        "gt": u"{%s TO *}",
+        "gte": u"[%s TO *]",
+        "rangeexc": u"{%s TO %s}",
+        "range": u"[%s TO %s]",
     }
     def serialize_range_queries(self):
         s = []
         for name, rel, values in sorted(self.ranges):
             range_s = self.range_query_templates[rel] % \
                 tuple(value.to_solr() for value in sorted(values, key=lambda x: getattr(x, "value")))
-            s.append("%s:%s" % (name, range_s))
-        return ' AND '.join(s)
+            s.append(u"%s:%s" % (name, range_s))
+        return u' AND '.join(s)
 
     def child_needs_parens(self, child):
         if len(child) == 1:
@@ -196,7 +195,7 @@ class LuceneQuery(object):
                              self.serialize_range_queries()]
                  if s]
             for q in self.subqueries:
-                op_ = 'OR' if self._or else 'AND'
+                op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
                     u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
                 else:
@@ -297,20 +296,22 @@ class LuceneQuery(object):
                 self.add_range(field_name, rel, v)
 
     def add_exact(self, field_name, values, term_or_phrase):
-        if field_name:
-            field = self.schema.match_field(field_name)
-        else:
-            field = self.schema.default_field
-#FIXME when we introduce RawString
-#        if (field_name, value) == ("*", "*"):
-#            # Get the wildcard out of the way first
-#            self.terms["*"].add(WildcardString("*"))
-#            return
         # We let people pass in a list of values to match.
         # This really only makes sense for text fields or
         # multivalued fields.
         if not hasattr(values, "__iter__"):
             values = [values]
+        # We can only do a field_name == "*" if:
+        if field_name and field_name != "*":
+            field = self.schema.match_field(field_name)
+        elif not field_name:
+            field = self.schema.default_field
+        else: # field_name must be "*"
+            if len(values) == 1 and values[0] == "*":
+                self.terms["*"].add(WildcardFieldInstance())
+                return
+            else:
+                raise SolrError("If field_name is '*', then only '*' is permitted as the query")
         insts = [field.instance_from_user_data(value) for value in values]
         for inst in insts:
             if isinstance(field, SolrUnicodeField):
@@ -358,8 +359,8 @@ class SolrSearch(object):
         self.interface = interface
         self.schema = interface.schema
         if original is None:
-            self.query_obj = LuceneQuery(self.schema, 'q')
-            self.filter_obj = LuceneQuery(self.schema, 'fq')
+            self.query_obj = LuceneQuery(self.schema, u'q')
+            self.filter_obj = LuceneQuery(self.schema, u'fq')
             self.paginator = PaginateOptions(self.schema)
             self.more_like_this = MoreLikeThisOptions(self.schema)
             self.highlighter = HighlightOptions(self.schema)
@@ -454,8 +455,8 @@ class SolrSearch(object):
         options = {}
         for option_module in self.option_modules:
             options.update(getattr(self, option_module).options())
-        if 'q' not in options:
-            options['q'] = '*:*' # search everything
+        if u'q' not in options:
+            options[u'q'] = u'*:*' # search everything
         return options
 
     def params(self):

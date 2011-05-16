@@ -306,14 +306,16 @@ def test_delete_docs():
 
 
 delete_queries = [
-    (["search"],
+    ([(["search"], {})],
      """<delete><query>search</query></delete>"""),
-    (["search1", "search2"],
+    ([(["search1"], {}), (["search2"], {})],
      """<delete><query>search1</query><query>search2</query></delete>"""),
+    ([([], {"*":"*"})],
+     """<delete><query>*:*</query></delete>"""),
     ]
 
 def check_delete_queries(s, queries, xml_string):
-    p = str(SolrDelete(s, queries=[s.Q(query) for query in queries]))
+    p = str(SolrDelete(s, queries=[s.Q(*args, **kwargs) for args, kwargs in queries]))
     if debug:
         try:
             assert p == xml_string
