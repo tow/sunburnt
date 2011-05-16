@@ -134,13 +134,10 @@ class SolrField(object):
         return self.normalize(value)
 
     def to_solr(self, value):
-        return self.as_unicode(value)
-
-    def deserialize(self, value):
-        return self.normalize(value)
-
-    def as_unicode(self, value):
         return unicode(value)
+
+    def from_solr(self, value):
+        return self.normalize(value)
 
 
 class SolrUnicodeField(SolrField):
@@ -159,9 +156,6 @@ class SolrUnicodeField(SolrField):
         except UnicodeError:
             raise SolrError("%s could not be coerced to unicode" % value)
 
-    def as_unicode(self, value):
-        return value
-
 
 class SolrBooleanField(SolrField):
     def normalize(self, value):
@@ -174,7 +168,7 @@ class SolrBooleanField(SolrField):
                 raise ValueError("sorry, I only understand simple boolean strings")
         return bool(value)
 
-    def as_unicode(self, value):
+    def to_solr(self, value):
         return u"true" if value else u"false"
 
 
@@ -185,10 +179,10 @@ class SolrBinaryField(SolrField):
         except TypeError:
             raise SolrError("could not coerce value to a bytestring")
 
-    def as_unicode(self, value):
+    def to_solr(self, value):
         return unicode(value.encode('base64'))
 
-    def deserialize(self, value):
+    def from_solr(self, value):
         return value.decode('base64')
 
 
@@ -237,7 +231,7 @@ class SolrDateField(SolrField):
     def normalize(self, v):
         return solr_date(v)
 
-    def deserialize(self, v):
+    def from_solr(self, v):
         return solr_date(v)._dt_obj
 
 
@@ -252,7 +246,7 @@ def SolrPointFieldFactory(dimension, **kwargs):
         value_class = solr_point_factory(dim)
         def normalize(self, v):
             return self.value_class(v)
-        def deserialize(self, v):
+        def from_solr(self, v):
             return self.value_class(v).point
     return SolrPoint
 
@@ -419,7 +413,7 @@ class SolrSchema(object):
             field_class = self.match_field(name)
         except KeyError:
             raise SolrError("unexpected field found in result")
-        return name, field_class.deserialize(doc.text or '')
+        return name, field_class.from_solr(doc.text or '')
 
 
 class SolrUpdate(object):
