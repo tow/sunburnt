@@ -136,13 +136,6 @@ class SolrField(object):
     def to_solr(self, value):
         return self.as_unicode(value)
 
-    def serialize(self, value):
-        if hasattr(value, "__iter__"):
-            if not self.multi_valued:
-                raise SolrError("'%s' is not a multi-valued field" % self.name)
-            return [self.serialize(v) for v in value]
-        return self.as_unicode(self.normalize(value))
-
     def deserialize(self, value):
         return self.normalize(value)
 
