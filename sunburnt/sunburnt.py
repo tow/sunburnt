@@ -127,7 +127,7 @@ class SolrInterface(object):
             raise TypeError("This Solr instance is only for reading")
         self.conn.rollback()
 
-    def clear_all(self):
+    def delete_all(self):
         if not self.writeable:
             raise TypeError("This Solr instance is only for reading")
         # When deletion is fixed to escape query strings, this will need fixed.
