@@ -361,13 +361,20 @@ class SolrSchema(object):
         return [name for name in set(self.fields.keys()) - set(field_names)
                 if self.fields[name].required]
 
-    def check_fields(self, field_names):
+    def check_fields(self, field_names, required_atts=None):
         if isinstance(field_names, basestring):
             field_names = [field_names]
+        if required_atts is None:
+            required_atts = {}
         undefined_field_names = []
         for field_name in field_names:
-            if not self.match_field(field_name):
+            field = self.match_field(field_name)
+            if not field:
                 undefined_field_names.append(field_name)
+            else:
+                for k, v in required_atts.items():
+                    if getattr(field, k) != v:
+                        raise SolrError("Field '%s' does not have %s=%s" % (field_name, k, v))
         if undefined_field_names:
             raise SolrError("Fields not defined in schema: %s" % list(undefined_field_names))
 
