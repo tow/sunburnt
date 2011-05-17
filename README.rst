@@ -15,6 +15,8 @@ Bugs can be filed on the `issue tracker <https://github.com/tow/sunburnt/issues>
 It's tested with Solr 1.4.1 and 3.1; previous versions were known to work
 with 1.3 and 1.4 as well.
 
+Full documentation can be found at http://opensource.timetric.com/sunburnt/index.html.
+
 Dependencies
 ============
 
