@@ -131,7 +131,7 @@ class SolrField(object):
                 return name.startswith(self.name[:-1])
 
     def instance_from_user_data(self, data):
-        return SolrFieldInstance(self, data)
+        return SolrFieldInstance.from_user_data(self, data)
 
     def from_user_data(self, value):
         return self.normalize(value)
@@ -264,9 +264,12 @@ def SolrFieldTypeFactory(cls, name, **kwargs):
 
 
 class SolrFieldInstance(object):
-    def __init__(self, field, data):
+    @classmethod
+    def from_user_data(cls, field, data):
+        self = cls()
         self.field = field
         self.value = self.field.from_user_data(data)
+        return self
 
     def to_solr(self):
         return self.field.to_solr(self.value)
@@ -284,8 +287,9 @@ class SolrScoreField(SolrDoubleField):
 
 
 class WildcardFieldInstance(SolrFieldInstance):
-    def __init__(self):
-        return super(WildcardFieldInstance, self).__init__(SolrWildcardField(), "*")
+    @classmethod
+    def from_user_data(cls):
+        return super(WildcardFieldInstance, cls).from_user_data(SolrWildcardField(), "*")
 
 
 class SolrSchema(object):

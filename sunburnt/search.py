@@ -310,7 +310,7 @@ class LuceneQuery(object):
             field = self.schema.default_field
         else: # field_name must be "*"
             if len(values) == 1 and values[0] == "*":
-                self.terms["*"].add(WildcardFieldInstance())
+                self.terms["*"].add(WildcardFieldInstance.from_user_data())
                 return
             else:
                 raise SolrError("If field_name is '*', then only '*' is permitted as the query")
