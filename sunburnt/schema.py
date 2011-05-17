@@ -148,7 +148,7 @@ class SolrUnicodeField(SolrField):
         if isinstance(value, SolrString):
             return value
         else:
-            return WildcardString(value)
+            return WildcardString(unicode(value))
 
     def to_solr(self, value):
         return value.escape_for_lqs_term()
