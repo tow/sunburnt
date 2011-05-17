@@ -9,7 +9,7 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions, SortOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .search import SolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
 
 debug = False
@@ -321,6 +321,20 @@ good_option_data = {
          {"mlt":True, "mlt.fl":"string_field,text_field", "mlt.qf":"text_field^0.25 string_field^0.75"}),
         ({"fields":"text_field", "count":1},
          {"mlt":True, "mlt.fl":"text_field", "mlt.count":1}),
+        ),
+    FieldLimitOptions:(
+        ({},
+         {}),
+        ({"fields":"int_field"},
+         {"fl":"int_field"}),
+        ({"fields":["int_field", "text_field"]},
+         {"fl":"int_field,text_field"}),
+        ({"score": True},
+         {"fl":"score"}),
+        ({"all_fields": True, "score": True},
+         {"fl":"*,score"}),
+        ({"fields":"int_field", "score": True},
+         {"fl":"int_field,score"}),
         ),
     }
 

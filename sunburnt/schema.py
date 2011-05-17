@@ -272,9 +272,15 @@ class SolrFieldInstance(object):
         return self.field.to_solr(self.value)
 
 
+# These are artificial field classes/instances:
 class SolrWildcardField(SolrUnicodeField):
     def __init__(self):
         pass
+
+
+class SolrScoreField(SolrDoubleField):
+    def __init__(self):
+       pass
 
 
 class WildcardFieldInstance(SolrFieldInstance):
@@ -438,9 +444,10 @@ class SolrSchema(object):
             return name, tuple(v[1] for v in values)
         if doc.tag in 'doc':
             return dict(self.parse_result_doc(n) for n in doc.getchildren())
-        try:
-            field_class = self.match_field(name)
-        except KeyError:
+        field_class = self.match_field(name)
+        if field_class is None and name == "score":
+            field_class = SolrScoreField()
+        elif field_class is None:
             raise SolrError("unexpected field found in result")
         return name, field_class.from_solr(doc.text or '')
 

@@ -354,7 +354,7 @@ class LuceneQuery(object):
 
 
 class SolrSearch(object):
-    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier')
+    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier', 'field_limiter',)
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
@@ -366,6 +366,7 @@ class SolrSearch(object):
             self.highlighter = HighlightOptions(self.schema)
             self.faceter = FacetOptions(self.schema)
             self.sorter = SortOptions(self.schema)
+            self.field_limiter = FieldLimitOptions(self.schema)
             self.facet_querier = FacetQueryOptions(self.schema)
         else:
             for opt in self.option_modules:
@@ -437,6 +438,11 @@ class SolrSearch(object):
     def sort_by(self, field):
         newself = self.clone()
         newself.sorter.update(field)
+        return newself
+
+    def field_limit(self, fields=None, score=False, all_fields=False):
+        newself = self.clone()
+        newself.field_limiter.update(fields, score, all_fields)
         return newself
 
     def boost_relevancy(self, boost_score, **kwargs):
@@ -710,6 +716,43 @@ class SortOptions(Options):
             return {"sort":", ".join("%s %s" % (field, order) for order, field in self.fields)}
         else:
             return {}
+
+
+class FieldLimitOptions(Options):
+    option_name = "fl"
+
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = set()
+            self.score = False
+            self.all_fields = False
+        else:
+            self.fields = copy.copy(original.fields)
+            self.score = original.score
+            self.all_fields = original.all_fields
+
+    def update(self, fields=None, score=False, all_fields=False):
+        if fields is None:
+            fields = []
+        if isinstance(fields, basestring):
+            fields = [fields]
+        self.schema.check_fields(fields, {"stored": True})
+        self.fields.update(fields)
+        self.score = score
+        self.all_fields = all_fields
+
+    def options(self):
+        opts = {}
+        if self.all_fields:
+            fields = set("*")
+        else:
+            fields = self.fields
+        if self.score:
+            fields.add("score")
+        if fields:
+            opts['fl'] = ','.join(sorted(fields))
+        return opts
 
 
 class FacetQueryOptions(Options):
