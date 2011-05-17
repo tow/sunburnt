@@ -133,6 +133,9 @@ class SolrField(object):
     def instance_from_user_data(self, data):
         return SolrFieldInstance.from_user_data(self, data)
 
+    def to_user_data(self, value):
+        return value
+
     def from_user_data(self, value):
         return self.normalize(value)
 
@@ -234,6 +237,9 @@ class SolrDateField(SolrField):
     def normalize(self, v):
         return solr_date(v)
 
+    def to_user_data(self, v):
+        return v._dt_obj
+
 
 class SolrRandomField(SolrField):
     def normalize(self, v):
@@ -265,6 +271,13 @@ def SolrFieldTypeFactory(cls, name, **kwargs):
 
 class SolrFieldInstance(object):
     @classmethod
+    def from_solr(cls, field, data):
+        self = cls()
+        self.field = field
+        self.value = self.field.from_solr(data)
+        return self
+
+    @classmethod
     def from_user_data(cls, field, data):
         self = cls()
         self.field = field
@@ -273,6 +286,9 @@ class SolrFieldInstance(object):
 
     def to_solr(self):
         return self.field.to_solr(self.value)
+
+    def to_user_data(self):
+        return self.field.to_user_data(self.value)
 
 
 # These are artificial field classes/instances:
@@ -453,7 +469,7 @@ class SolrSchema(object):
             field_class = SolrScoreField()
         elif field_class is None:
             raise SolrError("unexpected field found in result")
-        return name, field_class.from_solr(doc.text or '')
+        return name, SolrFieldInstance.from_solr(field_class, doc.text or '').to_user_data()
 
 
 class SolrUpdate(object):
