@@ -1,14 +1,16 @@
 Sunburnt
 ========
 
-Sunburnt is a Python-based interface for working with the Solr
-(http://lucene.apache.org/solr/) search engine.
+Sunburnt is a Python-based interface for working with the `Apache Solr
+<http://lucene.apache.org/solr/>`_ search engine.
 
-It was written by Toby White <toby@timetric.com> for use in the Timetric
-(http://timetric.com) platform.
+It was written by Toby White <toby@timetric.com> for use in the `Timetric
+platform <http://timetric.com>`_.
 
-Please send queries/comments/suggestions to:
-http://groups.google.com/group/python-sunburnt
+Please send queries/comments/suggestions to the `mailing list
+<http://groups.google.com/group/python-sunburnt>`_.
+
+Bugs can be filed on the `issue tracker <https://github.com/tow/sunburnt/issues>`_.
 
 It's tested with Solr 1.4.1 and 3.1; previous versions were known to work
 with 1.3 and 1.4 as well.
