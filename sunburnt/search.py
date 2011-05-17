@@ -290,6 +290,8 @@ class LuceneQuery(object):
                 if (k, v) != ("*", "*"):
                     # the only case where wildcards in field names are allowed
                     raise ValueError("%s is not a valid field name" % k)
+            elif not field.indexed:
+                raise SolrError("Can't query on non-indexed field '%s'" % field_name)
             if rel == 'eq':
                 self.add_exact(field_name, v, terms_or_phrases)
             else:
@@ -349,6 +351,8 @@ class LuceneQuery(object):
             field = self.schema.match_field(k)
             if not field:
                 raise ValueError("%s is not a valid field name" % k)
+            elif not field.indexed:
+                raise SolrError("Can't query on non-indexed field '%s'" % field_name)
             value = field.instance_from_user_data(v)
         self.boosts.append((kwargs, boost_score))
 
