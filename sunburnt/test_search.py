@@ -350,6 +350,7 @@ bad_option_data = {
         ),
     SortOptions:(
         {"field":"myarse"}, # Undefined field
+        {"field":"string_field"}, # Multivalued field
         ),
     HighlightOptions:(
         {"fields":"myarse"}, # Undefined field
