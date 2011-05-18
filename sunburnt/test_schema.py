@@ -194,6 +194,32 @@ class D(object):
             self.my_arse = my_arse
 
 
+class StringWrapper(object):
+    def __init__(self, s):
+        self.s = s
+
+    def __unicode__(self):
+        return self.s
+
+
+class D_with_callables(object):
+    def __init__(self, int_field, text_field=None, my_arse=None):
+        self._int_field = int_field
+        if text_field:
+            self._text_field = text_field
+        if my_arse:
+            self._my_arse = my_arse
+
+    def int_field(self):
+        return self._int_field
+
+    def text_field(self):
+        return self._text_field
+
+    def my_arse(self):
+        return self._my_arse
+
+
 update_docs = [
     # One single dictionary, not making use of multivalued field
     ({"int_field":1, "text_field":"a"},
@@ -224,6 +250,18 @@ update_docs = [
     # Make sure we distinguish strings and lists
     ({"int_field":1, "text_field":"abcde"},
       """<add><doc><field name="int_field">1</field><field name="text_field">abcde</field></doc></add>"""),
+
+    # Check attributes which are objects to be converted.
+    (D(1, StringWrapper("a"), True),
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc></add>"""),
+
+    # Check attributes which are callable methods.
+    (D_with_callables(1, "a", True),
+     """<add><doc><field name="int_field">1</field><field name="text_field">a</field></doc></add>"""),
+
+    # Check that strings aren't query-escaped
+    (D(1, "a b", True),
+     """<add><doc><field name="int_field">1</field><field name="text_field">a b</field></doc></add>"""),
     ]
 
 def check_update_serialization(s, obj, xml_string):
