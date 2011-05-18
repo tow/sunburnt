@@ -378,10 +378,10 @@ More likely you’ll want to search by comparison or by range:
 ::
 
  # all items manufactured on or after the 1st January 2006
- si.query(manufacturedate_dt__gt=datetime.datetime(2006))
+ si.query(manufacturedate_dt__gt=datetime.datetime(2006, 1, 1))
 
  # all items manufactured in Q1 2006.
- si.query(manufacturedate_dt__range=(datetime.datetime(2006, 1), datetime.datetime(2006, 4))
+ si.query(manufacturedate_dt__range=(datetime.datetime(2006, 1, 1), datetime.datetime(2006, 4, 1))
 
 The argument to a date query can be any object that looks roughly like
 a Python ``datetime`` object (so ``mx.DateTime`` objects will also work),
