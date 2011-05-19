@@ -37,8 +37,8 @@ Using a downloaded release
 You can get versions of sunburnt from pypi.
 
 ::
-
- tar xzf http://pypi.python.org/packages/source/s/sunburnt/sunburnt-0.5.tar.gz
+ wget http://pypi.python.org/packages/source/s/sunburnt/sunburnt-0.5.tar.gz
+ tar xzf sunburnt-0.5.tar.gz
  cd sunburnt-0.5
  setup.py install
 
