@@ -74,6 +74,19 @@ class solr_date(object):
         return u"%s.%sZ" % (self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S"),
                             "%06d" % self.microsecond)
 
+    def __cmp__(self, other):
+        try:
+            other = other._dt_obj
+        except AttributeError:
+            pass
+        if self._dt_obj < other:
+            return -1
+        elif self._dt_obj > other:
+            return 1
+        else:
+            return 0
+
+
 def solr_point_factory(dimension):
     if dimension < 1:
         raise ValueError("dimension of PointType must be greater than one")
