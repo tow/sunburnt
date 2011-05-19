@@ -467,7 +467,8 @@ class SolrSearch(object):
             options.update(getattr(self, option_module).options())
         if u'q' not in options:
             options[u'q'] = u'*:*' # search everything
-        return options
+        # Next line is for pre-2.6.5 python
+        return dict((k.encode('utf8'), v) for k, v in options.items())
 
     def params(self):
         return params_from_dict(**self.options())
