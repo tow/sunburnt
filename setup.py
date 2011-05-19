@@ -16,7 +16,7 @@ distutils.core.setup(
     requires=['httplib2', 'lxml', 'pytz'],
     license='WTFPL',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: DFSG approved',
         'Programming Language :: Python',
