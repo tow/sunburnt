@@ -482,7 +482,7 @@ class SolrSchema(object):
             values = [self.parse_result_doc(n, name) for n in doc.getchildren()]
             return name, tuple(v[1] for v in values)
         if doc.tag in 'doc':
-            return dict(self.parse_result_doc(n) for n in doc.getchildren())
+            return dict([self.parse_result_doc(n) for n in doc.getchildren()])
         field_class = self.match_field(name)
         if field_class is None and name == "score":
             field_class = SolrScoreField()
