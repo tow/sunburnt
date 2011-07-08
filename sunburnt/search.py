@@ -376,6 +376,10 @@ class SolrSearch(object):
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
 
+        self._count = None
+        self._result = None
+
+
     def clone(self):
         return SolrSearch(interface=self.interface, original=self)
 
@@ -479,7 +483,6 @@ class SolrSearch(object):
             result.result.docs = [constructor(**d) for d in result.result.docs]
         return result
 
-    _result = None
     def _get_results(self):
         # retrieve and cache results for use with __len__, __getitem__,
         # and execute
@@ -490,7 +493,6 @@ class SolrSearch(object):
         
     ## methods to allow SolrSearch to be used with Django paginator ##
 
-    _count = None
     def count(self):
         # get the total count for the current query without retrieving any results 
         if self._count is None:
@@ -518,6 +520,8 @@ class SolrSearch(object):
             raise TypeError
         
         if isinstance(k, slice):
+            if k.step > 1:
+                raise IndexError('Stepped slicing is not supported')
             # calculate solr pagination options for the requested slice
             paginate_opts = {}
             # if start was specified, use it
