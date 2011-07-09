@@ -216,16 +216,16 @@ You can extract more information from the response than simply the list of resul
 
 and the results themselves are in the following attributes
 
-* ``response.results`` : the results of your main query.
+* ``response.result`` : the results of your main query.
 * ``response.facet_counts`` : see `Faceting`_ below.
 * ``response.highlighting`` : see `Highlighting`_ below.
 * ``response.more_like_these`` : see `More Like This`_ below.
 
-Finally, ``response.results`` itself has the following attributes
+Finally, ``response.result`` itself has the following attributes
 
-* ``response.results.numFound`` : total number of docs in the index which fulfilled the query.
-* ``response.results.docs`` : the actual results themselves (more easily extracted as ``list(response)``).
-* ``response.results.start`` : if the number of docs is less than numFound, then this is the pagination offset. 
+* ``response.result.numFound`` : total number of docs in the index which fulfilled the query.
+* ``response.result.docs`` : the actual results themselves (more easily extracted as ``list(response)``).
+* ``response.result.start`` : if the number of docs is less than numFound, then this is the pagination offset. 
 
 
 Pagination
