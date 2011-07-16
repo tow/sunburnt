@@ -492,11 +492,7 @@ class SolrSearch(BaseSearch):
 
 
 class MltSolrSearch(BaseSearch):
-    """Utility object to gather parameters for a MoreLikeThisHandler query
-
-    TODO: we need a base class with methods common to SolrSearch and
-    MltSolrSearch instead.
-    """
+    """Manage parameters to build a MoreLikeThisHandler query"""
 
     option_modules = ('filter_obj', 'paginator', 'more_like_this',
                       'highlighter', 'faceter', 'sorter', 'facet_querier',
