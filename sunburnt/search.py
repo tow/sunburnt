@@ -592,7 +592,6 @@ class Options(object):
         return opts
 
 
-
 class FacetOptions(Options):
     option_name = "facet"
     opts = {"prefix":unicode,

@@ -10,7 +10,7 @@ import warnings
 import httplib2
 
 from .schema import SolrSchema, SolrError
-from .search import LuceneQuery, SolrSearch, params_from_dict
+from .search import LuceneQuery, SolrSearch, MltSolrSearch, params_from_dict
 
 
 class SolrConnection(object):
@@ -83,8 +83,8 @@ class SolrConnection(object):
             headers = {"Content-Type": "text/plain; charset=%s" % charset}
             if isinstance(body, unicode):
                 body = body.encode(charset)
-            r, c = self.request(self.update_url, method="POST",
-                                body=body, headers=headers)
+            r, c = self.request(url, method="POST", body=body,
+                                headers=headers)
         else:
             # the body passed as a GET parameters
             r, c = self.request(url)
@@ -196,7 +196,6 @@ class SolrInterface(object):
         """
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
-        print body
         q = MltSolrSearch(self, body_content=body, body_url=url)
         return q.mlt(fields, query_fields=query_fields, **kwargs)
 
