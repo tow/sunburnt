@@ -9,8 +9,10 @@ import datetime
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
+
+from nose.tools import assert_equal
 
 debug = False
 
@@ -517,3 +519,25 @@ def check_url_encode_data(kwargs, output):
 def test_url_encode_data():
     for kwargs, output in param_encode_data:
         yield check_url_encode_data, kwargs, output
+
+
+mlt_query_options_data = (
+    ('text_field', {}, {},
+     [('mlt.fl', 'text_field')]),
+    (['string_field', 'text_field'], {'string_field': 3.0}, {},
+     [('mlt.fl', 'string_field,text_field'), ('mlt.qf', 'string_field^3.0')]),
+    ('text_field', {}, {'mindf': 3, 'interestingTerms': 'details'},
+     [('mlt.fl', 'text_field'), ('mlt.interestingTerms', 'details'),
+      ('mlt.mindf', '3')]),
+)
+
+
+def check_mlt_query_options(fields, query_fields, kwargs, output):
+    q = MltSolrSearch(interface, body_content="This is the posted content.")
+    q = q.mlt(fields, query_fields=query_fields, **kwargs)
+    assert_equal(q.params(), output)
+
+
+def test_mlt_query_options():
+    for (fields, query_fields, kwargs, output) in mlt_query_options_data:
+        yield check_mlt_query_options, fields, query_fields, kwargs, output
