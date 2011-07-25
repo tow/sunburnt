@@ -529,7 +529,7 @@ class SolrSearch(object):
                 else:
                     start = offset
                 if k.stop is not None:
-                    stop = operator.index(k.stop)
+                    stop = offset + operator.index(k.stop)
                 else:
                     stop = self.count()
             else:
@@ -538,7 +538,7 @@ class SolrSearch(object):
                 else:
                     start = self.count()
                 if k.stop is not None:
-                    stop = operator.index(k.stop)
+                    stop = offset + operator.index(k.stop)
                 else:
                     stop = offset
 
