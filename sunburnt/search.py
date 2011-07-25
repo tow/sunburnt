@@ -495,56 +495,84 @@ class SolrSearch(object):
 
     def count(self):
         # get the total count for the current query without retrieving any results 
+        # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
-            # store the count, since it may be needed multiple
-            # times when used with django paginator
-            response = self.paginate(rows=0).execute()
-            self._count = response.result.numFound
+            # are we already paginated? then we'll behave as if that's
+            # defined our result set already.
+            if self.paginator.rows is not None:
+                total_results = self.paginator.rows
+            else:
+                response = self.paginate(rows=0).execute()
+                total_results = response.result.numFound
+                if self.paginator.start is not None:
+                    total_results -= self.paginator.start
+            self._count = total_results
         return self._count
 
-    def __len__(self):
-        # number of items in the current, paginated result set
-        return len(self._get_results())
-        # (could possibly be calculated via current pagination
-        # settings and count, but that wouldn't take into account the
-        # solr configured default rows when paginator.rows is not set;
-        # probably not a big performance difference)
-        
     def __getitem__(self, k):
         """Return a single result or slice of results from the query.
-        When sliced, it returns a paginated SolrSearch instance.
         """
-        # NOTE: currently only supports the default result constructor.
+        # NOTE: only supports the default result constructor.
 
-        if not isinstance(k, (slice, int, long)):
-            raise TypeError
-        
+        # are we already paginated? if so, we'll apply this getitem to the
+        # paginated result - else we'll apply it to the whole.
+        offset = 0 if self.paginator.start is None else self.paginator.start
+
         if isinstance(k, slice):
-            if k.step > 1:
-                raise IndexError('Stepped slicing is not supported')
             # calculate solr pagination options for the requested slice
-            paginate_opts = {}
-            # if start was specified, use it
-            if k.start is not None:
-                paginate_opts['start'] = int(k.start)
-            # if a slice bigger than available results is requested, cap it at actual max
-            if k.stop is None:
-                stop = self.count()
+            step = operator.index(k.step) if k.step is not None else 1
+            if step == 0:
+                raise ValueError("slice step cannot be zero")
+            if step > 0:
+                if k.start is not None:
+                    start = offset + operator.index(k.start)
+                else:
+                    start = offset
+                if k.stop is not None:
+                    stop = operator.index(k.stop)
+                else:
+                    stop = self.count()
             else:
-                stop = min(k.stop, self.count())
-            paginate_opts['rows'] = stop - int(k.start)
-            return self.paginate(**paginate_opts)
+                if k.start is not None:
+                    start = offset + operator.index(k.start)
+                else:
+                    start = self.count()
+                if k.stop is not None:
+                    stop = operator.index(k.stop)
+                else:
+                    stop = offset
 
-        # if not a slice, a single result is being requested
-        
-        # check that index is in range
-        # (for now, not handling any fancy python indexing)
-        if k < 0 or k >= self.count():
-            raise IndexError
+            if start < 0:
+                start += self.count()
+                start = max(0, start)
+            if stop < 0:
+                stop += self.count()
+                stop = max(0, stop)
 
-        # index is relative to currently paginated result set
-        return self._get_results()[k]
+            if step < 1:
+                start, stop = stop, start
 
+            rows = stop - start
+            if self.paginator.rows is not None:
+                rows = min(rows, self.paginator.rows)
+
+            if rows <= 0:
+                return []
+
+            return self.paginate(start=start, rows=rows)._get_results()[::step]
+
+        else:
+            # if not a slice, a single result is being requested
+            k = operator.index(k)
+            if k < 0:
+                k += self.count()
+                if k < 0:
+                    raise IndexError("list index out of range")
+            # Otherwise do the query anyway, don't count() to avoid extra Solr call
+            response = self.paginate(start=k, rows=1)._get_results()
+            if response.result.numFound < k:
+                raise IndexError("list index out of range")
+            return response.result.docs[0]
 
 
 class Options(object):
