@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import datetime
 import math
 import operator
+import uuid
 import warnings
 
 import lxml.builder
@@ -262,6 +263,25 @@ class SolrRandomField(SolrField):
         raise TypeError("Don't try and store or index values in a RandomSortField")
 
 
+class SolrUUIDField(SolrUnicodeField):
+    def from_solr(self, v):
+        return uuid.UUID(v)
+
+    def from_user_data(self, v):
+        if v == 'NEW':
+            return v
+        elif isinstance(v, uuid.UUID):
+            return v
+        else:
+            return uuid.UUID(v)
+
+    def to_solr(self, v):
+        if v == 'NEW':
+            return v
+        else:
+            return v.urn[9:]
+
+
 class SolrPointField(SolrField):
     def __init__(self, **kwargs):
         super(SolrPointField, self).__init__(**kwargs)
@@ -348,6 +368,7 @@ class SolrSchema(object):
         'solr.DateField':SolrDateField,
         'solr.TrieDateField':SolrDateField,
         'solr.RandomSortField':SolrRandomField,
+        'solr.UUIDField':SolrUUIDField,
         'solr.BinaryField':SolrBinaryField,
         'solr.PointType':SolrPointField,
         'solr.LatLonType':SolrPoint2Field,

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import cStringIO as StringIO
 import datetime
+import uuid
 
 import mx.DateTime
 import pytz
@@ -381,6 +382,7 @@ new_field_types_schema = \
     <fieldtype name="geohash" class="solr.GeoHashField"/>
     <!-- And just to check it works: -->
     <fieldType name="point3" class="solr.PointType" dimension="3" subFieldSuffix="_d"/>
+    <fieldType name="uuid" class="solr.UUIDField" indexed="true" />
   </types>
   <fields>
     <field name="binary_field" required="false" type="binary"/>
@@ -388,6 +390,7 @@ new_field_types_schema = \
     <field name="location_field" required="false" type="location"/>
     <field name="geohash_field" required="false" type="geohash"/>
     <field name="point3_field" required="false" type="point3"/>
+    <field name="id" type="uuid" indexed="true" stored="true" default="NEW"/>
   </fields>
  </schema>
 """
@@ -423,3 +426,22 @@ def test_3point_data_understood_ok():
     assert field_inst.to_solr() == solr_data
     point_field = s.match_field("point3_field")
     assert point_field.from_solr(solr_data) == user_data
+
+
+def test_uuid_data_understood_ok():
+    s = SolrSchema(StringIO.StringIO(new_field_types_schema))
+
+    user_data = "12980286-591b-40c6-aa08-b4393a6d13b3"
+    field_inst = s.field_from_user_data('id', user_data)
+    assert field_inst.value == uuid.UUID("12980286-591b-40c6-aa08-b4393a6d13b3")
+
+    user_data = uuid.UUID("12980286-591b-40c6-aa08-b4393a6d13b3")
+    field_inst = s.field_from_user_data('id', user_data)
+    assert field_inst.value == uuid.UUID("12980286-591b-40c6-aa08-b4393a6d13b3")
+
+    user_data = "NEW"
+    field_inst = s.field_from_user_data('id', user_data)
+
+    solr_data = "12980286-591b-40c6-aa08-b4393a6d13b3"
+    uuid_field = s.match_field("id")
+    assert uuid_field.from_solr(solr_data) == uuid.UUID("12980286-591b-40c6-aa08-b4393a6d13b3")
