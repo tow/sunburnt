@@ -14,11 +14,10 @@ distutils.core.setup(
     author_email='toby@timetric.com',
     packages=['sunburnt'],
     requires=['httplib2', 'lxml', 'pytz'],
-    license='WTFPL',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'License :: DFSG approved',
+        'License :: OSI Approved :: MIT License'
         'Programming Language :: Python',
         'Topic :: Internet :: WWW/HTTP :: Indexing/Search',
         'Topic :: Software Development :: Libraries'],
