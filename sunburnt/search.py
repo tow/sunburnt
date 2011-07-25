@@ -376,10 +376,6 @@ class SolrSearch(object):
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
 
-        self._count = None
-        self._result = None
-
-
     def clone(self):
         return SolrSearch(interface=self.interface, original=self)
 
@@ -478,21 +474,14 @@ class SolrSearch(object):
         return params_from_dict(**self.options())
 
     def execute(self, constructor=dict):
-        result = self._get_results()
+        result = self.interface.search(**self.options())
         if constructor is not dict:
             result.result.docs = [constructor(**d) for d in result.result.docs]
         return result
 
-    def _get_results(self):
-        # retrieve and cache results for use with __len__, __getitem__,
-        # and execute
-        if self._result is None:
-            self._result = self.interface.search(**self.options())
-        return self._result
-        
-        
     ## methods to allow SolrSearch to be used with Django paginator ##
 
+    _count = None
     def count(self):
         # get the total count for the current query without retrieving any results 
         # cache it, since it may be needed multiple times when used with django paginator
@@ -508,6 +497,8 @@ class SolrSearch(object):
                     total_results -= self.paginator.start
             self._count = total_results
         return self._count
+
+    __len__ = count
 
     def __getitem__(self, k):
         """Return a single result or slice of results from the query.
@@ -559,7 +550,7 @@ class SolrSearch(object):
             if rows <= 0:
                 return []
 
-            return self.paginate(start=start, rows=rows)._get_results()[::step]
+            return self.paginate(start=start, rows=rows).execute()[::step]
 
         else:
             # if not a slice, a single result is being requested
@@ -569,7 +560,7 @@ class SolrSearch(object):
                 if k < 0:
                     raise IndexError("list index out of range")
             # Otherwise do the query anyway, don't count() to avoid extra Solr call
-            response = self.paginate(start=k, rows=1)._get_results()
+            response = self.paginate(start=k, rows=1).execute()
             if response.result.numFound < k:
                 raise IndexError("list index out of range")
             return response.result.docs[0]
