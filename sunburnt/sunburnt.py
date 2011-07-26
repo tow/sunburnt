@@ -7,7 +7,6 @@ import logging
 import socket, time, urllib, urlparse
 import warnings
 
-import httplib2
 
 from .schema import SolrSchema, SolrError
 from .search import LuceneQuery, SolrSearch, params_from_dict
@@ -18,6 +17,7 @@ class SolrConnection(object):
         if http_connection:
             self.http_connection = http_connection
         else:
+            import httplib2
             self.http_connection = httplib2.Http()
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
