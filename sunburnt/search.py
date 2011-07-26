@@ -417,12 +417,18 @@ class SolrSearch(object):
 
     def facet_by(self, field, **kwargs):
         newself = self.clone()
-        newself.faceter.update(field, **kwargs)
+        args.field = field
+        newself.faceter.update(field, a)
         return newself
         
     def group_by(self, field, **kwargs):
         newself = self.clone()
-        newself.grouper.update(field, **kwargs)
+        kwargs['field'] = field
+        
+        if not kwargs.has_key('ngroups'):
+            kwargs['ngroups'] = True
+            
+        newself.grouper.update(None, **kwargs)
         return newself
 
     def facet_query(self, *args, **kwargs):
@@ -528,6 +534,7 @@ class Options(object):
             fields = [field for field in self.fields if field]
             self.field_names_in_opts(opts, fields)
         for field_name, field_opts in self.fields.items():
+            print("field_name: %s, field_opts: %s" % (field_name, field_opts))
             if not field_name:
                 for field_opt, v in field_opts.items():
                     opts['%s.%s'%(self.option_name, field_opt)] = v
@@ -563,7 +570,10 @@ class FacetOptions(Options):
             
 class GroupOptions(Options):
     option_name = "group"
-    opts = {"limit":int
+    opts = {"field":unicode,
+            "limit":int,
+            "main":bool,
+            "ngroups":bool
            }
            
     def __init__(self, schema, original=None):
@@ -572,11 +582,10 @@ class GroupOptions(Options):
             self.fields = collections.defaultdict(dict)
         else:
             self.fields = copy.copy(original.fields)
-            
+        
     def field_names_in_opts(self, opts, fields):
         if fields:
-            opts["group.field"] = sorted(fields)
-            opts["group.main"] = "true"
+            opts["facet.field"] = sorted(fields)
 
 
 class HighlightOptions(Options):

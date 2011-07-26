@@ -489,6 +489,11 @@ class SolrSchema(object):
         elif field_class is None:
             raise SolrError("unexpected field found in result")
         return name, SolrFieldInstance.from_solr(field_class, doc.text or '').to_user_data()
+        
+    def parse_group(self, group, value=None):
+        if value is None:
+            value = group.xpath("str[@name='groupValue']")[0].text
+        return value, [self.parse_result_doc(n) for n in group.xpath("result/doc")]
 
 
 class SolrUpdate(object):
@@ -613,8 +618,12 @@ class SolrResponse(object):
             setattr(self, attr, details['responseHeader'].get(attr))
         if self.status != 0:
             raise ValueError("Response indicates an error")
-        result_node = doc.xpath("/response/result")[0]
-        self.result = SolrResult(schema, result_node)
+        result_node_list = doc.xpath("/response/result")
+        group_node_list = doc.xpath("/response/lst[@name='grouped']")
+        if result_node_list:
+            self.result = SolrResult(schema, result_node_list[0])
+        else:
+            self.result = SolrResult(schema, group_node_list[0])
         self.facet_counts = SolrFacetCounts.from_response(details)
         self.highlighting = dict((k, dict(v))
                                  for k, v in details.get("highlighting", ()))
@@ -641,12 +650,22 @@ class SolrResponse(object):
 
 class SolrResult(object):
     def __init__(self, schema, node):
+        self.grouped = True if (node.tag == 'lst' and node.attrib['name'] == 'grouped') else False
         self.schema = schema
         self.name = node.attrib['name']
-        self.numFound = int(node.attrib['numFound'])
-        self.start = int(node.attrib['start'])
+        self.numFound = node.xpath("lst/int[@name='matches']")[0].text if self.grouped else int(node.attrib['numFound'])
+        if self.grouped:
+            ngroups = node.xpath("lst/int[@name='ngroups']")
+            if ngroups:
+                self.ngroups = int(ngroups[0].text)
+        if 'start' in node.attrib:
+            self.start = int(node.attrib['start'])
+        else:
+            start_param = node.xpath("../lst[@name='responseHeader']/lst[@name='params']/str[@name='start']")
+            self.start = start_param[0].text if start_param else 0
         self.docs = [schema.parse_result_doc(n) for n in node.xpath("doc")]
-
+        self.groups = [schema.parse_group(n) for n in node.xpath("lst/arr[@name='groups']/lst")]
+        
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
@@ -720,6 +739,8 @@ def value_from_node(node):
         value = float(node.text)
     elif node.tag == 'date':
         value = solr_date(node.text)
+    elif node.tag == 'result':
+        value = [value_from_node(n) for n in node.getchildren()]
     if name is not None:
         return name, value
     else:
