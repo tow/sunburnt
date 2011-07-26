@@ -116,7 +116,7 @@ class MockConnection(object):
 
 conn = SolrInterface("http://test.example.com/", http_connection=MockConnection())
 
-pagination_tests = (
+pagination_slice_tests = (
 ((None, None), range(0, 10),
     (slice(None, None, None),
      slice(0, 10, None),
@@ -171,14 +171,54 @@ pagination_tests = (
      slice(-5, -2, -1))),
 )
 
+def check_slice_pagination(p_args, a, s):
+    assert [d['int_field'] for d in conn.query("*").paginate(*p_args)[s]] == a[s]
+
+def test_slice_pagination():
+    for p_args, a, slices in pagination_slice_tests:
+        for s in slices:
+            yield check_slice_pagination, p_args, a, s
+
 # indexing to cells
 
 # IndexErrors as appropriate
 
-def check_pagination(p_args, a, s):
-    assert [d['int_field'] for d in conn.query("*").paginate(*p_args)[s]] == a[s]
+pagination_index_tests = (
+((None, None), range(0, 10),
+   ((0, None),
+    (5, None),
+    (9, None),
+    (-1, None),
+    (-5, None),
+    (-9, None),
+    (10, IndexError),
+    (20, IndexError),
+    (-10, IndexError),
+    (-20, IndexError))),
+((2, 6), range(2, 8),
+   ((0, None),
+    (3, None),
+    (5, None),
+    (-1, None),
+    (-3, None),
+    (-6, None),
+    (6, IndexError),
+    (20, IndexError),
+    (-7, IndexError),
+    (-20, IndexError))),
+)
 
-def test_pagination():
-    for p_args, a, slices in pagination_tests:
-        for s in slices:
-            yield check_pagination, p_args, a, s
+def check_index_pagination(p_args, a, s, e):
+    if e is None:
+        assert conn.query("*").paginate(*p_args)[s]['int_field'] == a[s]
+    else:
+        q = conn.query("*").paginate(*p_args)
+        try:
+            q[s]
+        except IndexError:
+            pass
+
+def test_index_pagination():
+    for p_args, a, slices in pagination_index_tests:
+        for s, e in slices:
+            yield check_index_pagination, p_args, a, s, e

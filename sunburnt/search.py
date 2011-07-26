@@ -505,9 +505,6 @@ class SolrSearch(object):
         """
         # NOTE: only supports the default result constructor.
 
-        if k.start == -1 and k.stop == -5 and k.step == -1:
-            import pdb;pdb.set_trace()
-
         # are we already paginated? if so, we'll apply this getitem to the
         # paginated result - else we'll apply it to the whole.
         offset = 0 if self.paginator.start is None else self.paginator.start
@@ -561,7 +558,9 @@ class SolrSearch(object):
                 k += self.count()
                 if k < 0:
                     raise IndexError("list index out of range")
+
             # Otherwise do the query anyway, don't count() to avoid extra Solr call
+            k += offset
             response = self.paginate(start=k, rows=1).execute()
             if response.result.numFound < k:
                 raise IndexError("list index out of range")
