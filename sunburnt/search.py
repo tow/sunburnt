@@ -524,24 +524,25 @@ class SolrSearch(object):
                 else:
                     stop = self.count()
             else:
-                if k.start is not None:
-                    start = offset + operator.index(k.start)
-                else:
-                    start = self.count()
                 if k.stop is not None:
-                    stop = offset + operator.index(k.stop)
+                    start = offset + operator.index(k.stop)
+                    if k.stop >= 0:
+                        start += 1
                 else:
-                    stop = offset
+                    start = offset
+                if k.start is not None:
+                    stop = offset + operator.index(k.start)
+                    if k.start >= 0:
+                        stop += 1
+                else:
+                    stop = self.count()
 
-            if start < 0:
+            if start < offset:
                 start += self.count()
-                start = max(0, start)
-            if stop < 0:
+                start = max(offset, start)
+            if stop < offset:
                 stop += self.count()
-                stop = max(0, stop)
-
-            if step < 1:
-                start, stop = stop, start
+                stop = max(offset, stop)
 
             rows = stop - start
             if self.paginator.rows is not None:

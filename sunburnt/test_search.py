@@ -6,6 +6,9 @@ except ImportError:
     from StringIO import StringIO
 
 import datetime
+
+from lxml.builder import E
+from lxml.etree import tostring
 import mx.DateTime
 
 from .schema import SolrSchema, SolrError
