@@ -6,7 +6,7 @@ import operator
 import uuid
 import warnings
 
-import lxml.builder
+from lxml.builder import E
 import lxml.etree
 
 from .dates import datetime_from_w3_datestring
@@ -19,9 +19,6 @@ except ImportError:
         "pytz not found; cannot do timezone conversions for Solr DateFields",
         ImportWarning)
     pytz = None
-
-
-E = lxml.builder.ElementMaker()
 
 
 class SolrError(Exception):
