@@ -505,6 +505,9 @@ class SolrSearch(object):
         """
         # NOTE: only supports the default result constructor.
 
+        if k.start == -1 and k.stop == -5 and k.step == -1:
+            import pdb;pdb.set_trace()
+
         # are we already paginated? if so, we'll apply this getitem to the
         # paginated result - else we'll apply it to the whole.
         offset = 0 if self.paginator.start is None else self.paginator.start
@@ -516,33 +519,36 @@ class SolrSearch(object):
                 raise ValueError("slice step cannot be zero")
             if step > 0:
                 if k.start is not None:
-                    start = offset + operator.index(k.start)
+                    start = operator.index(k.start)
+                    if start < 0:
+                        start += self.count()
+                        start = max(0, start)
                 else:
-                    start = offset
+                    start = 0
                 if k.stop is not None:
-                    stop = offset + operator.index(k.stop)
+                    stop = operator.index(k.stop)
+                    if stop < 0:
+                        stop += self.count()
+                        stop = max(0, stop)
                 else:
                     stop = self.count()
             else:
                 if k.stop is not None:
-                    start = offset + operator.index(k.stop)
-                    if k.stop >= 0:
-                        start += 1
+                    start = operator.index(k.stop)
+                    if start < 0:
+                        start += self.count()
+                        start = max(0, start)
+                    start += 1
                 else:
-                    start = offset
+                    start = 0
                 if k.start is not None:
-                    stop = offset + operator.index(k.start)
-                    if k.start >= 0:
-                        stop += 1
+                    stop = operator.index(k.start)
+                    if stop < 0:
+                        stop += self.count()
+                        stop = max(0, stop)
+                    stop += 1
                 else:
                     stop = self.count()
-
-            if start < offset:
-                start += self.count()
-                start = max(offset, start)
-            if stop < offset:
-                stop += self.count()
-                stop = max(offset, stop)
 
             rows = stop - start
             if self.paginator.rows is not None:
@@ -550,6 +556,8 @@ class SolrSearch(object):
 
             if rows <= 0:
                 return []
+
+            start += offset
 
             return self.paginate(start=start, rows=rows).execute()[::step]
 

@@ -117,44 +117,63 @@ class MockConnection(object):
 conn = SolrInterface("http://test.example.com/", http_connection=MockConnection())
 
 pagination_tests = (
-    ((None, None), slice(None, None, None), range(10)),
-    ((None, None), slice(0, 10, None), range(10)),
-    ((None, None), slice(0, 10, 1), range(10)),
-    ((None, None), slice(0, 5, None), range(5)),
-    ((None, None), slice(5, 10, None), range(5, 10)),
-    ((None, None), slice(0, 5, 2), range(0, 5, 2)),
-    ((None, None), slice(5, 10, 2), range(5, 10, 2)),
-    ((None, None), slice(9, None, -1), range(9, -1, -1)), # f
-    ((None, None), slice(None, 0, -1), range(9, 0, -1)), # f
-    ((None, None), slice(7, 3, -2), range(7, 3, -2)), # f
+((None, None), range(0, 10),
+    (slice(None, None, None),
+     slice(0, 10, None),
+     slice(0, 10, 1),
+     slice(0, 5, None),
+     slice(5, 10, None),
+     slice(0, 5, 2),
+     slice(5, 10, 2),
+     slice(9, None, -1),
+     slice(None, 0, -1),
+     slice(7, 3, -2),
     # out of range but ok
-    ((None, None), slice(0, 12, None), range(10)),
-    ((None, None), slice(-100, 12, None), range(10)),
+     slice(0, 12, None),
+     slice(-100, 12, None),
     # out of range but empty
-    ((None, None), slice(12, 20, None), []),
-    ((None, None), slice(-100, -90), []),
+     slice(12, 20, None),
+     slice(-100, -90),
     # negative offsets
-    ((None, None), slice(0, -1, None), range(9)),
-    ((None, None), slice(-5, -1, None), range(5, 9)),
-    ((None, None), slice(-1, -5, -1), range(8, 4, -1)),
+     slice(0, -1, None),
+     slice(-5, -1, None),
+     slice(-1, -5, -1),
     # zero-range produced
-    ((None, None), slice(10, 0, None), []),
-    ((None, None), slice(0, 10, -1), []),
-    ((None, None), slice(0, -3, -1), []),
-    ((None, None), slice(-5, -9, None), []),
-    ((None, None), slice(-9, -5, -1), []),
-)
+     slice(10, 0, None),
+     slice(0, 10, -1),
+     slice(0, -3, -1),
+     slice(-5, -9, None),
+     slice(-9, -5, -1))),
 
-#pagination to paginated query
+### and now with pre-paginated queries:
+((2, 6), range(2, 8),
+    (slice(None, None, None),
+     slice(0, 6, None),
+     slice(0, 6, 1),
+     slice(0, 5, None),
+     slice(5, 6, None),
+     slice(0, 5, 2),
+     slice(3, 6, 2),
+     slice(5, None, -1), 
+     slice(None, 0, -1),
+    # out of range but ok
+     slice(0, 12, None),
+     slice(-100, 12, None),
+    # negative offsets
+     slice(0, -1, None),
+     slice(-3, -1, None),
+     slice(-1, -3, -1))),
+
+)
 
 # indexing to cells
 
 # IndexErrors as appropriate
 
-def check_pagination(p):
-    p_args, s_args, output = p
-    assert [d['int_field'] for d in conn.query("*").paginate(*p_args)[s_args]] == output
+def check_pagination(p_args, a, s):
+    assert [d['int_field'] for d in conn.query("*").paginate(*p_args)[s]] == a[s]
 
 def test_pagination():
-    for p in pagination_tests:
-        yield check_pagination, p
+    for p_args, a, slices in pagination_tests:
+        for s in slices:
+            yield check_pagination, p_args, a, s
