@@ -162,8 +162,13 @@ pagination_tests = (
     # negative offsets
      slice(0, -1, None),
      slice(-3, -1, None),
-     slice(-1, -3, -1))),
-
+     slice(-1, -3, -1),
+    # zero-range produced
+     slice(6, 0, None),
+     slice(0, 6, -1),
+     slice(0, -3, -1),
+     slice(-2, -5, None),
+     slice(-5, -2, -1))),
 )
 
 # indexing to cells

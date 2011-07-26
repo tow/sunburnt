@@ -518,37 +518,30 @@ class SolrSearch(object):
             if step == 0:
                 raise ValueError("slice step cannot be zero")
             if step > 0:
-                if k.start is not None:
-                    start = operator.index(k.start)
-                    if start < 0:
-                        start += self.count()
-                        start = max(0, start)
-                else:
-                    start = 0
-                if k.stop is not None:
-                    stop = operator.index(k.stop)
-                    if stop < 0:
-                        stop += self.count()
-                        stop = max(0, stop)
-                else:
-                    stop = self.count()
+                s1 = k.start
+                s2 = k.stop
+                inc = 0
             else:
-                if k.stop is not None:
-                    start = operator.index(k.stop)
-                    if start < 0:
-                        start += self.count()
-                        start = max(0, start)
-                    start += 1
-                else:
-                    start = 0
-                if k.start is not None:
-                    stop = operator.index(k.start)
-                    if stop < 0:
-                        stop += self.count()
-                        stop = max(0, stop)
-                    stop += 1
-                else:
-                    stop = self.count()
+                s1 = k.stop
+                s2 = k.start
+                inc = 1
+
+            if s1 is not None:
+                start = operator.index(s1)
+                if start < 0:
+                    start += self.count()
+                    start = max(0, start)
+                start += inc
+            else:
+                start = 0
+            if s2 is not None:
+                stop = operator.index(s2)
+                if stop < 0:
+                    stop += self.count()
+                    stop = max(0, stop)
+                stop += inc
+            else:
+                stop = self.count()
 
             rows = stop - start
             if self.paginator.rows is not None:
