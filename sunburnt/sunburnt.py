@@ -11,9 +11,11 @@ import warnings
 from .schema import SolrSchema, SolrError
 from .search import LuceneQuery, SolrSearch, params_from_dict
 
+MAX_LENGTH_GET_URL = 2048
+# Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
 
 class SolrConnection(object):
-    def __init__(self, url, http_connection=None, retry_timeout=-1):
+    def __init__(self, url, http_connection, retry_timeout, max_length_get_url):
         if http_connection:
             self.http_connection = http_connection
         else:
@@ -23,6 +25,7 @@ class SolrConnection(object):
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
         self.retry_timeout = retry_timeout
+        self.max_length_get_url = max_length_get_url
 
     def request(self, *args, **kwargs):
         try:
@@ -61,7 +64,12 @@ class SolrConnection(object):
     def select(self, params):
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
-        r, c = self.request(url)
+        if len(url) > self.max_length_get_url:
+            warnings.warn("Long query URL encountered - POSTing instead of GETting. This query will not be cached at the HTTP layer")
+            method = "POST"
+        else:
+            method = "GET"
+        r, c = self.request(url, method=method)
         if r.status != 200:
             raise SolrError(r, c)
         return c
@@ -71,8 +79,8 @@ class SolrInterface(object):
     readable = True
     writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1):
-        self.conn = SolrConnection(url, http_connection, retry_timeout)
+    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1, max_length_get_url=MAX_LENGTH_GET_URL):
+        self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url)
         self.schemadoc = schemadoc
         if mode == 'r':
             self.writeable = False
