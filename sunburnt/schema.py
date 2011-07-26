@@ -654,10 +654,13 @@ class SolrResult(object):
         self.schema = schema
         self.name = node.attrib['name']
         self.numFound = node.xpath("lst/int[@name='matches']")[0].text if self.grouped else int(node.attrib['numFound'])
+        
         if self.grouped:
             ngroups = node.xpath("lst/int[@name='ngroups']")
             if ngroups:
                 self.ngroups = int(ngroups[0].text)
+            self.groupField = node.xpath("lst")[0].attrib['name']    
+        
         if 'start' in node.attrib:
             self.start = int(node.attrib['start'])
         else:
