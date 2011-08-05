@@ -417,6 +417,7 @@ class SolrSearch(object):
 
     def facet_by(self, field, **kwargs):
         newself = self.clone()
+        newself.faceter.update(field, **kwargs)
         args.field = field
         newself.faceter.update(field, a)
         return newself
