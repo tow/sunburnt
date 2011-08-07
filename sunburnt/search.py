@@ -533,7 +533,6 @@ class Options(object):
             fields = [field for field in self.fields if field]
             self.field_names_in_opts(opts, fields)
         for field_name, field_opts in self.fields.items():
-            print("field_name: %s, field_opts: %s" % (field_name, field_opts))
             if not field_name:
                 for field_opt, v in field_opts.items():
                     opts['%s.%s'%(self.option_name, field_opt)] = v
