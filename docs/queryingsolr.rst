@@ -247,6 +247,28 @@ will return the 11th result, and ``rows=30`` will return the next 30 results,
 up to the 40th.
 
 
+Pagination with Django
+......................
+
+If you are using sunburnt with `Django
+<https://www.djangoproject.com/>`_, you can paginate your query
+results with `Django's Paginator
+<https://docs.djangoproject.com/en/1.3/topics/pagination/>`_.  For
+example, the pagination example above could be wrapped in a Django
+Paginator as simply as this:
+
+::
+
+  from django.core.paginator import Paginator
+
+  paginator = Paginator(si.query("black"), 30)    # 30 results per page
+
+The resulting paginator object can then be used in a Django view (or
+anywhere else you want to paginate contents) exactly as described in
+the `paginator example in the Django documentation
+<https://docs.djangoproject.com/en/1.3/topics/pagination/#using-paginator-in-a-view>`_.
+
+
 Returning different fields
 --------------------------
 
