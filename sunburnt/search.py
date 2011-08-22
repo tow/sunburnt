@@ -264,7 +264,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -357,58 +357,33 @@ class LuceneQuery(object):
         self.boosts.append((kwargs, boost_score))
 
 
-class SolrSearch(object):
-    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier', 'field_limiter',)
-    def __init__(self, interface, original=None):
-        self.interface = interface
-        self.schema = interface.schema
-        if original is None:
-            self.query_obj = LuceneQuery(self.schema, u'q')
-            self.filter_obj = LuceneQuery(self.schema, u'fq')
-            self.paginator = PaginateOptions(self.schema)
-            self.more_like_this = MoreLikeThisOptions(self.schema)
-            self.highlighter = HighlightOptions(self.schema)
-            self.faceter = FacetOptions(self.schema)
-            self.sorter = SortOptions(self.schema)
-            self.field_limiter = FieldLimitOptions(self.schema)
-            self.facet_querier = FacetQueryOptions(self.schema)
-        else:
-            for opt in self.option_modules:
-                setattr(self, opt, getattr(original, opt).clone())
+class BaseSearch(object):
+    """Base class for common search options management"""
 
-    def clone(self):
-        return SolrSearch(interface=self.interface, original=self)
+    def _init_common_modules(self):
+        self.filter_obj = LuceneQuery(self.schema, u'fq')
+        self.paginator = PaginateOptions(self.schema)
+        self.highlighter = HighlightOptions(self.schema)
+        self.faceter = FacetOptions(self.schema)
+        self.sorter = SortOptions(self.schema)
+        self.field_limiter = FieldLimitOptions(self.schema)
+        self.facet_querier = FacetQueryOptions(self.schema)
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
         q.add(args, kwargs)
         return q
 
-    def query_by_term(self, *args, **kwargs):
-        return self.query(__terms_or_phrases="terms", *args, **kwargs)
-
-    def query_by_phrase(self, *args, **kwargs):
-        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
+    def filter(self, *args, **kwargs):
+        newself = self.clone()
+        newself.filter_obj.add(args, kwargs)
+        return newself
 
     def filter_by_term(self, *args, **kwargs):
         return self.filter(__terms_or_phrases="terms", *args, **kwargs)
 
     def filter_by_phrase(self, *args, **kwargs):
         return self.filter(__terms_or_phrases="phrases", *args, **kwargs)
-
-    def query(self, *args, **kwargs):
-        newself = self.clone()
-        newself.query_obj.add(args, kwargs)
-        return newself
-
-    def exclude(self, *args, **kwargs):
-        # cloning will be done by query
-        return self.query(~self.Q(*args, **kwargs))
-
-    def filter(self, *args, **kwargs):
-        newself = self.clone()
-        newself.filter_obj.add(args, kwargs)
-        return newself
 
     def filter_exclude(self, *args, **kwargs):
         # cloning will be done by filter
@@ -449,6 +424,45 @@ class SolrSearch(object):
         newself.field_limiter.update(fields, score, all_fields)
         return newself
 
+    def params(self):
+        return params_from_dict(**self.options())
+
+
+class SolrSearch(BaseSearch):
+
+    option_modules = ('query_obj', 'filter_obj', 'paginator',
+                      'more_like_this', 'highlighter', 'faceter',
+                      'sorter', 'facet_querier', 'field_limiter',)
+
+    def __init__(self, interface, original=None):
+        self.interface = interface
+        self.schema = interface.schema
+        if original is None:
+            self.query_obj = LuceneQuery(self.schema, u'q')
+            self.more_like_this = MoreLikeThisOptions(self.schema)
+            self._init_common_modules()
+        else:
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+
+    def clone(self):
+        return SolrSearch(interface=self.interface, original=self)
+
+    def query_by_term(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="terms", *args, **kwargs)
+
+    def query_by_phrase(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
+
+    def query(self, *args, **kwargs):
+        newself = self.clone()
+        newself.query_obj.add(args, kwargs)
+        return newself
+
+    def exclude(self, *args, **kwargs):
+        # cloning will be done by query
+        return self.query(~self.Q(*args, **kwargs))
+
     def boost_relevancy(self, boost_score, **kwargs):
         if not self.query_obj:
             raise TypeError("Can't boost the relevancy of an empty query")
@@ -469,9 +483,6 @@ class SolrSearch(object):
             options[u'q'] = u'*:*' # search everything
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
-
-    def params(self):
-        return params_from_dict(**self.options())
 
     def execute(self, constructor=dict):
         result = self.interface.search(**self.options())
@@ -567,6 +578,52 @@ class SolrSearch(object):
             return response.result.docs[0]
 
 
+class MltSolrSearch(BaseSearch):
+    """Manage parameters to build a MoreLikeThisHandler query"""
+
+    option_modules = ('filter_obj', 'paginator', 'more_like_this',
+                      'highlighter', 'faceter', 'sorter', 'facet_querier',
+                      'field_limiter',)
+
+    def __init__(self, interface, body_content=None, body_url=None,
+                 original=None):
+        self.interface = interface
+        self.schema = interface.schema
+        if original is None:
+            if body_content is None and body_url is None:
+                raise ValueError(
+                    "Either body_content or body_url is required")
+            self.body_content = body_content
+            self.body_url = body_url
+            self.more_like_this = MoreLikeThisHandlerOptions(self.schema)
+            self._init_common_modules()
+        else:
+            self.body_content = original.body_content
+            self.body_url = original.body_url
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+
+    def clone(self):
+        return MltSolrSearch(interface=self.interface, original=self)
+
+    def execute(self, constructor=dict):
+        options = self.options()
+        if self.body_url is not None:
+            options['stream.url'] = self.body_url
+        result = self.interface.mlt_search(body=self.body_content, **options)
+        if constructor is not dict:
+            result.result.docs = [constructor(**d)
+                                  for d in result.result.docs]
+        return result
+
+    def options(self):
+        options = {}
+        for option_module in self.option_modules:
+            options.update(getattr(self, option_module).options())
+        # Next line is for pre-2.6.5 python
+        return dict((k.encode('utf8'), v) for k, v in options.items())
+
+
 class Options(object):
     def clone(self):
         return self.__class__(self.schema, self)
@@ -616,7 +673,6 @@ class Options(object):
                 for field_opt, v in field_opts.items():
                     opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
         return opts
-
 
 
 class FacetOptions(Options):
@@ -727,6 +783,36 @@ class MoreLikeThisOptions(Options):
         opts = {}
         if self.fields:
             opts['mlt'] = True
+            opts['mlt.fl'] = ','.join(sorted(self.fields))
+
+        if self.query_fields:
+            qf_arg = []
+            for k, v in self.query_fields.items():
+                if v is None:
+                    qf_arg.append(k)
+                else:
+                    qf_arg.append("%s^%s" % (k, float(v)))
+            opts["mlt.qf"] = " ".join(qf_arg)
+
+        for opt_name, opt_value in self.kwargs.items():
+            opt_type = self.opts[opt_name]
+            opts["mlt.%s" % opt_name] = opt_type(opt_value)
+
+        return opts
+
+
+class MoreLikeThisHandlerOptions(MoreLikeThisOptions):
+
+    opts = {'match.include': bool,
+            'match.offset': int,
+            'interestingTerms': unicode,
+           }
+    opts.update(MoreLikeThisOptions.opts)
+    del opts['count']
+
+    def options(self):
+        opts = {}
+        if self.fields:
             opts['mlt.fl'] = ','.join(sorted(self.fields))
 
         if self.query_fields:
