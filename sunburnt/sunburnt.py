@@ -9,7 +9,7 @@ import warnings
 
 
 from .schema import SolrSchema, SolrError
-from .search import LuceneQuery, SolrSearch, params_from_dict
+from .search import LuceneQuery, MltSolrSearch, SolrSearch, params_from_dict
 
 MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
@@ -24,6 +24,7 @@ class SolrConnection(object):
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
+        self.mlt_url = self.url + "mlt/"
         self.retry_timeout = retry_timeout
         self.max_length_get_url = max_length_get_url
 
@@ -70,6 +71,26 @@ class SolrConnection(object):
         else:
             method = "GET"
         r, c = self.request(url, method=method)
+        if r.status != 200:
+            raise SolrError(r, c)
+        return c
+
+    def mlt(self, params, content=None):
+        """Perform a MoreLikeThis query using the content specified
+        There may be no content if stream.url is specified in the params.
+        """
+        qs = urllib.urlencode(params)
+        base_url = "%s?%s" % (self.mlt_url, qs)
+        if content is None:
+            kwargs = {'url': base_url, 'method': "GET"}
+        else:
+            get_url = ("%s&stream.body=%s") % (base_url, urllib.quote_plus(content))
+            if len(get_url) <= self.max_length_get_url:
+                kwargs = {'url': get_url, 'method': "GET"}
+            else:
+                kwargs = {'url': base_url, 'method': "POST",
+                    body: content, headers: {"Content-Type": "text/plain; charset=utf-8"}}
+        r, c = self.request(**kwargs)
         if r.status != 200:
             raise SolrError(r, c)
         return c
@@ -155,6 +176,31 @@ class SolrInterface(object):
             return q.query(*args, **kwargs)
         else:
             return q
+
+    def mlt_search(self, content=None, **kwargs):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        params = params_from_dict(**kwargs)
+        return self.schema.parse_response(self.conn.mlt(params, content=content))
+
+    def mlt_query(self, fields, content=None, content_charset='utf_8', url=None, query_fields=None,
+                  **kwargs):
+        """Perform a similarity query on MoreLikeThisHandler
+
+        The MoreLikeThisHandler is expected to be registered at the '/mlt'
+        endpoint in the solrconfig.xml file of the server.
+
+        fields is the list of field names to compute similarity upon.
+        query_fields can be used to adjust boosting values on a subset of those
+        fields.
+
+        Other MoreLikeThis specific parameters can be passed as kwargs without
+        the 'mlt.' prefix.
+        """
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        q = MltSolrSearch(self, content=content, content_charset=content_charset, url=url)
+        return q.mlt(fields, query_fields=query_fields, **kwargs)
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)

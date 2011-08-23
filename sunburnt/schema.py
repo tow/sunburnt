@@ -647,6 +647,14 @@ class SolrResponse(object):
         else:
             self.more_like_this = None
 
+        # can be computed by MoreLikeThisHandler
+        termsNodes = doc.xpath("/response/*[@name='interestingTerms']")
+        if len(termsNodes) == 1:
+            _, value = value_from_node(termsNodes[0])
+        else:
+            value = None
+        self.interesting_terms = value
+
     def __str__(self):
         return str(self.result)
 

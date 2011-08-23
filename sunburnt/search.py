@@ -357,58 +357,37 @@ class LuceneQuery(object):
         self.boosts.append((kwargs, boost_score))
 
 
-class SolrSearch(object):
-    option_modules = ('query_obj', 'filter_obj', 'paginator', 'more_like_this', 'highlighter', 'faceter', 'sorter', 'facet_querier', 'field_limiter',)
-    def __init__(self, interface, original=None):
-        self.interface = interface
-        self.schema = interface.schema
-        if original is None:
-            self.query_obj = LuceneQuery(self.schema, u'q')
-            self.filter_obj = LuceneQuery(self.schema, u'fq')
-            self.paginator = PaginateOptions(self.schema)
-            self.more_like_this = MoreLikeThisOptions(self.schema)
-            self.highlighter = HighlightOptions(self.schema)
-            self.faceter = FacetOptions(self.schema)
-            self.sorter = SortOptions(self.schema)
-            self.field_limiter = FieldLimitOptions(self.schema)
-            self.facet_querier = FacetQueryOptions(self.schema)
-        else:
-            for opt in self.option_modules:
-                setattr(self, opt, getattr(original, opt).clone())
+
+class BaseSearch(object):
+    """Base class for common search options management"""
+
+    def _init_common_modules(self):
+        self.filter_obj = LuceneQuery(self.schema, u'fq')
+        self.paginator = PaginateOptions(self.schema)
+        self.highlighter = HighlightOptions(self.schema)
+        self.faceter = FacetOptions(self.schema)
+        self.sorter = SortOptions(self.schema)
+        self.field_limiter = FieldLimitOptions(self.schema)
+        self.facet_querier = FacetQueryOptions(self.schema)
 
     def clone(self):
-        return SolrSearch(interface=self.interface, original=self)
+        return self.__class__(interface=self.interface, original=self)
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
         q.add(args, kwargs)
         return q
 
-    def query_by_term(self, *args, **kwargs):
-        return self.query(__terms_or_phrases="terms", *args, **kwargs)
-
-    def query_by_phrase(self, *args, **kwargs):
-        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
+    def filter(self, *args, **kwargs):
+        newself = self.clone()
+        newself.filter_obj.add(args, kwargs)
+        return newself
 
     def filter_by_term(self, *args, **kwargs):
         return self.filter(__terms_or_phrases="terms", *args, **kwargs)
 
     def filter_by_phrase(self, *args, **kwargs):
         return self.filter(__terms_or_phrases="phrases", *args, **kwargs)
-
-    def query(self, *args, **kwargs):
-        newself = self.clone()
-        newself.query_obj.add(args, kwargs)
-        return newself
-
-    def exclude(self, *args, **kwargs):
-        # cloning will be done by query
-        return self.query(~self.Q(*args, **kwargs))
-
-    def filter(self, *args, **kwargs):
-        newself = self.clone()
-        newself.filter_obj.add(args, kwargs)
-        return newself
 
     def filter_exclude(self, *args, **kwargs):
         # cloning will be done by filter
@@ -449,35 +428,15 @@ class SolrSearch(object):
         newself.field_limiter.update(fields, score, all_fields)
         return newself
 
-    def boost_relevancy(self, boost_score, **kwargs):
-        if not self.query_obj:
-            raise TypeError("Can't boost the relevancy of an empty query")
-        try:
-            float(boost_score)
-        except ValueError:
-            raise ValueError("Non-numeric boost value supplied")
-
-        newself = self.clone()
-        newself.query_obj.add_boost(kwargs, boost_score)
-        return newself
-
     def options(self):
         options = {}
         for option_module in self.option_modules:
             options.update(getattr(self, option_module).options())
-        if u'q' not in options:
-            options[u'q'] = u'*:*' # search everything
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
 
     def params(self):
         return params_from_dict(**self.options())
-
-    def execute(self, constructor=dict):
-        result = self.interface.search(**self.options())
-        if constructor is not dict:
-            result.result.docs = [constructor(**d) for d in result.result.docs]
-        return result
 
     ## methods to allow SolrSearch to be used with Django paginator ##
 
@@ -567,6 +526,105 @@ class SolrSearch(object):
             return response.result.docs[0]
 
 
+class SolrSearch(BaseSearch):
+
+    option_modules = ('query_obj', 'filter_obj', 'paginator',
+                      'more_like_this', 'highlighter', 'faceter',
+                      'sorter', 'facet_querier', 'field_limiter',)
+
+    def __init__(self, interface, original=None):
+        self.interface = interface
+        self.schema = interface.schema
+        if original is None:
+            self.query_obj = LuceneQuery(self.schema, u'q')
+            self.more_like_this = MoreLikeThisOptions(self.schema)
+            self._init_common_modules()
+        else:
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+
+    def query(self, *args, **kwargs):
+        newself = self.clone()
+        newself.query_obj.add(args, kwargs)
+        return newself
+
+    def query_by_term(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="terms", *args, **kwargs)
+
+    def query_by_phrase(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
+
+    def exclude(self, *args, **kwargs):
+        # cloning will be done by query
+        return self.query(~self.Q(*args, **kwargs))
+
+    def boost_relevancy(self, boost_score, **kwargs):
+        if not self.query_obj:
+            raise TypeError("Can't boost the relevancy of an empty query")
+        try:
+            float(boost_score)
+        except ValueError:
+            raise ValueError("Non-numeric boost value supplied")
+
+        newself = self.clone()
+        newself.query_obj.add_boost(kwargs, boost_score)
+        return newself
+
+    def options(self):
+        options = super(SolrSearch, self).options()
+        if 'q' not in options:
+            options['q'] = '*:*' # search everything
+        return options
+
+    def execute(self, constructor=dict):
+        result = self.interface.search(**self.options())
+        if constructor is not dict:
+            result.result.docs = [constructor(**d) for d in result.result.docs]
+        return result
+
+
+class MltSolrSearch(BaseSearch):
+    """Manage parameters to build a MoreLikeThisHandler query"""
+    option_modules = ('filter_obj', 'paginator', 'more_like_this',
+                      'highlighter', 'faceter', 'sorter', 'facet_querier',
+                      'field_limiter',)
+    def __init__(self, interface, content=None, content_charset='utf_8', url=None,
+                 original=None):
+        self.interface = interface
+        self.schema = interface.schema
+        if original is None:
+            if content is None and url is None:
+                raise ValueError(
+                    "Either content or url is required")
+            elif content is not None and url is not None:
+                raise ValueError(
+                    "Cannot specify both content and url")
+            if content is not None:
+                if isinstance(content, unicode):
+                    content = content.encode('utf-8')
+                elif content_charset.lower().replace('-', '_') not in ["utf_8", "u8", "utf", "utf8"]:
+                    content = content.decode(content_charset).encode('utf-8')
+            self.content = content
+            self.url = url
+            self.more_like_this = MoreLikeThisHandlerOptions(self.schema)
+            self._init_common_modules()
+        else:
+            self.content = original.content
+            self.url = original.url
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+
+    def execute(self, constructor=dict):
+        options = self.options()
+        if self.url is not None:
+            options['stream.url'] = self.url
+        result = self.interface.mlt_search(body=self.content, **options)
+        if constructor is not dict:
+            result.result.docs = [constructor(**d)
+                                  for d in result.result.docs]
+        return result
+
+
 class Options(object):
     def clone(self):
         return self.__class__(self.schema, self)
@@ -583,9 +641,13 @@ class Options(object):
                 self.fields[field] = {}
         elif kwargs:
             fields = [None]
-        self.check_opts(fields, kwargs)
+        checked_kwargs = self.check_opts(kwargs)
+        for k, v in checked_kwargs.items():
+            for field in fields:
+                self.fields[field][k] = v
 
-    def check_opts(self, fields, kwargs):
+    def check_opts(self, kwargs):
+        checked_kwargs = {}
         for k, v in kwargs.items():
             if k not in self.opts:
                 raise SolrError("No such option for %s: %s" % (self.option_name, k))
@@ -599,8 +661,8 @@ class Options(object):
                     v = opt_type(self, v)
             except:
                 raise SolrError("Invalid value for %s option %s: %s" % (self.option_name, k, v))
-            for field in fields:
-                self.fields[field][k] = v
+            checked_kwargs[k] = v
+        return checked_kwargs
 
     def options(self):
         opts = {}
@@ -616,7 +678,6 @@ class Options(object):
                 for field_opt, v in field_opts.items():
                     opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
         return opts
-
 
 
 class FacetOptions(Options):
@@ -675,6 +736,7 @@ class HighlightOptions(Options):
 
 
 class MoreLikeThisOptions(Options):
+    option_name = "mlt"
     opts = {"count":int,
             "mintf":int,
             "mindf":int,
@@ -712,16 +774,8 @@ class MoreLikeThisOptions(Options):
                         raise SolrError("'%s' has non-numerical boost value"% k)
             self.query_fields.update(query_fields)
 
-        for opt_name, opt_value in kwargs.items():
-            if opt_name not in self.opts:
-                raise SolrError("Invalid MLT option %s" % opt_name)
-            opt_type = self.opts[opt_name]
-            try:
-                opt_type(opt_value)
-            except (ValueError, TypeError):
-                raise SolrError("'mlt.%s' should be an '%s'"%
-                                (opt_name, opt_type.__name__))
-        self.kwargs.update(kwargs)
+        checked_kwargs = self.check_opts(kwargs)
+        self.kwargs.update(checked_kwargs)
 
     def options(self):
         opts = {}
@@ -741,6 +795,34 @@ class MoreLikeThisOptions(Options):
         for opt_name, opt_value in self.kwargs.items():
             opt_type = self.opts[opt_name]
             opts["mlt.%s" % opt_name] = opt_type(opt_value)
+
+        return opts
+
+
+class MoreLikeThisHandlerOptions(MoreLikeThisOptions):
+    opts = {'match.include': bool,
+            'match.offset': int,
+            'interestingTerms': ["list", "details", "none"],
+           }
+    opts.update(MoreLikeThisOptions.opts)
+    del opts['count']
+
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts['mlt.fl'] = ','.join(sorted(self.fields))
+
+        if self.query_fields:
+            qf_arg = []
+            for k, v in self.query_fields.items():
+                if v is None:
+                    qf_arg.append(k)
+                else:
+                    qf_arg.append("%s^%s" % (k, float(v)))
+            opts["mlt.qf"] = " ".join(qf_arg)
+
+        for opt_name, opt_value in self.kwargs.items():
+            opts["mlt.%s" % opt_name] = opt_value
 
         return opts
 
