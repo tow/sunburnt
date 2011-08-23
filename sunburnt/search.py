@@ -588,7 +588,7 @@ class MltSolrSearch(BaseSearch):
     option_modules = ('filter_obj', 'paginator', 'more_like_this',
                       'highlighter', 'faceter', 'sorter', 'facet_querier',
                       'field_limiter',)
-    def __init__(self, interface, content=None, content_charset='utf_8', url=None,
+    def __init__(self, interface, content=None, content_charset=None, url=None,
                  original=None):
         self.interface = interface
         self.schema = interface.schema
@@ -600,6 +600,8 @@ class MltSolrSearch(BaseSearch):
                 raise ValueError(
                     "Cannot specify both content and url")
             if content is not None:
+                if content_charset is None:
+                    content_charset = 'utf-8'
                 if isinstance(content, unicode):
                     content = content.encode('utf-8')
                 elif content_charset.lower().replace('-', '_') not in ["utf_8", "u8", "utf", "utf8"]:
@@ -618,7 +620,7 @@ class MltSolrSearch(BaseSearch):
         options = self.options()
         if self.url is not None:
             options['stream.url'] = self.url
-        result = self.interface.mlt_search(body=self.content, **options)
+        result = self.interface.mlt_search(content=self.content, **options)
         if constructor is not dict:
             result.result.docs = [constructor(**d)
                                   for d in result.result.docs]
@@ -758,6 +760,8 @@ class MoreLikeThisOptions(Options):
             self.kwargs = copy.copy(original.kwargs)
 
     def update(self, fields, query_fields=None, **kwargs):
+        if fields is None:
+            fields = [self.schema.default_field_name]
         self.schema.check_fields(fields)
         if isinstance(fields, basestring):
             fields = [fields]

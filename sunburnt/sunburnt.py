@@ -82,13 +82,13 @@ class SolrConnection(object):
         qs = urllib.urlencode(params)
         base_url = "%s?%s" % (self.mlt_url, qs)
         if content is None:
-            kwargs = {'url': base_url, 'method': "GET"}
+            kwargs = {'uri': base_url, 'method': "GET"}
         else:
-            get_url = ("%s&stream.body=%s") % (base_url, urllib.quote_plus(content))
+            get_url = "%s&stream.body=%s" % (base_url, urllib.quote_plus(content))
             if len(get_url) <= self.max_length_get_url:
-                kwargs = {'url': get_url, 'method': "GET"}
+                kwargs = {'uri': get_url, 'method': "GET"}
             else:
-                kwargs = {'url': base_url, 'method': "POST",
+                kwargs = {'uri': base_url, 'method': "POST",
                     body: content, headers: {"Content-Type": "text/plain; charset=utf-8"}}
         r, c = self.request(**kwargs)
         if r.status != 200:
@@ -183,14 +183,15 @@ class SolrInterface(object):
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.mlt(params, content=content))
 
-    def mlt_query(self, fields, content=None, content_charset='utf_8', url=None, query_fields=None,
+    def mlt_query(self, fields=None, content=None, content_charset='utf_8', url=None, query_fields=None,
                   **kwargs):
         """Perform a similarity query on MoreLikeThisHandler
 
         The MoreLikeThisHandler is expected to be registered at the '/mlt'
         endpoint in the solrconfig.xml file of the server.
 
-        fields is the list of field names to compute similarity upon.
+        fields is the list of field names to compute similarity upon. If not
+        provided, we just use the default search field.
         query_fields can be used to adjust boosting values on a subset of those
         fields.
 
@@ -200,7 +201,7 @@ class SolrInterface(object):
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
         q = MltSolrSearch(self, content=content, content_charset=content_charset, url=url)
-        return q.mlt(fields, query_fields=query_fields, **kwargs)
+        return q.mlt(fields=fields, query_fields=query_fields, **kwargs)
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)

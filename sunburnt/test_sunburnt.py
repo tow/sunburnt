@@ -13,6 +13,8 @@ import mx.DateTime
 
 from .sunburnt import SolrInterface
 
+from nose.tools import assert_equal
+
 debug = False
 
 schema_string = \
@@ -222,3 +224,59 @@ def test_index_pagination():
     for p_args, a, slices in pagination_index_tests:
         for s, e in slices:
             yield check_index_pagination, p_args, a, s, e
+
+
+class MLTMockConnection(object):
+    # put something into conn instance variable?
+    def __init__(self, tracking_dict):
+        self.tracking_dict = tracking_dict
+
+    def request(self, uri, method='GET', body=None, headers=None):
+
+        class MockStatus(object):
+            def __init__(self, status):
+                self.status = status
+
+        u = urlparse.urlparse(uri)
+        params = cgi.parse_qs(u.query)
+
+        if method == 'GET' and u.path.endswith('/admin/file/') and params.get("file") == ["schema.xml"]:
+            return MockStatus(200), schema_string
+
+        self.tracking_dict.update(url=uri,
+                                  params=params,
+                                  method=method,
+                                  body=body or '',
+                                  headers=headers or {})
+        return MockStatus(200), MockResponse(1, 2).xml_response()
+
+
+mlt_query_tests = (
+        # basic query
+        (("Content", None, None), ({'stream.body': ['Content'], 'mlt.fl': ['text_field']}, 'GET'), None),
+        )
+
+def check_mlt_query(i, o, E):
+    if E is None:
+        query_params, method = o
+    content, content_charset, url = i
+    d = {}
+    conn = SolrInterface("http://test.example.com/", http_connection=MLTMockConnection(d))
+    if E is None:
+        conn.mlt_query(content=content, content_charset=content_charset, url=url).execute()
+        assert_equal(d['params'], query_params)
+        if content is not None:
+            content_charset = content_charset or 'utf_8'
+            assert_equal(d['body'], d['body'].decode(content_charset).encode('utf_8'))
+        assert_equal(d['method'], method)
+    else:
+        try:
+            conn.mlt_query(content=content, content_charset=content_charset, url=url).execute()
+        except Exception, e:
+            assert isinstance(e, E)
+        else:
+            assert False
+
+def test_mlt_queries():
+    for i, o, E in mlt_query_tests:
+        yield check_mlt_query, i, o, E
