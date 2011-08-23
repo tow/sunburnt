@@ -89,7 +89,7 @@ class SolrConnection(object):
                 kwargs = {'uri': get_url, 'method': "GET"}
             else:
                 kwargs = {'uri': base_url, 'method': "POST",
-                    body: content, headers: {"Content-Type": "text/plain; charset=utf-8"}}
+                    'body': content, 'headers': {"Content-Type": "text/plain; charset=utf-8"}}
         r, c = self.request(**kwargs)
         if r.status != 200:
             raise SolrError(r, c)

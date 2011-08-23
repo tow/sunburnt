@@ -253,27 +253,33 @@ class MLTMockConnection(object):
 
 mlt_query_tests = (
         # basic query
-        (("Content", None, None), ({'stream.body': ['Content'], 'mlt.fl': ['text_field']}, 'GET'), None),
+        (("Content", None, None), ({'stream.body': ['Content'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
+        (("Content with space", None, None), ({'stream.body': ['Content with space'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
+        ((None, None, "http://source.example.com"), ({'stream.url': ['http://source.example.com'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
+        (("long "*1024+"content", None, None), ({'mlt.fl': ['text_field']}, 'POST', 'long '*1024+"content"), None),
+        (("Content", None, "http://source.example.com"), (), ValueError),
+        ((None, None, None), (), ValueError),
+        (('Content', 'not-an-encoding', None), (), LookupError),
+        ((u'Content', None, None), ({'stream.body': ['Content'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
+        (('Cont\xe9nt', 'iso-8859-1', None), ({'stream.body': ['Cont\xc3\xa9nt'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
         )
 
 def check_mlt_query(i, o, E):
     if E is None:
-        query_params, method = o
+        query_params, method, body = o
     content, content_charset, url = i
     d = {}
     conn = SolrInterface("http://test.example.com/", http_connection=MLTMockConnection(d))
     if E is None:
         conn.mlt_query(content=content, content_charset=content_charset, url=url).execute()
         assert_equal(d['params'], query_params)
-        if content is not None:
-            content_charset = content_charset or 'utf_8'
-            assert_equal(d['body'], d['body'].decode(content_charset).encode('utf_8'))
         assert_equal(d['method'], method)
+        assert_equal(d['body'], body)
     else:
         try:
             conn.mlt_query(content=content, content_charset=content_charset, url=url).execute()
-        except Exception, e:
-            assert isinstance(e, E)
+        except E:
+            pass
         else:
             assert False
 
