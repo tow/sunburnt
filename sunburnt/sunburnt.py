@@ -37,27 +37,45 @@ class SolrConnection(object):
             time.sleep(self.retry_timeout)
             return self.http_connection.request(*args, **kwargs)
 
-    def commit(self, wait_flush=True, wait_searcher=True):
-        response = self.commit_or_optimize("commit",
-                                           wait_flush, wait_searcher)
+    def commit(self, wait_flush=True, wait_searcher=True, expungeDeletes=False):
+        response = self.update('<commit/>',
+                waitFlush=wait_flush, waitSearcher=wait_searcher, expungeDeletes=expungeDeletes)
 
-    def optimize(self, wait_flush=True, wait_searcher=True):
-        response = self.commit_or_optimize("optimize",
-                                           wait_flush, wait_searcher)
+    def optimize(self, wait_flush=None, wait_searcher=None, maxSegments=None):
+        response = self.update('<optimize/>', optimize=True,
+            waitFlush=wait_flush, waitSearcher=wait_searcher, maxSegments=maxSegments)
 
-    def commit_or_optimize(self, verb, wait_flush, wait_searcher):
-        wait_flush = "true" if wait_flush else "false"
-        wait_searcher = "true" if wait_searcher else "false"
-        response = self.update('<%s waitFlush="%s" waitSearcher="%s"/>' %
-                               (verb, wait_flush, wait_searcher))
+    # For both commit & optimize above, we use the XML body instead
+    # of the URL parameter, because if we're using POST (which we
+    # should) then only the former works.
 
     def rollback(self):
         response = self.update("<rollback/>")
 
-    def update(self, update_doc):
+    def update(self, update_doc, commit=None, optimize=None, waitFlush=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
         body = update_doc
-        headers = {"Content-Type":"text/xml; charset=utf-8"}
-        r, c = self.request(self.update_url, method="POST", body=body,
+        if body:
+            headers = {"Content-Type":"text/xml; charset=utf-8"}
+        else:
+            headers = {}
+        extra_params = {}
+        if commit is not None:
+            extra_params['commit'] = "true" if commit else "false"
+        if optimize is not None:
+            extra_params['optimize'] = "true" if optimize else "false"
+        if waitFlush is not None:
+            extra_params['waitFlush'] = "true" if waitFlush else "false"
+        if waitSearcher is not None:
+            extra_params['waitSearcher'] = "true" if waitSearcher else "false"
+        if expungeDeletes is not None:
+            extra_params['expungeDeletes'] = "true" if expungeDeletes else "false"
+        if maxSegments is not None:
+            extra_params['maxSegments'] = str(int(maxSegments))
+        if extra_params:
+            url = "%s?%s" % (self.update_url, urllib.urlencode(extra_params))
+        else:
+            url = self.update_url
+        r, c = self.request(url, method="POST", body=body,
                             headers=headers)
         if r.status != 200:
             raise SolrError(r, c)
@@ -120,7 +138,7 @@ class SolrInterface(object):
             schemadoc = StringIO.StringIO(c)
         self.schema = SolrSchema(schemadoc)
 
-    def add(self, docs, chunk=100):
+    def add(self, docs, chunk=100, commit=None, waitFlush=None, waitSearcher=None):
         if not self.writeable:
             raise TypeError("This Solr instance is only for reading")
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
@@ -129,9 +147,9 @@ class SolrInterface(object):
         # chunk docs.
         for doc_chunk in grouper(docs, chunk):
             update_message = self.schema.make_update(doc_chunk)
-            self.conn.update(str(update_message))
+            self.conn.update(str(update_message), commit=commit, waitFlush=waitFlush, waitSearcher=waitSearcher)
 
-    def delete(self, docs=None, queries=None):
+    def delete(self, docs=None, queries=None, commit=None, waitFlush=None, waitSearcher=None):
         if not self.writeable:
             raise TypeError("This Solr instance is only for reading")
         if not docs and not queries:
@@ -139,7 +157,7 @@ class SolrInterface(object):
         elif docs is not None and (hasattr(docs, "items") or not hasattr(docs, "__iter__")):
             docs = [docs]
         delete_message = self.schema.make_delete(docs, queries)
-        self.conn.update(str(delete_message))
+        self.conn.update(str(delete_message), commit=commit, waitFlush=waitFlush, waitSearcher=waitSearcher)
 
     def commit(self, *args, **kwargs):
         if not self.writeable:
