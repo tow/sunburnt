@@ -26,6 +26,7 @@ Contents:
    solrbackground
    connectionconfiguration
    queryingsolr
+   mltqueries
    addingdocuments
    deletingdocuments
    indexmanagement

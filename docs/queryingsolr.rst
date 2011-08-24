@@ -767,6 +767,7 @@ and all of these are exposed through sunburnt. The full list of supported option
 
 See the note above in `Faceting`_ about using keyword arguments with periods.
 
+.. _standard-query-more-like-this:
 
 More Like This
 --------------
@@ -782,8 +783,9 @@ are similar to each of the documents in the search result.
  more-like-this searches on documents that are already in its index.
 
 More-like-this searches are accomplished with the ``mlt()`` chainable
-option. You need to tell solr which fields to consider when deciding
-similarity.
+option. Solr needs to know which fields to consider when deciding similarity;
+if you don't make any choice, then the default field (specified by ``schema.xml``)
+will be used.
 
 ::
 
@@ -860,3 +862,12 @@ Solr these are stored as base64-encoded blobs, but as a sunburnt user you don’
 have to care about this. Sunburnt will automatically transcode to and from base64
 as appropriate, and your results will contain a binary string where appropriate.
 (Querying on Binary Fields is not supported, and doesn’t make much sense anyway).
+
+UUID fields
+-----------
+
+From version 1.4 of Solr, fields for UUIDs are supported in the schema (see http://wiki.apache.org/solr/UniqueKey).
+When retrieving results, Solr will automatically translate any UUID fields into
+python UUID objects (see http://docs.python.org/library/uuid.html). When inserting documents, sunburnt will accept values
+which are either UUID objects or UUID strings; or the string "NEW", to indicate that
+a UUID should be created on ingestion.
