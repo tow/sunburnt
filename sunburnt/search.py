@@ -805,8 +805,9 @@ class MoreLikeThisOptions(Options):
 
 
 class MoreLikeThisHandlerOptions(MoreLikeThisOptions):
-    opts = {'match.include': bool,
-            'match.offset': int,
+    opts = {#'match.include': bool,
+            #'match.offset': int,
+            # The options above are only used for queries on the MLT handler, which we don't support
             'interestingTerms': ["list", "details", "none"],
            }
     opts.update(MoreLikeThisOptions.opts)
