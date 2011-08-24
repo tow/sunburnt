@@ -37,13 +37,13 @@ class SolrConnection(object):
             time.sleep(self.retry_timeout)
             return self.http_connection.request(*args, **kwargs)
 
-    def commit(self, wait_flush=True, wait_searcher=True, expungeDeletes=False):
+    def commit(self, waitFlush=True, waitSearcher=True, expungeDeletes=False):
         response = self.update('<commit/>',
-                waitFlush=wait_flush, waitSearcher=wait_searcher, expungeDeletes=expungeDeletes)
+                waitFlush=waitFlush, waitSearcher=waitSearcher, expungeDeletes=expungeDeletes)
 
-    def optimize(self, wait_flush=None, wait_searcher=None, maxSegments=None):
+    def optimize(self, waitFlush=None, waitSearcher=None, maxSegments=None):
         response = self.update('<optimize/>', optimize=True,
-            waitFlush=wait_flush, waitSearcher=wait_searcher, maxSegments=maxSegments)
+            waitFlush=waitFlush, waitSearcher=waitSearcher, maxSegments=maxSegments)
 
     # For both commit & optimize above, we use the XML body instead
     # of the URL parameter, because if we're using POST (which we
