@@ -588,6 +588,7 @@ class MltSolrSearch(BaseSearch):
     option_modules = ('filter_obj', 'paginator', 'more_like_this',
                       'highlighter', 'faceter', 'sorter', 'facet_querier',
                       'field_limiter',)
+    trivial_encodings = ["utf_8", "u8", "utf", "utf8", "ascii", "646", "us_ascii"]
     def __init__(self, interface, content=None, content_charset=None, url=None,
                  original=None):
         self.interface = interface
@@ -604,7 +605,7 @@ class MltSolrSearch(BaseSearch):
                     content_charset = 'utf-8'
                 if isinstance(content, unicode):
                     content = content.encode('utf-8')
-                elif content_charset.lower().replace('-', '_') not in ["utf_8", "u8", "utf", "utf8"]:
+                elif content_charset.lower().replace('-', '_') not in self.trivial_encodings:
                     content = content.decode(content_charset).encode('utf-8')
             self.content = content
             self.url = url

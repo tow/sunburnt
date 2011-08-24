@@ -183,7 +183,7 @@ class SolrInterface(object):
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.mlt(params, content=content))
 
-    def mlt_query(self, fields=None, content=None, content_charset='utf_8', url=None, query_fields=None,
+    def mlt_query(self, fields=None, content=None, content_charset=None, url=None, query_fields=None,
                   **kwargs):
         """Perform a similarity query on MoreLikeThisHandler
 
