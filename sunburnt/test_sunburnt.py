@@ -227,7 +227,7 @@ def test_index_pagination():
 
 
 class MLTMockConnection(object):
-    # put something into conn instance variable?
+    # TODO; refactor this and MockConnection above.
     def __init__(self, tracking_dict):
         self.tracking_dict = tracking_dict
 
