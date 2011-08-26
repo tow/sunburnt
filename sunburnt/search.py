@@ -360,8 +360,12 @@ class LuceneQuery(object):
 
 class BaseSearch(object):
     """Base class for common search options management"""
+    option_modules = ('query_obj', 'filter_obj', 'paginator',
+                      'more_like_this', 'highlighter', 'faceter',
+                      'sorter', 'facet_querier', 'field_limiter',)
 
     def _init_common_modules(self):
+        self.query_obj = LuceneQuery(self.schema, u'q')
         self.filter_obj = LuceneQuery(self.schema, u'fq')
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
@@ -377,6 +381,33 @@ class BaseSearch(object):
         q = LuceneQuery(self.schema)
         q.add(args, kwargs)
         return q
+
+    def query(self, *args, **kwargs):
+        newself = self.clone()
+        newself.query_obj.add(args, kwargs)
+        return newself
+
+    def query_by_term(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="terms", *args, **kwargs)
+
+    def query_by_phrase(self, *args, **kwargs):
+        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
+
+    def exclude(self, *args, **kwargs):
+        # cloning will be done by query
+        return self.query(~self.Q(*args, **kwargs))
+
+    def boost_relevancy(self, boost_score, **kwargs):
+        if not self.query_obj:
+            raise TypeError("Can't boost the relevancy of an empty query")
+        try:
+            float(boost_score)
+        except ValueError:
+            raise ValueError("Non-numeric boost value supplied")
+
+        newself = self.clone()
+        newself.query_obj.add_boost(kwargs, boost_score)
+        return newself
 
     def filter(self, *args, **kwargs):
         newself = self.clone()
@@ -434,6 +465,11 @@ class BaseSearch(object):
             options.update(getattr(self, option_module).options())
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
+
+    def transform_result(self, result, constructor):
+        if constructor is not dict:
+            result.result.docs = [constructor(**d) for d in result.result.docs]
+        return result
 
     def params(self):
         return params_from_dict(**self.options())
@@ -527,48 +563,15 @@ class BaseSearch(object):
 
 
 class SolrSearch(BaseSearch):
-
-    option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',)
-
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
         if original is None:
-            self.query_obj = LuceneQuery(self.schema, u'q')
             self.more_like_this = MoreLikeThisOptions(self.schema)
             self._init_common_modules()
         else:
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
-
-    def query(self, *args, **kwargs):
-        newself = self.clone()
-        newself.query_obj.add(args, kwargs)
-        return newself
-
-    def query_by_term(self, *args, **kwargs):
-        return self.query(__terms_or_phrases="terms", *args, **kwargs)
-
-    def query_by_phrase(self, *args, **kwargs):
-        return self.query(__terms_or_phrases="phrases", *args, **kwargs)
-
-    def exclude(self, *args, **kwargs):
-        # cloning will be done by query
-        return self.query(~self.Q(*args, **kwargs))
-
-    def boost_relevancy(self, boost_score, **kwargs):
-        if not self.query_obj:
-            raise TypeError("Can't boost the relevancy of an empty query")
-        try:
-            float(boost_score)
-        except ValueError:
-            raise ValueError("Non-numeric boost value supplied")
-
-        newself = self.clone()
-        newself.query_obj.add_boost(kwargs, boost_score)
-        return newself
 
     def options(self):
         options = super(SolrSearch, self).options()
@@ -578,26 +581,18 @@ class SolrSearch(BaseSearch):
 
     def execute(self, constructor=dict):
         result = self.interface.search(**self.options())
-        if constructor is not dict:
-            result.result.docs = [constructor(**d) for d in result.result.docs]
-        return result
+        return self.transform_result(result, constructor)
 
 
 class MltSolrSearch(BaseSearch):
     """Manage parameters to build a MoreLikeThisHandler query"""
-    option_modules = ('filter_obj', 'paginator', 'more_like_this',
-                      'highlighter', 'faceter', 'sorter', 'facet_querier',
-                      'field_limiter',)
     trivial_encodings = ["utf_8", "u8", "utf", "utf8", "ascii", "646", "us_ascii"]
     def __init__(self, interface, content=None, content_charset=None, url=None,
                  original=None):
         self.interface = interface
         self.schema = interface.schema
         if original is None:
-            if content is None and url is None:
-                raise ValueError(
-                    "Either content or url is required")
-            elif content is not None and url is not None:
+            if content is not None and url is not None:
                 raise ValueError(
                     "Cannot specify both content and url")
             if content is not None:
@@ -617,15 +612,25 @@ class MltSolrSearch(BaseSearch):
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
 
-    def execute(self, constructor=dict):
-        options = self.options()
+    def query(self, *args, **kwargs):
+        if self.content is not None or self.url is not None:
+            raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+
+    query_by_term = query
+    query_by_phrase = query
+    exclude = query
+    Q = query
+    boost_relevancy = query
+
+    def options(self):
+        options = super(MltSolrSearch, self).options()
         if self.url is not None:
             options['stream.url'] = self.url
-        result = self.interface.mlt_search(content=self.content, **options)
-        if constructor is not dict:
-            result.result.docs = [constructor(**d)
-                                  for d in result.result.docs]
-        return result
+        return options
+
+    def execute(self, constructor=dict):
+        result = self.interface.mlt_search(content=self.content, **self.options())
+        return self.transform_result(result, constructor)
 
 
 class Options(object):
@@ -805,9 +810,8 @@ class MoreLikeThisOptions(Options):
 
 
 class MoreLikeThisHandlerOptions(MoreLikeThisOptions):
-    opts = {#'match.include': bool,
-            #'match.offset': int,
-            # The options above are only used for queries on the MLT handler, which we don't support
+    opts = {'match.include': bool,
+            'match.offset': int,
             'interestingTerms': ["list", "details", "none"],
            }
     opts.update(MoreLikeThisOptions.opts)

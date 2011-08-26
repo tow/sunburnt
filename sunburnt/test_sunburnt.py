@@ -253,7 +253,7 @@ mlt_query_tests = (
         ((None, None, "http://source.example.com"), ({'stream.url': ['http://source.example.com'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
         (("long "*1024+"content", None, None), ({'mlt.fl': ['text_field']}, 'POST', 'long '*1024+"content"), None),
         (("Content", None, "http://source.example.com"), (), ValueError),
-        ((None, None, None), (), ValueError),
+        ((None, None, None), ({'mlt.fl': ['text_field']}, 'GET', ''), None),
         (('Content', 'not-an-encoding', None), (), LookupError),
         ((u'Content', None, None), ({'stream.body': ['Content'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
         (('Cont\xe9nt', 'iso-8859-1', None), ({'stream.body': ['Cont\xc3\xa9nt'], 'mlt.fl': ['text_field']}, 'GET', ''), None),
