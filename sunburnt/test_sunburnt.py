@@ -94,29 +94,44 @@ class MockResponse(object):
 
 
 class MockConnection(object):
-    def request(self, uri, method='GET', body=None, headers=None):
+    class MockStatus(object):
+        def __init__(self, status):
+            self.status = status
 
-        class MockStatus(object):
-            def __init__(self, status):
-                self.status = status
+    def __init__(self, tracking_dict=None):
+        if tracking_dict is None:
+            tracking_dict = {}
+        self.tracking_dict = tracking_dict
+
+    def request(self, uri, method='GET', body=None, headers=None):
 
         u = urlparse.urlparse(uri)
         params = cgi.parse_qs(u.query)
 
-        if method == 'GET' and u.path.endswith('/admin/file/') and params.get("file") == ["schema.xml"]:
-            return MockStatus(200), schema_string
+        self.tracking_dict.update(url=uri,
+                                  params=params,
+                                  method=method,
+                                  body=body or '',
+                                  headers=headers or {})
 
-        elif method == 'GET' and u.path.endswith('/select/'):
+        if method == 'GET' and u.path.endswith('/admin/file/') and params.get("file") == ["schema.xml"]:
+            return self.MockStatus(200), schema_string
+
+        rc = self._handle_request(u, params, method, body, headers)
+        if rc is not None:
+            return rc
+
+        raise ValueError("Can't handle this URI")
+
+class PaginationMockConnection(MockConnection):
+    def _handle_request(self, uri_obj, params, method, body, headers):
+        if method == 'GET' and uri_obj.path.endswith('/select/'):
             start = int(params.get("start", [0])[0])
             rows = int(params.get("rows", [10])[0])
-            return MockStatus(200), MockResponse(start, rows).xml_response()
+            return self.MockStatus(200), MockResponse(start, rows).xml_response()
 
 
-        else:
-            raise ValueError("Can't handle this URI")
-
-
-conn = SolrInterface("http://test.example.com/", http_connection=MockConnection())
+conn = SolrInterface("http://test.example.com/", http_connection=PaginationMockConnection())
 
 pagination_slice_tests = (
 ((None, None), range(0, 10),
@@ -226,29 +241,9 @@ def test_index_pagination():
             yield check_index_pagination, p_args, a, s, e
 
 
-class MLTMockConnection(object):
-    # TODO; refactor this and MockConnection above.
-    def __init__(self, tracking_dict):
-        self.tracking_dict = tracking_dict
-
-    def request(self, uri, method='GET', body=None, headers=None):
-
-        class MockStatus(object):
-            def __init__(self, status):
-                self.status = status
-
-        u = urlparse.urlparse(uri)
-        params = cgi.parse_qs(u.query)
-
-        if method == 'GET' and u.path.endswith('/admin/file/') and params.get("file") == ["schema.xml"]:
-            return MockStatus(200), schema_string
-
-        self.tracking_dict.update(url=uri,
-                                  params=params,
-                                  method=method,
-                                  body=body or '',
-                                  headers=headers or {})
-        return MockStatus(200), MockResponse(1, 2).xml_response()
+class MLTMockConnection(MockConnection):
+    def _handle_request(self, u, params, method, body, headers):
+        return self.MockStatus(200), MockResponse(1, 2).xml_response()
 
 
 mlt_query_tests = (
