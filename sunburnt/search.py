@@ -725,6 +725,7 @@ class HighlightOptions(Options):
             "simple.pre":unicode,
             "simple.post":unicode,
             "fragmenter":unicode,
+            "useFastVectorHighlighter":bool,	# available as of Solr 3.1
             "usePhraseHighlighter":bool,
             "highlightMultiTerm":bool,
             "regex.slop":float,
