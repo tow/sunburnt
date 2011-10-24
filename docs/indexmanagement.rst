@@ -3,8 +3,16 @@
 Managing your index
 ===================
 
-We mentioned the use of ``commit()`` above.
-There’s a couple of other housekeeping methods that might be useful.
+Committing changes
+------------------
+
+We mentioned the use of ``commit()`` above. It takes three optional arguments:
+
+* waitSearcher
+* expungeDeletes
+* softCommit
+
+See http://wiki.apache.org/solr/UpdateXmlMessages for details.
 
 Optimizing
 ----------
@@ -25,12 +33,12 @@ Either way, to optimize an index, simply call:
 A Solr optimize also performs a commit, so if you’re about to ``optimize()`` anyway,
 you can leave off the preceding ``commit()``. It doesn’t particularly hurt to do both though.
 
-Both ``commit()`` and ``optimize()`` take two optional arguments, which you
-almost never need to worry about. See http://wiki.apache.org/solr/UpdateXmlMessages for details.
+``optimize()`` takes two optional arguments:
 
-::
+* waitSearcher
+* maxSegments
 
- wait_flush, wait_searcher
+See http://wiki.apache.org/solr/UpdateXmlMessages for details.
 
 Rollback
 --------

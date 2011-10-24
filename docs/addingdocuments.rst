@@ -91,3 +91,8 @@ huge update POST. You can do this by doing:
  si.add(Book.objects.iterator(), chunk=1000)
 
 where ``chunk`` controls how many documents are put into each update chunk.
+
+.. note:: Optional arguments to add:
+
+ ``add()`` takes two additional optional arguments: ``commit``, ``commitWithin``, ``softCommit``.
+ See http://wiki.apache.org/solr/UpdateXmlMessages for details.

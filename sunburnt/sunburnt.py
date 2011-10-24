@@ -37,13 +37,13 @@ class SolrConnection(object):
             time.sleep(self.retry_timeout)
             return self.http_connection.request(*args, **kwargs)
 
-    def commit(self, waitFlush=True, waitSearcher=True, expungeDeletes=False):
-        response = self.update('<commit/>',
-                waitFlush=waitFlush, waitSearcher=waitSearcher, expungeDeletes=expungeDeletes)
+    def commit(self, waitSearcher=None, expungeDeletes=None, softCommit=None):
+        response = self.update('<commit/>', commit=True,
+                waitSearcher=waitSearcher, expungeDeletes=expungeDeletes, softCommit=softCommit)
 
-    def optimize(self, waitFlush=None, waitSearcher=None, maxSegments=None):
+    def optimize(self, waitSearcher=None, maxSegments=None):
         response = self.update('<optimize/>', optimize=True,
-            waitFlush=waitFlush, waitSearcher=waitSearcher, maxSegments=maxSegments)
+            waitSearcher=waitSearcher, maxSegments=maxSegments)
 
     # For both commit & optimize above, we use the XML body instead
     # of the URL parameter, because if we're using POST (which we
@@ -52,7 +52,7 @@ class SolrConnection(object):
     def rollback(self):
         response = self.update("<rollback/>")
 
-    def update(self, update_doc, commit=None, optimize=None, waitFlush=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
+    def update(self, update_doc, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
         body = update_doc
         if body:
             headers = {"Content-Type":"text/xml; charset=utf-8"}
@@ -61,16 +61,32 @@ class SolrConnection(object):
         extra_params = {}
         if commit is not None:
             extra_params['commit'] = "true" if commit else "false"
+        if commitWithin is not None:
+            try:
+                extra_params['commitWithin'] = str(float(commitWithin))
+            except (TypeError, ValueError):
+                raise ValueError("commitWithin should be a number in milliseconds")
+            if extra_params['commitWithin'] < 0:
+                raise ValueError("commitWithin should be a number in milliseconds")
+        if softCommit is not None:
+            extra_params['softCommit'] = "true" if softCommit else "false"
         if optimize is not None:
             extra_params['optimize'] = "true" if optimize else "false"
-        if waitFlush is not None:
-            extra_params['waitFlush'] = "true" if waitFlush else "false"
         if waitSearcher is not None:
             extra_params['waitSearcher'] = "true" if waitSearcher else "false"
         if expungeDeletes is not None:
             extra_params['expungeDeletes'] = "true" if expungeDeletes else "false"
         if maxSegments is not None:
-            extra_params['maxSegments'] = str(int(maxSegments))
+            try:
+                extra_params['maxSegments'] = str(int(maxSegments))
+            except (TypeError, ValueError):
+                raise ValueError("maxSegments")
+            if extra_params['maxSegments'] <= 0:
+                raise ValueError("maxSegments should be a positive number")
+        if 'expungeDeletes' in extra_params and 'commit' not in extra_params:
+            raise ValueError("Can't do expungeDeletes without commit")
+        if 'maxSegments' in extra_params and 'optimize' not in extra_params:
+            raise ValueError("Can't do expungeDeletes without commit")
         if extra_params:
             url = "%s?%s" % (self.update_url, urllib.urlencode(extra_params))
         else:
@@ -138,7 +154,7 @@ class SolrInterface(object):
             schemadoc = StringIO.StringIO(c)
         self.schema = SolrSchema(schemadoc)
 
-    def add(self, docs, chunk=100, commit=None, waitFlush=None, waitSearcher=None):
+    def add(self, docs, chunk=100, **kwargs):
         if not self.writeable:
             raise TypeError("This Solr instance is only for reading")
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
@@ -147,9 +163,9 @@ class SolrInterface(object):
         # chunk docs.
         for doc_chunk in grouper(docs, chunk):
             update_message = self.schema.make_update(doc_chunk)
-            self.conn.update(str(update_message), commit=commit, waitFlush=waitFlush, waitSearcher=waitSearcher)
+            self.conn.update(str(update_message), **kwargs)
 
-    def delete(self, docs=None, queries=None, commit=None, waitFlush=None, waitSearcher=None):
+    def delete(self, docs=None, queries=None, **kwargs):
         if not self.writeable:
             raise TypeError("This Solr instance is only for reading")
         if not docs and not queries:
@@ -157,7 +173,7 @@ class SolrInterface(object):
         elif docs is not None and (hasattr(docs, "items") or not hasattr(docs, "__iter__")):
             docs = [docs]
         delete_message = self.schema.make_delete(docs, queries)
-        self.conn.update(str(delete_message), commit=commit, waitFlush=waitFlush, waitSearcher=waitSearcher)
+        self.conn.update(str(delete_message), **kwargs)
 
     def commit(self, *args, **kwargs):
         if not self.writeable:
