@@ -306,7 +306,7 @@ def SolrFieldTypeFactory(cls, name, **kwargs):
     # information in cls anyway.
     name = 'SolrFieldType_%s_%s' % (cls.__name__, '_'.join('%s_%s' % kv for kv in sorted(atts.items()) if kv[0] != 'class'))
     # and its safe to put in globals(), because the class is
-    # defined by the consituents of its name.
+    # defined by the constituents of its name.
     if name not in globals():
         globals()[name] = type(name, (cls,), atts)
     return globals()[name]
