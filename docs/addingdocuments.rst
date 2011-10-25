@@ -94,5 +94,5 @@ where ``chunk`` controls how many documents are put into each update chunk.
 
 .. note:: Optional arguments to add:
 
- ``add()`` takes two additional optional arguments: ``commit``, ``commitWithin``, ``softCommit``.
+ ``add()`` takes additional optional arguments: ``commit``, ``commitWithin``, ``softCommit``, ``expungeDeletes``, ``waitSearcher``, ``optimize``, ``maxSegments``.
  See http://wiki.apache.org/solr/UpdateXmlMessages for details.
