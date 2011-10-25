@@ -8,9 +8,9 @@ Committing changes
 
 We mentioned the use of ``commit()`` above. It takes three optional arguments:
 
-* waitSearcher
-* expungeDeletes
-* softCommit
+* ``waitSearcher``
+* ``expungeDeletes``
+* ``softCommit``
 
 See http://wiki.apache.org/solr/UpdateXmlMessages for details.
 
@@ -35,8 +35,8 @@ you can leave off the preceding ``commit()``. It doesn’t particularly hurt to 
 
 ``optimize()`` takes two optional arguments:
 
-* waitSearcher
-* maxSegments
+* ``waitSearcher``
+* ``maxSegments``
 
 See http://wiki.apache.org/solr/UpdateXmlMessages for details.
 

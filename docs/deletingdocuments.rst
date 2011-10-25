@@ -44,3 +44,8 @@ To clear the entire index, there is a shortcut which simply deletes every docume
  si.delete_all()
 
 Deletions, like additions, only take effect after a commit (or autocommit).
+
+.. note:: Optional arguments to delete:
+
+ ``delete()`` takes additional optional arguments: ``commit``, ``commitWithin``, ``softCommit``, ``expungeDeletes``, ``waitSearcher``, ``optimize``, ``maxSegments``.
+  See http://wiki.apache.org/solr/UpdateXmlMessages for details.
