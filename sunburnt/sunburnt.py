@@ -93,7 +93,7 @@ class SolrConnection(object):
         if 'expungeDeletes' in extra_params and 'commit' not in extra_params:
             raise ValueError("Can't do expungeDeletes without commit")
         if 'maxSegments' in extra_params and 'optimize' not in extra_params:
-            raise ValueError("Can't do expungeDeletes without commit")
+            raise ValueError("Can't do maxSegments without optimize")
         if extra_params:
             return "%s?%s" % (self.update_url, urllib.urlencode(sorted(extra_params.items())))
         else:
