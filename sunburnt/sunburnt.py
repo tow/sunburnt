@@ -52,12 +52,19 @@ class SolrConnection(object):
     def rollback(self):
         response = self.update("<rollback/>")
 
-    def update(self, update_doc, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
+    def update(self, **kwargs):
         body = update_doc
         if body:
             headers = {"Content-Type":"text/xml; charset=utf-8"}
         else:
             headers = {}
+        url = self.url_for_update(**kwargs)
+        r, c = self.request(url, method="POST", body=body,
+                            headers=headers)
+        if r.status != 200:
+            raise SolrError(r, c)
+
+    def url_for_update(self, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
         extra_params = {}
         if commit is not None:
             extra_params['commit'] = "true" if commit else "false"
@@ -88,13 +95,9 @@ class SolrConnection(object):
         if 'maxSegments' in extra_params and 'optimize' not in extra_params:
             raise ValueError("Can't do expungeDeletes without commit")
         if extra_params:
-            url = "%s?%s" % (self.update_url, urllib.urlencode(extra_params))
+            return "%s?%s" % (self.update_url, urllib.urlencode(sorted(extra_params.items())))
         else:
-            url = self.update_url
-        r, c = self.request(url, method="POST", body=body,
-                            headers=headers)
-        if r.status != 200:
-            raise SolrError(r, c)
+            return self.update_url
 
     def select(self, params):
         qs = urllib.urlencode(params)
