@@ -72,12 +72,28 @@ All the other options above still apply to URL-sourced content, except for "cont
 
 In all the cases above, you can also specify any of the other options shown in ``mlt()``, apart from "count".
 
+
+MLT queries on indexed content
+------------------------------
+
+You can perform an MLT query on indexed content in the following way:
+
+::
+
+ si.mlt_query().query(...)
+
+ie - initialize an otherwise empty mlt_query object, and then run queries on it as you would run normal queries. The full range of query operations is supported when composing the query for indexed content:
+
+::
+
+ si.mlt_query().query(title='Whale').exclude(author='Melville').query(si.Q('Moby')|si.Q('Dick'))
+
 Chaining MLT queries
 --------------------
 
 The ``mlt_query()`` method is chainable in the same way as the ``query`` method. There are a fre differences to note.
 
-* You can't chain a ``query()`` or ``exclude()`` onto an ``mlt_query()`` call - that would make no sense. If you need to filter the results, use ``filter`` or ``filter_exclude``
+* You can't chain a ``query()`` or ``exclude()`` onto an ``mlt_query()`` call if the MLT query is based on supplied ``content`` or ``url``.
 * You can't chain multiple ``mlt_query()`` methods together - only one content source can be considered at a time.
 
 The ``mlt_query()`` method takes all of the mlt() options except "count".

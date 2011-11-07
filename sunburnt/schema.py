@@ -299,7 +299,17 @@ class SolrPoint2Field(SolrPointField):
 def SolrFieldTypeFactory(cls, name, **kwargs):
     atts = {'stored':True, 'indexed':True}
     atts.update(kwargs)
-    return type('SolrFieldType_%s' % name, (cls,), atts)
+    # This next because otherwise the class names aren't globally
+    # visible or useful, which is confusing for debugging.
+    # We give the new class a name which uniquely identifies it
+    # (but we don't need Solr class, because we've got the same
+    # information in cls anyway.
+    name = 'SolrFieldType_%s_%s' % (cls.__name__, '_'.join('%s_%s' % kv for kv in sorted(atts.items()) if kv[0] != 'class'))
+    # and its safe to put in globals(), because the class is
+    # defined by the constituents of its name.
+    if name not in globals():
+        globals()[name] = type(name, (cls,), atts)
+    return globals()[name]
 
 
 class SolrFieldInstance(object):

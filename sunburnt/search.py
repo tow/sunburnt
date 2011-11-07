@@ -628,12 +628,32 @@ class MltSolrSearch(BaseSearch):
     def query(self, *args, **kwargs):
         if self.content is not None or self.url is not None:
             raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+        return super(MltSolrSearch, self).query(*args, **kwargs)
 
-    query_by_term = query
-    query_by_phrase = query
-    exclude = query
-    Q = query
-    boost_relevancy = query
+    def query_by_term(self, *args, **kwargs):
+        if self.content is not None or self.url is not None:
+            raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+        return super(MltSolrSearch, self).query_by_term(*args, **kwargs)
+
+    def query_by_phrase(self, *args, **kwargs):
+        if self.content is not None or self.url is not None:
+            raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+        return super(MltSolrSearch, self).query_by_phrase(*args, **kwargs)
+
+    def exclude(self, *args, **kwargs):
+        if self.content is not None or self.url is not None:
+            raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+        return super(MltSolrSearch, self).exclude(*args, **kwargs)
+
+    def Q(self, *args, **kwargs):
+        if self.content is not None or self.url is not None:
+            raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+        return super(MltSolrSearch, self).Q(*args, **kwargs)
+
+    def boost_relevancy(self, *args, **kwargs):
+        if self.content is not None or self.url is not None:
+            raise ValueError("Cannot specify query as well as content on an MltSolrSearch")
+        return super(MltSolrSearch, self).boost_relevancy(*args, **kwargs)
 
     def options(self):
         options = super(MltSolrSearch, self).options()
