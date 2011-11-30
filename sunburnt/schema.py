@@ -132,7 +132,8 @@ class SolrField(object):
             elif self.name.endswith("*"):
                 self.wildcard_at_start = False
             else:
-                raise SolrError("Dynamic fields must have * at start or end of name")
+                raise SolrError("Dynamic fields must have * at start or end of name (field %s)" % 
+                        self.name)
 
     def match(self, name):
         if self.dynamic:
@@ -174,7 +175,8 @@ class SolrUnicodeField(SolrField):
         try:
             return unicode(value)
         except UnicodeError:
-            raise SolrError("%s could not be coerced to unicode" % value)
+            raise SolrError("%s could not be coerced to unicode (field %s)" % 
+                    (value, self.name))
 
 
 class SolrBooleanField(SolrField):
@@ -188,7 +190,8 @@ class SolrBooleanField(SolrField):
             elif value.lower() == "false":
                 return False
             else:
-                raise ValueError("sorry, I only understand simple boolean strings")
+                raise ValueError("sorry, I only understand simple boolean strings (field %s)" % 
+                        self.name)
         return bool(value)
 
 
@@ -197,7 +200,8 @@ class SolrBinaryField(SolrField):
         try:
             return str(value)
         except (TypeError, ValueError):
-            raise SolrError("Could not convert data to binary string")
+            raise SolrError("Could not convert data to binary string (field %s)" % 
+                    self.name)
 
     def to_solr(self, value):
         return unicode(value.encode('base64'))
@@ -211,9 +215,11 @@ class SolrNumericalField(SolrField):
         try:
             v = self.base_type(value)
         except (OverflowError, TypeError, ValueError):
-            raise SolrError("%s is invalid value for %s" % (value, self.__class__))
+            raise SolrError("%s is invalid value for %s (field %s)" % 
+                    (value, self.__class__, self.name))
         if v < self.min or v > self.max:
-            raise SolrError("%s out of range for a %s" % (value, self.__class__))
+            raise SolrError("%s out of range for a %s (field %s)" %
+                    (value, self.__class__, self.name))
         return v
 
 
