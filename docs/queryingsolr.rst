@@ -268,16 +268,6 @@ anywhere else you want to paginate contents) exactly as described in
 the `paginator example in the Django documentation
 <https://docs.djangoproject.com/en/1.3/topics/pagination/#using-paginator-in-a-view>`_.
 
-.. Note::
-
-  When using a sunburnt query object with a Django paginator, you can
-  chain any number of filters or any of the other methods that return
-  a :class:`~sunburnt.SolrSearch` instance; however, you should *not*
-  call :meth:`~sunburnt.SolrSearch.execute`, as that will execute the
-  query and return the result set for the current query; to function
-  properly, the paginator needs to be able to query Solr for the total
-  number of matches for the query and then add pagination options to
-  slice up the results appropriately.
 
 Returning different fields
 --------------------------
