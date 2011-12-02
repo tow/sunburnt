@@ -753,7 +753,31 @@ The results are shown as a dictionary of dictionaries. The top-level key is the 
 mapping field names to fragments of highlighted text. In this case we only asked for
 highlighting on the ``name`` field. Multiple fragments might be returned for each field,
 though in this case we only get one fragment each. The text is highlighted with HTML, and
-the fragments should be suitable for dropping straight into a search template.
+the fragments should be suitable for dropping straight into a search
+template.
+
+If you are using the default result format (that is, if you are not
+specifying a ``constructor`` option when you call
+:meth:`~sunburnt.search.SolrSearch.execute`), highlighting results for
+a single result can be accessed on the individual result item as a
+dictionary in a ``solr_highlights`` field.  For example, with the
+highlighted query above, you could access highlight snippets for the
+``name`` field on an individual result as
+``result['solr_highlights']['name']``.  This is particularly
+convenient for displaying highlighted text snippets in a template;
+e.g., displaying highlights in a Django template might look like this:
+
+::
+    
+  {% for snippet in book.solr_highlights.name %}
+     <p>... {{ snippet|safe }} ...</p>
+  {% endfor %}
+
+.. Note::
+
+  The ``solr_highlights`` field will only be available on a result
+  item if highlights were found for that record.
+
 
 Again, Solr supports a large number of options to the highlighting command,
 and all of these are exposed through sunburnt. The full list of supported options is:
