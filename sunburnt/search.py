@@ -469,6 +469,19 @@ class BaseSearch(object):
     def transform_result(self, result, constructor):
         if constructor is not dict:
             result.result.docs = [constructor(**d) for d in result.result.docs]
+            # perhaps make highlighting available in custom results if
+            # the class provides a set_highlighting method or some such ?
+        else:
+            if result.highlighting:
+                for d in result.result.docs:
+                    # if the unique key for a result doc is present in highlighting,
+                    # add the highlighting for that document into the result dict
+                    # (but don't override any existing content)
+                    if 'highlighting' not in d and \
+                           d[self.schema.unique_key] in result.highlighting:
+                        d['highlighting'] = result.highlighting[d[self.schema.unique_key]]
+                        # NOTE: should this be a more unique field
+                        # name to reduce potential conflicts?
         return result
 
     def params(self):
