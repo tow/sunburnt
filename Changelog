@@ -1,0 +1,21 @@
+* 0.6 : 2012-01-01
+ - Change license to MIT/X11
+ - Integrate with Django Paginator (thanks @rlskoeser)
+ - Add UUIDField support
+ - Add MLT Handler support (thanks @ogrisel)
+
+
+* 0.5 : 2011-05-18
+ - Add proper documentation
+ - Add field_limit() option (thanks, @danaspiegel)
+ - Add basic support for new Solr-3.1 datatypes
+ - Add support for __any queries (thanks, @skarab)
+ - Add experimental JSON output module
+
+ - Rationalize data normalization and quoting codepaths, fixing several bugs along the way
+ - Fixes for correct serialization of complex nested query objects
+
+
+* 0.4 : 2011-01-04
+
+ - First release on PyPi

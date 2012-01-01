@@ -3,7 +3,7 @@
 Installing Sunburnt
 ===================
 
-Sunburnt's current release is `0.5`.
+Sunburnt's current release is `0.6`.
 
 You can install sunburnt via pip, you can download a release, or you
 can pull from the git repository.
@@ -37,9 +37,9 @@ Using a downloaded release
 You can get versions of sunburnt from pypi.
 
 ::
- wget http://pypi.python.org/packages/source/s/sunburnt/sunburnt-0.5.tar.gz
- tar xzf sunburnt-0.5.tar.gz
- cd sunburnt-0.5
+ wget http://pypi.python.org/packages/source/s/sunburnt/sunburnt-0.6.tar.gz
+ tar xzf sunburnt-0.6.tar.gz
+ cd sunburnt-0.6
  setup.py install
 
 Before using sunburnt, you need to make sure you have `httplib2
