@@ -639,6 +639,7 @@ class SolrFacetCounts(object):
 class SolrResponse(object):
     def __init__(self, schema, xmlmsg):
         self.schema = schema
+        self.original_xml = xmlmsg
         doc = lxml.etree.fromstring(xmlmsg)
         details = dict(value_from_node(n) for n in
                        doc.xpath("/response/lst[@name!='moreLikeThis']"))
