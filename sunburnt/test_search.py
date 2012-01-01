@@ -11,9 +11,10 @@ from lxml.builder import E
 from lxml.etree import tostring
 import mx.DateTime
 
-from .schema import SolrSchema, SolrError
+from .schema import SolrSchema, SolrError, SolrResponse
 from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
+from .test_sunburnt import MockResponse
 
 from nose.tools import assert_equal
 
@@ -541,3 +542,36 @@ def check_mlt_query_options(fields, query_fields, kwargs, output):
 def test_mlt_query_options():
     for (fields, query_fields, kwargs, output) in mlt_query_options_data:
         yield check_mlt_query_options, fields, query_fields, kwargs, output
+
+
+# test constructor to text transform result
+class TransformConstructor(object):
+    def __init__(self, **data):
+        self.data = data
+        
+    def __eq__(self, other):
+        # custom equality check to simplify test comparison
+        return self.data == other.data
+
+transform_results_data = (
+    # highlighting, constructor, result, first transformed result
+    ({}, dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
+     	{'int_field': 0, 'string_field': 'zero'}),
+    ({0: {'text': 'snippet'}},
+	dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
+     	{'int_field': 0, 'string_field': 'zero', 'solr_highlights': {'text': 'snippet'}}),
+    # highlighting with custom constructor - currently, highlighting is not passed
+    ({0: {'text': 'snippet'}},
+	TransformConstructor, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
+	TransformConstructor(int_field=0, string_field='zero')), 
+)
+
+def check_transform_results(highlighting, constructor, result, transformed):
+    q = SolrSearch(interface)
+    result.highlighting = highlighting
+    trans = q.transform_result(result, constructor)
+    assert_equal(trans[0], transformed)
+
+def test_transform_result():
+    for highlighting, constructor, result, transformed in transform_results_data:
+        yield check_transform_results, highlighting, constructor, result, transformed
