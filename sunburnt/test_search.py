@@ -11,10 +11,12 @@ from lxml.builder import E
 from lxml.etree import tostring
 import mx.DateTime
 
-from .schema import SolrSchema, SolrError, SolrResponse
+from .schema import SolrSchema, SolrError
 from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
-from .test_sunburnt import MockResponse
+from .sunburnt import SolrInterface
+
+from .test_sunburnt import MockConnection, MockResponse
 
 from nose.tools import assert_equal
 
@@ -544,34 +546,39 @@ def test_mlt_query_options():
         yield check_mlt_query_options, fields, query_fields, kwargs, output
 
 
-# test constructor to text transform result
-class TransformConstructor(object):
-    def __init__(self, **data):
-        self.data = data
-        
-    def __eq__(self, other):
-        # custom equality check to simplify test comparison
-        return self.data == other.data
+class HighlightingMockResponse(MockResponse):
+    def __init__(self, highlighting, *args, **kwargs):
+        self.highlighting = highlighting
+        super(HighlightingMockResponse, self).__init__(*args, **kwargs)
 
-transform_results_data = (
-    # highlighting, constructor, result, first transformed result
-    ({}, dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
-        {'int_field': 0, 'string_field': 'zero'}),
-    ({0: {'text': 'snippet'}},
-        dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
-        {'int_field': 0, 'string_field': 'zero', 'solr_highlights': {'text': 'snippet'}}),
-    # highlighting with custom constructor - currently, highlighting is not passed
-    ({0: {'text': 'snippet'}},
-        TransformConstructor, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
-        TransformConstructor(int_field=0, string_field='zero')),
-)
+    def extra_response_parts(self):
+        contents = []
+        if self.highlighting:
+            contents.append(
+                    E.lst({'name':'highlighting'}, E.lst({'name':'0'}, E.arr({'name':'string_field'}, E.str('zero'))))
+                    )
+        return contents
 
-def check_transform_results(highlighting, constructor, result, transformed):
-    q = SolrSearch(interface)
-    result.highlighting = highlighting
-    trans = q.transform_result(result, constructor)
-    assert_equal(trans[0], transformed)
+class HighlightingMockConnection(MockConnection):
+    def _handle_request(self, uri_obj, params, method, body, headers):
+        highlighting = params.get('hl') == ['true']
+        if method == 'GET' and uri_obj.path.endswith('/select/'):
+            return self.MockStatus(200), HighlightingMockResponse(highlighting, 0, 1).xml_response()
+
+highlighting_interface = SolrInterface("http://test.example.com/", http_connection=HighlightingMockConnection())
+
+solr_highlights_data = (
+    (None, dict, None),
+    (['string_field'], dict, {'string_field': ['zero']}),
+    )
+
+def check_transform_results(highlighting, constructor, solr_highlights):
+    q = highlighting_interface.query('zero')
+    if highlighting:
+        q = q.highlight(highlighting)
+    docs = q.execute().result.docs
+    assert_equal(docs[0].get('solr_highlights'), solr_highlights)
 
 def test_transform_result():
-    for highlighting, constructor, result, transformed in transform_results_data:
-        yield check_transform_results, highlighting, constructor, result, transformed
+    for highlighting, constructor, solr_highlights in solr_highlights_data:
+        yield check_transform_results, highlighting, constructor, solr_highlights

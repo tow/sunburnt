@@ -82,15 +82,19 @@ class MockResponse(object):
             E.str({'name':'string_field'}, d['string_field'])
         )
 
+    def extra_response_parts(self):
+        return []
+
     def xml_response(self):
-        return tostring(E.response(
+        response_portions = [
             E.lst({'name':'responseHeader'},
                 E.int({'name':'status'}, '0'), E.int({'name':'QTime'}, '0')
             ),
             E.result({'name':'response', 'numFound':str(len(self.mock_docs)), 'start':str(self.start)},
-               *[self.xmlify_doc(doc) for doc in self.mock_docs[self.start:self.start+self.rows]]
+                *[self.xmlify_doc(doc) for doc in self.mock_docs[self.start:self.start+self.rows]]
             )
-        ))
+            ] + self.extra_response_parts()
+        return tostring(E.response(*response_portions))
 
 
 class MockConnection(object):
