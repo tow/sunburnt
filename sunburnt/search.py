@@ -479,9 +479,12 @@ class BaseSearch(object):
                     # if the unique key for a result doc is present in highlighting,
                     # add the highlighting for that document into the result dict
                     # (but don't override any existing content)
+                    # If unique key field is not a string field (eg int) then we need to
+                    # convert it to its solr representation
+                    unique_key = self.schema.fields[self.schema.unique_key].to_solr(d[self.schema.unique_key])
                     if 'solr_highlights' not in d and \
-                           d[self.schema.unique_key] in result.highlighting:
-                        d['solr_highlights'] = result.highlighting[d[self.schema.unique_key]]
+                           unique_key in result.highlighting:
+                        d['solr_highlights'] = result.highlighting[unique_key]
         return result
 
     def params(self):
