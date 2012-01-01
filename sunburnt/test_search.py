@@ -556,14 +556,14 @@ class TransformConstructor(object):
 transform_results_data = (
     # highlighting, constructor, result, first transformed result
     ({}, dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
-     	{'int_field': 0, 'string_field': 'zero'}),
+        {'int_field': 0, 'string_field': 'zero'}),
     ({0: {'text': 'snippet'}},
-	dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
-     	{'int_field': 0, 'string_field': 'zero', 'solr_highlights': {'text': 'snippet'}}),
+        dict, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
+        {'int_field': 0, 'string_field': 'zero', 'solr_highlights': {'text': 'snippet'}}),
     # highlighting with custom constructor - currently, highlighting is not passed
     ({0: {'text': 'snippet'}},
-	TransformConstructor, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
-	TransformConstructor(int_field=0, string_field='zero')), 
+        TransformConstructor, SolrResponse(interface.schema, MockResponse(0, 1).xml_response()),
+        TransformConstructor(int_field=0, string_field='zero')),
 )
 
 def check_transform_results(highlighting, constructor, result, transformed):
