@@ -52,7 +52,7 @@ class SolrConnection(object):
     def rollback(self):
         response = self.update("<rollback/>")
 
-    def update(self, **kwargs):
+    def update(self, update_doc, **kwargs):
         body = update_doc
         if body:
             headers = {"Content-Type":"text/xml; charset=utf-8"}
