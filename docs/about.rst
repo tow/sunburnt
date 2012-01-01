@@ -12,4 +12,4 @@ Sunburnt is designed to provide a high level API for
 
 and particularly importantly, to provide Python-level error-checking. If you make a mistake, sunburnt will do its best to tell you why, rather than just throwing back an obscure Solr error.
 
-For an overview of the design choices, see http://eaddrinu.se/blog/2010/sunburnt.html.
+For an overview of the design choices, see http://blog.eaddrinu.se/blog/2010/sunburnt.html.
