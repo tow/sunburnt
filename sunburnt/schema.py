@@ -69,7 +69,7 @@ class solr_date(object):
         """ Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
-        return u"%s.%sZ" % (self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S"),
+        return u"%s.%sZ" % (self._dt_obj.isoformat(),
                             "%06d" % self.microsecond)
 
     def __cmp__(self, other):
