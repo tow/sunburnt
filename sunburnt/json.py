@@ -17,7 +17,7 @@ class SunburntJSONEncoder(json.JSONEncoder):
                 microsecond = obj.microsecond
             except AttributeError:
                 microsecond = int(1000000*math.modf(obj.second)[0])
-            return u"%s.%sZ" % (obj.strftime("%Y-%m-%dT%H:%M:%S"), microsecond)
+            return u"%s.%sZ" % (obj.isoformat(), microsecond)
         return super(SunburntJSONEncoder, self).default(obj)
 
 def dump(obj, fp, *args, **kwargs):
