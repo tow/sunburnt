@@ -364,6 +364,8 @@ class BaseSearch(object):
                       'more_like_this', 'highlighter', 'faceter',
                       'sorter', 'facet_querier', 'field_limiter',)
 
+    result_constructor = dict
+
     def _init_common_modules(self):
         self.query_obj = LuceneQuery(self.schema, u'q')
         self.filter_obj = LuceneQuery(self.schema, u'fq')
@@ -465,6 +467,11 @@ class BaseSearch(object):
             options.update(getattr(self, option_module).options())
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
+
+    def results_as(self, constructor):
+        newself = self.clone()
+        newself.result_constructor = constructor
+        return newself
 
     def transform_result(self, result, constructor):
         if constructor is not dict:
@@ -588,6 +595,7 @@ class SolrSearch(BaseSearch):
         else:
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
+            self.result_constructor = original.result_constructor
 
     def options(self):
         options = super(SolrSearch, self).options()
@@ -595,7 +603,9 @@ class SolrSearch(BaseSearch):
             options['q'] = '*:*' # search everything
         return options
 
-    def execute(self, constructor=dict):
+    def execute(self, constructor=None):
+        if constructor is None:
+            constructor = self.result_constructor
         result = self.interface.search(**self.options())
         return self.transform_result(result, constructor)
 
