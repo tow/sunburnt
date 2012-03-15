@@ -521,8 +521,6 @@ class BaseSearch(object):
     def __getitem__(self, k):
         """Return a single result or slice of results from the query.
         """
-        # NOTE: only supports the default result constructor.
-
         # are we already paginated? if so, we'll apply this getitem to the
         # paginated result - else we'll apply it to the whole.
         offset = 0 if self.paginator.start is None else self.paginator.start
@@ -567,7 +565,10 @@ class BaseSearch(object):
 
             start += offset
 
-            return self.paginate(start=start, rows=rows).execute()[::step]
+            response = self.paginate(start=start, rows=rows).execute()
+            if step != 1:
+                response.result.docs = response.result.docs[::step]
+            return response
 
         else:
             # if not a slice, a single result is being requested
