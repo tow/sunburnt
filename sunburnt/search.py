@@ -559,9 +559,7 @@ class BaseSearch(object):
             rows = stop - start
             if self.paginator.rows is not None:
                 rows = min(rows, self.paginator.rows)
-
-            if rows <= 0:
-                return []
+            rows = max(rows, 0)
 
             start += offset
 
