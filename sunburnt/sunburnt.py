@@ -15,7 +15,7 @@ MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
 
 class SolrConnection(object):
-    def __init__(self, url, http_connection, retry_timeout, max_length_get_url):
+    def __init__(self, url, http_connection, retry_timeout, max_length_get_url, http_user=None, http_pass=None):
         if http_connection:
             self.http_connection = http_connection
         else:
@@ -27,6 +27,10 @@ class SolrConnection(object):
         self.mlt_url = self.url + "mlt/"
         self.retry_timeout = retry_timeout
         self.max_length_get_url = max_length_get_url
+
+        # Additional headers for HTTP authentication. (Borrowed from solrpy.)
+        if http_user is not None and http_pass is not None:
+            self.http_connection.add_credentials(http_user, http_pass)
 
     def request(self, *args, **kwargs):
         try:
@@ -143,8 +147,8 @@ class SolrInterface(object):
     readable = True
     writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1, max_length_get_url=MAX_LENGTH_GET_URL):
-        self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url)
+    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1, max_length_get_url=MAX_LENGTH_GET_URL, http_user=None, http_pass=None):
+        self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url, http_user, http_pass)
         self.schemadoc = schemadoc
         if mode == 'r':
             self.writeable = False
