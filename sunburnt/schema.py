@@ -49,7 +49,7 @@ class solr_date(object):
         if hasattr(dt_obj, 'tzinfo') and dt_obj.tzinfo:
             # but Solr requires UTC times.
             if pytz:
-                return dt_obj.astimezone(pytz.utc)
+                return dt_obj.astimezone(pytz.utc).replace(tzinfo=None)
             else:
                 raise EnvironmentError("pytz not available, cannot do timezone conversions")
         else:
@@ -69,8 +69,13 @@ class solr_date(object):
         """ Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
-        return u"%s.%sZ" % (self._dt_obj.isoformat(),
-                            "%06d" % self.microsecond)
+        if hasattr(self._dt_obj, 'isoformat'):
+            return "%sZ" % (self._dt_obj.isoformat(), )
+        strtime = self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S")
+        microsecond = self.microsecond
+        if microsecond:
+            return u"%s.%06dZ" % (strtime, microsecond)
+        return u"%sZ" % (strtime,)
 
     def __cmp__(self, other):
         try:
