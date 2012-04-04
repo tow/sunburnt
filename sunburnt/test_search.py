@@ -176,9 +176,9 @@ good_query_data = {
         ([], {"sdouble_field":3}, # casting from int should work
          {"q":u"sdouble_field:3.0"}),
         ([], {"date_field":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:2009-01-01T00\\:00\\:00.000000Z"}),
+         {"q":u"date_field:2009-01-01T00\\:00\\:00Z"}),
         ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
-         {"q":u"date_field:2009-01-01T00\\:00\\:00.000000Z"}),
+         {"q":u"date_field:2009-01-01T00\\:00\\:00Z"}),
         ),
 
     "query":(
@@ -201,17 +201,17 @@ good_query_data = {
         ([], {"int_field__range":(3, -3)},
          [("q", u"int_field:[\-3 TO 3]")]),
         ([], {"date_field__lt":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:{* TO 2009\\-01\\-01T00\\:00\\:00.000000Z}")]),
+         [("q", u"date_field:{* TO 2009\\-01\\-01T00\\:00\\:00Z}")]),
         ([], {"date_field__gt":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:{2009\\-01\\-01T00\\:00\\:00.000000Z TO *}")]),
+         [("q", u"date_field:{2009\\-01\\-01T00\\:00\\:00Z TO *}")]),
         ([], {"date_field__rangeexc":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
-         [("q", "date_field:{2009\\-01\\-01T00\\:00\\:00.000000Z TO 2009\\-01\\-02T00\\:00\\:00.000000Z}")]),
+         [("q", "date_field:{2009\\-01\\-01T00\\:00\\:00Z TO 2009\\-01\\-02T00\\:00\\:00Z}")]),
         ([], {"date_field__lte":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:[* TO 2009\\-01\\-01T00\\:00\\:00.000000Z]")]),
+         [("q", u"date_field:[* TO 2009\\-01\\-01T00\\:00\\:00Z]")]),
         ([], {"date_field__gte":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00.000000Z TO *]")]),
+         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00Z TO *]")]),
         ([], {"date_field__range":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
-         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00.000000Z TO 2009\\-01\\-02T00\\:00\\:00.000000Z]")]),
+         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00Z TO 2009\\-01\\-02T00\\:00\\:00Z]")]),
         ([], {'string_field':['hello world', 'goodbye, cruel world']},
          [("q", u"string_field:goodbye,\\ cruel\\ world AND string_field:hello\\ world")]),
         # Raw strings
@@ -224,7 +224,7 @@ def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
     p = getattr(solr_search, method)(*args, **kwargs).params()
     try:
-        assert p == output
+        assert p == output, "Unequal: %r, %r" % (p, output)
     except AssertionError:
         if debug:
             print p

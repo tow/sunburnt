@@ -21,10 +21,10 @@ samples_from_pydatetimes = {
     "2009-07-23T00:24:34.000376Z":
         [not_utc.localize(datetime.datetime(2009, 07, 23, 3, 24, 34, 376)),
          datetime.datetime(2009, 07, 23, 0, 24, 34, 376, pytz.utc)],
-    "2009-07-23T03:24:34.000000Z":
+    "2009-07-23T03:24:34Z":
         [datetime.datetime(2009, 07, 23, 3, 24, 34),
          datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
-    "2009-07-23T00:24:34.000000Z":
+    "2009-07-23T00:24:34Z":
         [not_utc.localize(datetime.datetime(2009, 07, 23, 3, 24, 34)),
          datetime.datetime(2009, 07, 23, 0, 24, 34, tzinfo=pytz.utc)]
     }
@@ -33,7 +33,7 @@ samples_from_mxdatetimes = {
     "2009-07-23T03:24:34.000376Z":
         [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34.000376),
          datetime.datetime(2009, 07, 23, 3, 24, 34, 376, pytz.utc)],
-    "2009-07-23T03:24:34.000000Z":
+    "2009-07-23T03:24:34Z":
         [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34),
          datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
     }
@@ -50,7 +50,7 @@ samples_from_strings = {
     }
 
 def check_solr_date_from_date(s, date, canonical_date):
-    assert unicode(solr_date(date)) == s
+    assert unicode(solr_date(date)) == s, "Unequal representations of %r: %r and %r" % (date, unicode(solr_date(date)), s)
     check_solr_date_from_string(s, canonical_date)
 
 def check_solr_date_from_string(s, date):
