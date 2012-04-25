@@ -460,6 +460,17 @@ class BaseSearch(object):
         newself = self.clone()
         newself.field_limiter.update(fields, score, all_fields)
         return newself
+    
+    def field_limit_exclude(self, exclude=None, score=False, all_fields=False):
+        newself = self.clone()
+        if exclude is None:
+            exclude = []
+        if isinstance(exclude, basestring):
+            exclude = [exclude]
+        default_fields = [f for f in self.schema.fields]
+        fields = list(set(default_fields) - set(exclude))
+        newself.field_limiter.update(fields, score, all_fields)
+        return newself
 
     def options(self):
         options = {}
