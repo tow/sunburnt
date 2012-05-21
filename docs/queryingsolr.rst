@@ -734,8 +734,30 @@ the above as saying '*of the results, 1 of them fulfilled the first facet-query 
 
 .. note:: Other types of facet
 
- Currently, faceting by date and range are not currently supported (but some of their functionality can be replicated by using ``facet_query()``). Nor are LocalParams or pivot faceting.
+Range facets
+^^^^^^^^^^^^^^^^^^^^^
 
+More about range facets see: http://wiki.apache.org/solr/SimpleFacetParameters#Facet_by_Range
+
+Now sunburnt support range facets as well. Every range field can be set separately in order to fulfill the requirements. The facet_ranger.update() method takes a dictionary with the field names and the essential parameters (start, end and gap).
+
+**Simple usage**
+
+ >>> from sunburnt import SolrInterface
+ >>> si = SolrInterface('http://192.168.69.102:8983/solr/agumi.hu/')
+ >>> si.query('Query')
+ >>> si.facet_ranger.update({'price': {'range.start': 1, 'range.end': 99999, 'range.gap': 5000} })
+
+**Full example**
+
+ >>> from sunburnt import SolrInterface
+ >>> si = SolrInterface('http://some.url:8983/solr/')
+ >>> query = si.query('Query')
+ >>> query.facet_ranger.update({'price': {'range.start': 1, 'range.end': 99999, 'range.gap': 5000}, 'weight': {'range.start': 20, 'range.end': 120: 'range.gap': 2} }, mincount=1, limit=10, sort='index')
+ >>> resp = query[:10]
+ >>> resp.facet_counts.facet_ranges
+
+Comments and ideas are welcomed.
 
 Highlighting
 ------------

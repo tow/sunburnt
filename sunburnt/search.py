@@ -362,7 +362,7 @@ class LuceneQuery(object):
 class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
+                      'more_like_this', 'highlighter', 'faceter', 'facet_ranger',
                       'sorter', 'facet_querier', 'field_limiter',)
 
     result_constructor = dict
@@ -373,6 +373,7 @@ class BaseSearch(object):
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
+        self.facet_ranger = FacetRangeOptions(self.schema)
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
         self.facet_querier = FacetQueryOptions(self.schema)
@@ -761,6 +762,56 @@ class FacetOptions(Options):
         if fields:
             opts["facet.field"] = sorted(fields)
 
+class FacetRangeOptions(Options):
+    option_name = "facet"
+    opts = {"range.start":int,
+            "range.gap":int,
+            "range.end":int,
+            "sort":[True, False, "count", "index"],
+            "limit":int,
+            "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
+            "missing":bool,
+            }
+    facets = []
+
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def update(self, fields=None, **kwargs):
+        assert isinstance(fields, dict)
+        self.fields = dict()
+        if fields:
+            self.schema.check_fields(fields.keys())
+            for field, opts in fields.items():
+                self.fields[field] = dict()
+                checked_kwargs = self.check_opts(dict(opts.items() + kwargs.items()))
+                for k, v in checked_kwargs.items():
+                    for field in fields:
+                        self.fields[field][k] = v
+
+    def options(self):
+        opts = {}
+        if self.fields:
+            opts[self.option_name] = True
+            fields = [field for field in self.fields.keys() if field]
+            self.field_names_in_opts(opts, fields)
+
+            for field_name, field_opts in self.fields.items():
+                if field_name:
+                    for field_opt, v in field_opts.items():
+                        opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
+        return opts
+
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            for field in fields:
+                opts["facet.range"] = field
+
+        return opts
 
 class HighlightOptions(Options):
     option_name = "hl"
