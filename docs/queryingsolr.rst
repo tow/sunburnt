@@ -744,7 +744,7 @@ Now sunburnt support range facets as well. Every range field can be set separate
 **Simple usage**
 
  >>> from sunburnt import SolrInterface
- >>> si = SolrInterface('http://192.168.69.102:8983/solr/agumi.hu/')
+ >>> si = SolrInterface('http://some.url:8983/solr/')
  >>> si.query('Query')
  >>> si.facet_ranger.update({'price': {'range.start': 1, 'range.end': 99999, 'range.gap': 5000} })
 
