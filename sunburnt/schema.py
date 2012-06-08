@@ -211,8 +211,8 @@ class SolrBooleanField(SolrField):
             elif value.lower() == "false":
                 return False
             else:
-                raise ValueError("sorry, I only understand simple boolean strings (field %s)" % 
-                        self.name)
+                raise ValueError("sorry, I only understand simple boolean strings (field %s, value %s)" % 
+                        self.name, value)
         return bool(value)
 
 
