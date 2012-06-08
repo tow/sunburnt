@@ -383,6 +383,7 @@ new_field_types_schema = \
     <!-- And just to check it works: -->
     <fieldType name="point3" class="solr.PointType" dimension="3" subFieldSuffix="_d"/>
     <fieldType name="uuid" class="solr.UUIDField" indexed="true" />
+    <fieldType name="currency" class="solr.CurrencyField" precisionStep="8" currencyConfig="currency.xml" defaultCurrency="USD" />
   </types>
   <fields>
     <field name="binary_field" required="false" type="binary"/>
@@ -391,6 +392,7 @@ new_field_types_schema = \
     <field name="geohash_field" required="false" type="geohash"/>
     <field name="point3_field" required="false" type="point3"/>
     <field name="id" type="uuid" indexed="true" stored="true" default="NEW"/>
+    <field name="currency" type="currency" indexed="true" stored="true" />
   </fields>
  </schema>
 """
@@ -445,3 +447,16 @@ def test_uuid_data_understood_ok():
     solr_data = "12980286-591b-40c6-aa08-b4393a6d13b3"
     uuid_field = s.match_field("id")
     assert uuid_field.from_solr(solr_data) == uuid.UUID("12980286-591b-40c6-aa08-b4393a6d13b3")
+
+def test_currency_data_understood_ok():
+    s = SolrSchema(StringIO.StringIO(new_field_types_schema))
+
+    # Test with a currency added (different from the default one, we'll use Norwegian
+    # Kroner. I like Norwegians!)
+    user_data = "1.00,NOK"
+    field_inst = s.field_from_user_data("currency", user_data)
+    assert unicode(field_inst.value) == u"1.00,NOK"
+
+    user_data = "1.00"
+    field_inst = s.field_from_user_data("currency", user_data)
+    assert unicode(field_inst.value) == u"1.00,USD"
