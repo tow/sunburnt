@@ -7,7 +7,7 @@ This is not the place for a full description of a Solr schema,
 but you need to understand certain concepts to use sunburnt.
 
 For a better understanding of what’s going on, start with
-http://wiki.apache.org/Solr/SchemaXml and http://wiki.apache.org/solr/SchemaDesign.
+http://wiki.apache.org/solr/SchemaXml and http://wiki.apache.org/solr/SchemaDesign.
 
 The examples in this documentation can be run against the example
 data and schema, though you will need to understand the concepts

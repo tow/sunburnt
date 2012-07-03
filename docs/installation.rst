@@ -34,31 +34,27 @@ That's all you need to do; all dependencies will be pulled in automatically.
 Using a downloaded release
 --------------------------
 
-You can get versions of sunburnt from pypi.
+You can get versions of sunburnt from PyPI.
 
 ::
+
  wget http://pypi.python.org/packages/source/s/sunburnt/sunburnt-0.6.tar.gz
  tar xzf sunburnt-0.6.tar.gz
  cd sunburnt-0.6
- setup.py install
+ python setup.py install
 
-Before using sunburnt, you need to make sure you have `httplib2
-<http://code.google.com/p/httplib2/>`_ and `lxml <http://lxml.de>`_ installed.
-
+Dependencies will be automatically pulled in for you during installation.
 
 Using git
 ---------
 
-You can install the latest code from github by doing
+You can install the latest code from GitHub by doing
 
 ::
 
  git clone http://github.com/tow/sunburnt.git
  cd sunburnt
- setup.py install
-
-Again, you'll need to have `httplib2
-<http://code.google.com/p/httplib2/>`_ and `lxml <http://lxml.de>`_ installed.
+ python setup.py install
 
 Note that there's no guarantees that the latest git version will be
 particularly stable!
