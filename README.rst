@@ -20,6 +20,9 @@ Full documentation can be found at http://opensource.timetric.com/sunburnt/index
 Dependencies
 ============
 
+The requirements for Sunburnt will automatically be downloaded when using
+one of the installation methods (if they are not already available).
+
 - Requirements:
 
   * `httplib2 <http://code.google.com/p/httplib2/>`_
