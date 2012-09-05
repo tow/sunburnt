@@ -473,7 +473,7 @@ class BaseSearch(object):
         newself.result_constructor = constructor
         return newself
 
-    def transform_result(self, result, constructor):
+    def transform_result(self, result, constructor, format):
         if constructor is not dict:
             result.result.docs = [constructor(**d) for d in result.result.docs]
             # in future, highlighting chould be made available to
@@ -583,6 +583,19 @@ class BaseSearch(object):
                 raise IndexError("list index out of range")
             return response.result.docs[0]
 
+    formats = {'xml':'', 'json':'json'}
+    def execute(self, constructor=None, format='xml'):
+        if constructor is None:
+            constructor = self.result_constructor
+        try:
+            f = self.formats[format]
+        except KeyError:
+            raise ValueError("Unknown format: %s" % f)
+        options = self.options()
+        if f:
+            options['wt'] = f
+        return self.transform_result(self.search(options), constructor, format)
+
 
 class SolrSearch(BaseSearch):
     def __init__(self, interface, original=None):
@@ -596,17 +609,14 @@ class SolrSearch(BaseSearch):
                 setattr(self, opt, getattr(original, opt).clone())
             self.result_constructor = original.result_constructor
 
+    def search(self, options):
+        return self.interface.search(**options)
+
     def options(self):
         options = super(SolrSearch, self).options()
         if 'q' not in options:
             options['q'] = '*:*' # search everything
         return options
-
-    def execute(self, constructor=None):
-        if constructor is None:
-            constructor = self.result_constructor
-        result = self.interface.search(**self.options())
-        return self.transform_result(result, constructor)
 
 
 class MltSolrSearch(BaseSearch):
@@ -636,6 +646,10 @@ class MltSolrSearch(BaseSearch):
             self.url = original.url
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
+            self.result_constructor = original.result_constructor
+
+    def search(self, options):
+        return self.interface.mlt_search(self.content, **options)
 
     def query(self, *args, **kwargs):
         if self.content is not None or self.url is not None:
@@ -672,10 +686,6 @@ class MltSolrSearch(BaseSearch):
         if self.url is not None:
             options['stream.url'] = self.url
         return options
-
-    def execute(self, constructor=dict):
-        result = self.interface.mlt_search(content=self.content, **self.options())
-        return self.transform_result(result, constructor)
 
 
 class Options(object):
