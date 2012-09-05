@@ -512,7 +512,7 @@ class SolrSchema(object):
         return SolrDelete(self, docs, query)
 
     def parse_response(self, msg):
-        return SolrResponse(self, msg)
+        return SolrResponse.from_xml(self, msg)
 
     def parse_result_doc(self, doc, name=None):
         if name is None:
@@ -642,7 +642,9 @@ class SolrFacetCounts(object):
 
 
 class SolrResponse(object):
-    def __init__(self, schema, xmlmsg):
+    @classmethod
+    def from_xml(cls, schema, xmlmsg):
+        self = cls()
         self.schema = schema
         self.original_xml = xmlmsg
         doc = lxml.etree.fromstring(xmlmsg)
@@ -654,13 +656,13 @@ class SolrResponse(object):
         if self.status != 0:
             raise ValueError("Response indicates an error")
         result_node = doc.xpath("/response/result")[0]
-        self.result = SolrResult(schema, result_node)
+        self.result = SolrResult.from_xml(schema, result_node)
         self.facet_counts = SolrFacetCounts.from_response(details)
         self.highlighting = dict((k, dict(v))
                                  for k, v in details.get("highlighting", ()))
         more_like_these_nodes = \
             doc.xpath("/response/lst[@name='moreLikeThis']/result")
-        more_like_these_results = [SolrResult(schema, node)
+        more_like_these_results = [SolrResult.from_xml(schema, node)
                                   for node in more_like_these_nodes]
         self.more_like_these = dict((n.name, n)
                                          for n in more_like_these_results)
@@ -676,6 +678,7 @@ class SolrResponse(object):
         else:
             value = None
         self.interesting_terms = value
+        return self
 
     def __str__(self):
         return str(self.result)
@@ -688,12 +691,15 @@ class SolrResponse(object):
 
 
 class SolrResult(object):
-    def __init__(self, schema, node):
+    @classmethod
+    def from_xml(cls, schema, node):
+        self = cls()
         self.schema = schema
         self.name = node.attrib['name']
         self.numFound = int(node.attrib['numFound'])
         self.start = int(node.attrib['start'])
         self.docs = [schema.parse_result_doc(n) for n in node.xpath("doc")]
+        return self
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
