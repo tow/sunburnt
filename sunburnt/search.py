@@ -175,7 +175,10 @@ class LuceneQuery(object):
         obj.normalized = True
         return obj, mutated
 
-    def __unicode__(self, level=0, op=None):
+    def __unicode__(self):
+        return self.serialize_to_unicode(level=0, op=None)
+
+    def serialize_to_unicode(self, level=0, op=None):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -186,7 +189,7 @@ class LuceneQuery(object):
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
-            return newself.__unicode__(level=level)
+            return newself.serialize_to_unicode(level=level)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
@@ -195,9 +198,9 @@ class LuceneQuery(object):
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"(%s)"%q.serialize_to_unicode(level=level+1, op=op_))
                 else:
-                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"%s"%q.serialize_to_unicode(level=level+1, op=op_))
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
