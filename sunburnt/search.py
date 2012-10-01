@@ -31,8 +31,11 @@ class LuceneQuery(object):
             self._pow = original._pow
             self.boosts = copy.copy(original.boosts)
 
-    def clone(self):
-        return LuceneQuery(self.schema, original=self)
+    def clone(self, **kwargs):
+        q = LuceneQuery(self.schema, original=self)
+        for k, v in kwargs.items():
+            setattr(q, k, v)
+        return q
 
     def options(self):
         opts = {}
@@ -110,7 +113,7 @@ class LuceneQuery(object):
             return True
 
     @staticmethod
-    def merge_term_dicts(*args):
+    def merge_term_dicts(args):
         d = collections.defaultdict(set)
         for arg in args:
             for k, v in arg.items():
@@ -118,64 +121,59 @@ class LuceneQuery(object):
         return dict((k, v) for k, v in d.items())
 
     def normalize(self):
+        # shortcut to avoid re-normalization no-ops
         if self.normalized:
             return self, False
-        mutated = False
-        _subqueries = []
-        _terms = self.terms
-        _phrases = self.phrases
-        _ranges = self.ranges
-        for s in self.subqueries:
-            _s, changed = s.normalize()
-            if not _s or changed:
-                mutated = True
-            if _s:
-                if (_s._and and self._and) or (_s._or and self._or):
-                    mutated = True
-                    _terms = self.merge_term_dicts(_terms, _s.terms)
-                    _phrases = self.merge_term_dicts(_phrases, _s.phrases)
-                    _ranges = _ranges.union(_s.ranges)
-                    _subqueries.extend(_s.subqueries)
-                else:
-                    _subqueries.append(_s)
-        if mutated:
-            newself = self.clone()
-            newself.terms = _terms
-            newself.phrases = _phrases
-            newself.ranges = _ranges
-            newself.subqueries = _subqueries
-            self = newself
 
-        if self._not:
-            if not len(self.subqueries):
-                newself = self.clone()
-                newself._not = False
-                newself._and = True
-                self = newself
+        mutated = False
+
+        obj = self
+        new_subqueries = [s.normalize() for s in obj.subqueries] # NB recursive
+
+        # Now recalculate terms/phrases/ranges/subqueries as appropriate
+        _terms = [obj.terms]
+        _phrases = [obj.phrases]
+        _ranges = [obj.ranges]
+        _subqueries = []
+        for _s, changed in new_subqueries:
+            if changed:
                 mutated = True
-            elif len(self.subqueries) == 1:
-                if self.subqueries[0]._not:
-                    newself = self.clone()
-                    newself.subqueries = self.subqueries[0].subqueries
-                    newself._not = False
-                    newself._and = True
-                    self = newself
-                    mutated = True
-            else:
-                raise ValueError
-        elif self._pow:
-            if not len(self.subqueries):
-                newself = self.clone()
-                newself._pow = False
-                self = newself
+            elif not _s:
+                mutated = True # we're dropping a subquery
+                continue # don't append
+            if (_s._and and obj._and) or (_s._or and obj._or):
+                # then hoist the contents up
+                _terms.append(_s.terms)
+                _phrases.append(_s.phrases)
+                _ranges.append(_s.ranges)
+                _subqueries.extend(_s.subqueries)
                 mutated = True
-        elif self._and or self._or:
-            if not self.terms and not self.phrases and not self.ranges:
-                if len(self.subqueries) == 1:
-                    self = self.subqueries[0]
-                    mutated = True
-        self.normalized = True
-        return self, mutated
+            else: # just keep it unchanged
+                _subqueries.append(_s)
+
+        # and clone if there have been any changes
+        if mutated:
+            obj = obj.clone(terms = obj.merge_term_dicts(_terms),
+                            phrases = obj.merge_term_dicts(_phrases),
+                            ranges = reduce(operator.or_, _ranges),
+                            subqueries = _subqueries)
+
+        # having recaltulcated subqueries, there may be the opportunity for further normalization:
+        if obj._not and not len(obj.subqueries):
+            obj = obj.clone(_not=False, _and=True)
+            mutated = True
+        elif obj._not and len(obj.subqueries) == 1 and obj.subqueries[0]._not:
+            obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
+            mutated = True
+        elif obj._pow and not len(obj.subqueries):
+            obj = obj.clone(_pow=False)
+            mutated = True
+        elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges and len(obj.subqueries) == 1:
+            obj = obj.subqueries[0]
+            mutated = True
+
+        obj.normalized = True
+        return obj, mutated
 
     def __unicode__(self, level=0, op=None):
         if not self.normalized:
