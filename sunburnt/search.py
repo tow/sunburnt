@@ -158,19 +158,21 @@ class LuceneQuery(object):
                             ranges = reduce(operator.or_, _ranges),
                             subqueries = _subqueries)
 
-        # having recaltulcated subqueries, there may be the opportunity for further normalization:
-        if obj._not and not len(obj.subqueries):
-            obj = obj.clone(_not=False, _and=True)
-            mutated = True
-        elif obj._not and len(obj.subqueries) == 1 and obj.subqueries[0]._not:
-            obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
-            mutated = True
-        elif obj._pow and not len(obj.subqueries):
-            obj = obj.clone(_pow=False)
-            mutated = True
-        elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges and len(obj.subqueries) == 1:
-            obj = obj.subqueries[0]
-            mutated = True
+        # having recaltulcated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
+        if not len(obj.subqueries):
+            if obj._not:
+                obj = obj.clone(_not=False, _and=True)
+                mutated = True
+            elif obj._pow:
+                obj = obj.clone(_pow=False)
+                mutated = True
+        elif len(obj.subqueries) == 1:
+            if obj._not and obj.subqueries[0]._not:
+                obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
+                mutated = True
+            elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges:
+                obj = obj.subqueries[0]
+                mutated = True
 
         obj.normalized = True
         return obj, mutated
