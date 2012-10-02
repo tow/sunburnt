@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import collections, copy, operator, re
 
 from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
+from .walktree import walk, event, leaf, exit
 
 
 class LuceneQuery(object):
@@ -112,6 +113,28 @@ class LuceneQuery(object):
         else:
             return True
 
+    def normalize(self):
+        # shortcut to avoid re-normalization no-ops
+        if self.normalized:
+            return self, False
+
+        changed = False
+        for path in walk(self, lambda q: q.subqueries, event(exit|leaf)):
+            if len(path) == 1:
+                # last time around, so:
+                break
+            this = path[-1]
+            obj = self.normalize_node(this)
+            obj.normalized = True
+            if obj != this:
+                siblings = path[-2].subqueries
+                i = siblings.index(this)
+                siblings[i] = obj
+                changed = True
+
+        obj = self.normalize_node(self)
+        return obj, (changed or obj == self)
+
     @staticmethod
     def merge_term_dicts(args):
         d = collections.defaultdict(set)
@@ -120,62 +143,51 @@ class LuceneQuery(object):
                 d[k].update(v)
         return dict((k, v) for k, v in d.items())
 
-    def normalize(self):
-        # shortcut to avoid re-normalization no-ops
-        if self.normalized:
-            return self, False
+    @staticmethod
+    def normalize_node(obj):
+        """ Normalize a query node provided all its sub-queries
+        are already normalized"""
+        # Recalculate terms/phrases/ranges/subqueries as appropriate given immediate subqueries
+        terms = [obj.terms]
+        phrases = [obj.phrases]
+        ranges = [obj.ranges]
+        subqueries = []
 
         mutated = False
-
-        obj = self
-        new_subqueries = [s.normalize() for s in obj.subqueries] # NB recursive
-
-        # Now recalculate terms/phrases/ranges/subqueries as appropriate
-        _terms = [obj.terms]
-        _phrases = [obj.phrases]
-        _ranges = [obj.ranges]
-        _subqueries = []
-        for _s, changed in new_subqueries:
-            if changed:
-                mutated = True
-            elif not _s:
+        for s in obj.subqueries:
+            if not s:
                 mutated = True # we're dropping a subquery
                 continue # don't append
-            if (_s._and and obj._and) or (_s._or and obj._or):
+            if (s._and and obj._and) or (s._or and obj._or):
                 # then hoist the contents up
-                _terms.append(_s.terms)
-                _phrases.append(_s.phrases)
-                _ranges.append(_s.ranges)
-                _subqueries.extend(_s.subqueries)
+                terms.append(s.terms)
+                phrases.append(s.phrases)
+                ranges.append(s.ranges)
+                subqueries.extend(s.subqueries)
                 mutated = True
             else: # just keep it unchanged
-                _subqueries.append(_s)
+                subqueries.append(s)
 
         # and clone if there have been any changes
         if mutated:
-            obj = obj.clone(terms = obj.merge_term_dicts(_terms),
-                            phrases = obj.merge_term_dicts(_phrases),
-                            ranges = reduce(operator.or_, _ranges),
-                            subqueries = _subqueries)
+            obj = obj.clone(terms = obj.merge_term_dicts(terms),
+                            phrases = obj.merge_term_dicts(phrases),
+                            ranges = reduce(operator.or_, ranges),
+                            subqueries = subqueries)
 
-        # having recaltulcated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
+        # having recalculated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
         if not len(obj.subqueries):
             if obj._not:
                 obj = obj.clone(_not=False, _and=True)
-                mutated = True
             elif obj._pow:
                 obj = obj.clone(_pow=False)
-                mutated = True
         elif len(obj.subqueries) == 1:
             if obj._not and obj.subqueries[0]._not:
                 obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
-                mutated = True
             elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges:
                 obj = obj.subqueries[0]
-                mutated = True
-
         obj.normalized = True
-        return obj, mutated
+        return obj
 
     def __unicode__(self):
         return self.serialize_to_unicode(level=0, op=None)
