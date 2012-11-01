@@ -70,7 +70,7 @@ class SolrConnection(object):
             extra_params['commit'] = "true" if commit else "false"
         if commitWithin is not None:
             try:
-                extra_params['commitWithin'] = str(float(commitWithin))
+                extra_params['commitWithin'] = str(int(commitWithin))
             except (TypeError, ValueError):
                 raise ValueError("commitWithin should be a number in milliseconds")
             if extra_params['commitWithin'] < 0:
