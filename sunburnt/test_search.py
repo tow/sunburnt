@@ -586,8 +586,9 @@ def check_transform_results(highlighting, constructor, solr_highlights):
     q = highlighting_interface.query('zero')
     if highlighting:
         q = q.highlight(highlighting)
-    docs = q.execute().result.docs
+    docs = q.execute(constructor=constructor).result.docs
     assert_equal(docs[0].get('solr_highlights'), solr_highlights)
+    assert isinstance(docs[0], constructor)
 
 def test_transform_result():
     for highlighting, constructor, solr_highlights in solr_highlights_data:
