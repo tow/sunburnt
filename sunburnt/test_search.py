@@ -593,3 +593,71 @@ def check_transform_results(highlighting, constructor, solr_highlights):
 def test_transform_result():
     for highlighting, constructor, solr_highlights in solr_highlights_data:
         yield check_transform_results, highlighting, constructor, solr_highlights
+
+#Test More Like This results
+class MltMockResponse(MockResponse):
+
+    def extra_response_parts(self):
+        contents = []
+        create_doc = lambda value: E.doc(E.str({'name':'string_field'}, value))
+        #Main response result
+        contents.append(
+            E.result({'name': 'response'},
+                     create_doc('zero')
+                    )
+        )
+        #More like this results
+        contents.append(
+            E.lst({'name':'moreLikeThis'},
+                  E.result({'name': 'zero', 'numFound': '3', 'start': '0'},
+                           create_doc('one'),
+                           create_doc('two'),
+                           create_doc('three')
+                          )
+                 )
+        )
+        return contents
+
+class MltMockConnection(MockConnection):
+    def _handle_request(self, uri_obj, params, method, body, headers):
+        if method == 'GET' and uri_obj.path.endswith('/select/'):
+            return self.MockStatus(200), MltMockResponse(0, 1).xml_response()
+
+mlt_interface = SolrInterface("http://test.example.com/",
+                              http_connection=MltMockConnection())
+
+class DummyDocument(object):
+
+    def __init__(self, **kw):
+        self.kw = kw
+
+    def __repr__(self):
+        return "DummyDocument<%r>" % self.kw
+
+    def get(self, key):
+        return self.kw.get(key)
+
+def make_dummydoc(**kwargs):
+    return DummyDocument(**kwargs)
+
+solr_mlt_transform_data = (
+    (dict, dict),
+    (DummyDocument, DummyDocument),
+    (make_dummydoc, DummyDocument),
+    )
+
+def check_mlt_transform_results(constructor, _type):
+    q = mlt_interface.query('zero')
+    query = q.mlt(fields='string_field')
+    response = q.execute(constructor=constructor)
+
+    for doc in response.result.docs:
+        assert isinstance(doc, _type)
+
+    for key in response.more_like_these:
+        for doc in response.more_like_these[key].docs:
+            assert isinstance(doc, _type)
+
+def test_mlt_transform_result():
+    for constructor, _type in solr_mlt_transform_data:
+        yield check_mlt_transform_results, constructor, _type

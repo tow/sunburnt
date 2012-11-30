@@ -1,3 +1,7 @@
+* 0.7 : unreleased
+ - Ensure 'more like this' results are transformed using a query's
+   execute() `constructor`, as are normal query results. (@davidjb)
+
 * 0.6 : 2012-01-01
  - Change license to MIT/X11
  - Integrate with Django Paginator (thanks @rlskoeser)
