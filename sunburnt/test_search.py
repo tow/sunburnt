@@ -9,7 +9,11 @@ import datetime
 
 from lxml.builder import E
 from lxml.etree import tostring
-import mx.DateTime
+try:
+    import mx.DateTime
+    HAS_MX_DATETIME = True
+except ImportError:
+    HAS_MX_DATETIME = False
 
 from .schema import SolrSchema, SolrError
 from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
@@ -118,17 +122,6 @@ good_query_data = {
          [("fq", u"hello\\ world"), ("q", "*:*")]),
         ),
 
-    "query":(
-        (["hello"], {},
-         [("q", u"hello")]),
-        (["hello"], {"int_field":3},
-         [("q", u"hello AND int_field:3")]),
-        (["hello", "world"], {},
-         [("q", u"hello AND world")]),
-        (["hello world"], {},
-         {"q":u"\"hello world\""}),
-        ),
-
     "filter":(
         (["hello"], {},
          [("fq", u"hello"), ("q", "*:*")]),
@@ -141,47 +134,60 @@ good_query_data = {
         ),
 
     "query":(
+        #Basic queries
+        (["hello"], {},
+         [("q", u"hello")]),
+        (["hello"], {"int_field":3},
+         [("q", u"hello AND int_field:3")]),
+        (["hello", "world"], {},
+         [("q", u"hello AND world")]),
+        (["hello world"], {},
+         [("q", u"hello\\ world")]),
+        #Test fields
+        # Boolean fields take any truth-y value
         ([], {"boolean_field":True},
-         {"q":u"boolean_field:true"}),
+         [("q", u"boolean_field:true")]),
+        ([], {"boolean_field":'true'},
+         [("q", u"boolean_field:true")]),
+        ([], {"boolean_field":1},
+         [("q", u"boolean_field:true")]),
         ([], {"boolean_field":"false"},
-         {"q":u"boolean_field:true"}), # boolean field takes any truth-y value
+         [("q", u"boolean_field:false")]),
         ([], {"boolean_field":0},
-         {"q":u"boolean_field:false"}),
+         [("q", u"boolean_field:false")]),
+        ([], {"boolean_field":False},
+         [("q", u"boolean_field:false")]),
         ([], {"int_field":3},
-         {"q":u"int_field:3"}),
+         [("q", u"int_field:3")]),
         ([], {"int_field":3.1}, # casting from float should work
-         {"q":u"int_field:3"}),
+         [("q", u"int_field:3")]),
         ([], {"sint_field":3},
-         {"q":u"sint_field:3"}),
+         [("q", u"sint_field:3")]),
         ([], {"sint_field":3.1}, # casting from float should work
-         {"q":u"sint_field:3"}),
+         [("q", u"sint_field:3")]),
         ([], {"long_field":2**31},
-         {"q":u"long_field:2147483648"}),
+         [("q", u"long_field:2147483648")]),
         ([], {"slong_field":2**31},
-         {"q":u"slong_field:2147483648"}),
+         [("q", u"slong_field:2147483648")]),
         ([], {"float_field":3.0},
-         {"q":u"float_field:3.0"}),
+         [("q", u"float_field:3.0")]),
         ([], {"float_field":3}, # casting from int should work
-         {"q":u"float_field:3.0"}),
+         [("q", u"float_field:3.0")]),
         ([], {"sfloat_field":3.0},
-         {"q":u"sfloat_field:3.0"}),
+         [("q", u"sfloat_field:3.0")]),
         ([], {"sfloat_field":3}, # casting from int should work
-         {"q":u"sfloat_field:3.0"}),
+         [("q", u"sfloat_field:3.0")]),
         ([], {"double_field":3.0},
-         {"q":u"double_field:3.0"}),
+         [("q", u"double_field:3.0")]),
         ([], {"double_field":3}, # casting from int should work
-         {"q":u"double_field:3.0"}),
+         [("q", u"double_field:3.0")]),
         ([], {"sdouble_field":3.0},
-         {"q":u"sdouble_field:3.0"}),
+         [("q", u"sdouble_field:3.0")]),
         ([], {"sdouble_field":3}, # casting from int should work
-         {"q":u"sdouble_field:3.0"}),
+         [("q", u"sdouble_field:3.0")]),
         ([], {"date_field":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:2009-01-01T00\\:00\\:00Z"}),
-        ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
-         {"q":u"date_field:2009-01-01T00\\:00\\:00Z"}),
-        ),
-
-    "query":(
+         [("q", u"date_field:2009\\-01\\-01T00\\:00\\:00Z")]),
+        #Test ranges
         ([], {"int_field__any":True},
          [("q", u"int_field:[* TO *]")]),
         ([], {"int_field__lt":3},
@@ -219,6 +225,10 @@ good_query_data = {
          [("q", "string_field:abc\\*\\?\\?\\?")]),
         ),
     }
+if HAS_MX_DATETIME:
+    good_query_data['query'] += \
+            ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
+             [("q", u"date_field:2009-01-01T00\\:00\\:00Z")])
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
