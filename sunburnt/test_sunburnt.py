@@ -9,7 +9,6 @@ import cgi, datetime, urlparse
 
 from lxml.builder import E
 from lxml.etree import tostring
-import mx.DateTime
 
 from .sunburnt import SolrInterface
 
