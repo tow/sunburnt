@@ -170,7 +170,8 @@ class LuceneQuery(object):
                 self = newself
                 mutated = True
         elif self._and or self._or:
-            if not self.terms and not self.phrases and not self.ranges:
+            if not self.terms and not self.phrases and not self.ranges \
+               and not self.boosts:
                 if len(self.subqueries) == 1:
                     self = self.subqueries[0]
                     mutated = True

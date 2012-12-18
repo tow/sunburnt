@@ -1,4 +1,6 @@
 * 0.7 : unreleased
+ - Fix handling of queries with ``boost_relevancy`` applied - boost was 
+   previously lost in some cases. (@davidjb)
  - Ensure 'more like this' results are transformed using a query's
    execute() `constructor`, as are normal query results. (@davidjb)
 
