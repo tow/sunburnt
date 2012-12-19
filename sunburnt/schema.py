@@ -147,6 +147,14 @@ class SolrField(object):
             else:
                 return name.startswith(self.name[:-1])
 
+    def normalize(self, value):
+        """ Normalize the given value according to the field type.
+        
+        This method does nothing by default, returning the given value
+        as is. Child classes may override this method as required.
+        """
+        return value
+
     def instance_from_user_data(self, data):
         return SolrFieldInstance.from_user_data(self, data)
 
@@ -392,6 +400,7 @@ class SolrSchema(object):
         'solr.LatLonType':SolrPoint2Field,
         'solr.GeoHashField':SolrPoint2Field,
     }
+
     def __init__(self, f):
         """initialize a schema object from a
         filename or file-like object."""
@@ -441,10 +450,8 @@ class SolrSchema(object):
             name, class_name = field_type_node.attrib['name'], field_type_node.attrib['class']
         except KeyError, e:
             raise SolrError("Invalid schema.xml: missing %s attribute on fieldType" % e.args[0])
-        try:
-            field_class = self.solr_data_types[class_name]
-        except KeyError:
-            raise SolrError("Unknown field_class '%s'" % class_name)
+        #Obtain field type for given class. Defaults to generic SolrField.
+        field_class = self.solr_data_types.get(class_name, SolrField)
         return name, SolrFieldTypeFactory(field_class,
             **self.translate_attributes(field_type_node.attrib))
 

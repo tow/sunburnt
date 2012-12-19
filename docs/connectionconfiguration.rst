@@ -27,6 +27,51 @@ parameters.
   currently active schema. If you want to use a different schema for
   any reason, pass in a file object here which yields a schema
   document.
+ 
+  In querying the current active schema, sunburnt will automatically
+  understand the available fields and their respective types.  Sunburnt
+  has a variety of field helpers that automatically serialize and
+  deserialize data types behind the scenes (such as when querying Solr
+  and parsing a response).  For instance, this means that if you have a
+  field ``quantity`` in your schema with type ``solr.IntField``, Sunburnt
+  is aware that values of this field are integers. So, values going to Solr
+  in a query will get serialized into an appropriate string, and those coming
+  back as strings will be deserialized as ``int`` values.
+
+  Most built-in Solr field types (in the ``solr.*`` namespace) are understood,
+  including:
+
+  ========================  ===========
+  Field Type                Python Type
+  ========================  ===========
+  solr.StrField             unicode
+  solr.TextField            unicode
+  solr.BoolField            bool
+  solr.ShortField           int (-32768 to 32767)
+  solr.IntField             int
+  solr.SortableIntField     int
+  solr.TrieIntField         int
+  solr.LongField            long
+  solr.SortableLongField    long
+  solr.TrieLongField        long
+  solr.FloatField           float
+  solr.SortableFloatField   float
+  solr.TrieFloatField       float
+  solr.DoubleField          float
+  solr.SortableDoubleField  float
+  solr.TrieDoubleField      float
+  solr.DateField            datetime (or mx.DateTime)
+  solr.TrieDateField        datetime (or mx.DateTime)
+  solr.RandomSortField      str (default handling)
+  solr.UUIDField            uuid.UUID
+  solr.BinaryField          unicode (base64 decoded)
+  solr.PointType            solr_point (1 dimension)
+  solr.LatLonType           solr_point (2 dimensions)
+  solr.GeoHashField         solr_point (2 dimensions)
+  ========================  =========== 
+
+  If you are using a custom field type that Sunburnt does not
+  natively understand, values will be treated as strings.
 
 * ``http_connection``. By default, solr will open a new ``httplib2.Http``
   object to talk to the solr instance. If you want to re-use an
