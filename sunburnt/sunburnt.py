@@ -100,6 +100,7 @@ class SolrConnection(object):
             return self.update_url
 
     def select(self, params):
+        params.append(('version', '2.2'))
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:
