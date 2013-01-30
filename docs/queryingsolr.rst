@@ -696,16 +696,17 @@ You can facet on more than one field at a time:
 
 :: 
 
- si.query(...).facet_by(fields=["field1", "field2, ...])
+ si.query(...).facet_by(field=["field1", "field2, ...])
 
 and the ``facet_fields`` dictionary will have more than one key.
 
-Solr supports a number of parameters to the faceting operation. All of the basic options
-are exposed through sunburnt:
+Solr supports a number of parameters to the faceting operation. These are described in detail
+at http://wiki.apache.org/solr/SimpleFacetParameters#Field_Value_Faceting_Parameters.
+All of the basic options are exposed through sunburnt:
 
 ::
 
- fields, prefix, sort, limit, offset, mincount, missing, method, enum.cache.minDf
+ field, prefix, sort, limit, offset, mincount, missing, method, enum.cache.minDf
 
 All of these can be used as keyword arguments to the ``facet()`` call, except of course the
 last one since it contains periods. To pass keyword arguments with periods in them, you
