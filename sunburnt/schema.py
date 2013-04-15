@@ -659,7 +659,15 @@ class SolrClusterResponse(object):
     @classmethod
     def from_response(cls, response):
         labels = response.xpath("./arr[@name='labels']/str/text()")
-        score = response.xpath("./double[@name='score']/text()")
+        score_str = response.xpath("./double[@name='score']/text()")
+        score = 0.001
+        if score_str is not None and len(score_str) == 1:
+            try:
+                score = float(score_str[0])
+            except:
+                print "Error parsing score %s " % score_str
+        else:
+            print 'score not identifiable %s ' % score
         docList = response.xpath("./arr[@name='docs']/str/text()")
         cluster_response_dict = { 'labels': labels, 'score': score, 'docs': docList }
         return SolrClusterResponse(**cluster_response_dict)
