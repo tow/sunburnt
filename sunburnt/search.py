@@ -613,6 +613,29 @@ class SolrSearch(BaseSearch):
         result = self.interface.search(**self.options())
         return self.transform_result(result, constructor)
 
+class ClusterSolrSearch(SolrSearch):
+    def __init__(self, interface, original=None):
+        self.interface = interface
+        self.schema = interface.schema
+        if original is None:
+            self.more_like_this = MoreLikeThisOptions(self.schema)
+            self._init_common_modules()
+        else:
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+            self.result_constructor = original.result_constructor
+
+    def options(self):
+        options = super(ClusterSolrSearch, self).options()
+        if 'q' not in options:
+            options['q'] = '*:*' # search everything
+        return options
+
+    def execute(self, constructor=None):
+        if constructor is None:
+            constructor = self.result_constructor
+        result = self.interface.cluster_search(**self.options())
+        return self.transform_result(result, constructor)
 
 class MltSolrSearch(BaseSearch):
     """Manage parameters to build a MoreLikeThisHandler query"""
@@ -681,6 +704,7 @@ class MltSolrSearch(BaseSearch):
     def execute(self, constructor=dict):
         result = self.interface.mlt_search(content=self.content, **self.options())
         return self.transform_result(result, constructor)
+
 
 
 class Options(object):

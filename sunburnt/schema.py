@@ -648,6 +648,22 @@ class SolrFacetCounts(object):
         return SolrFacetCounts(**facet_counts_dict)
 
 
+
+class SolrClusterResponse(object):
+    members= ["labels", "score", "docs"]
+    def __init__(self, **kwargs):
+        for member in self.members:
+            setattr(self, member, kwargs.get(member, ()))
+
+
+    @classmethod
+    def from_response(cls, response):
+        labels = response.xpath("./arr[@name='labels']/str/text()")
+        score = response.xpath("./double[@name='score']/text()")
+        docList = response.xpath("./arr[@name='docs']/str/text()")
+        cluster_response_dict = { 'labels': labels, 'score': score, 'docs': docList }
+        return SolrClusterResponse(**cluster_response_dict)
+
 class SolrResponse(object):
     @classmethod
     def from_xml(cls, schema, xmlmsg):
@@ -678,6 +694,9 @@ class SolrResponse(object):
         else:
             self.more_like_this = None
 
+        clusterDetails = doc.xpath("/response/arr[@name='clusters']/lst")
+        self.clusters = map(lambda x: SolrClusterResponse.from_response(x), clusterDetails)
+        
         # can be computed by MoreLikeThisHandler
         termsNodes = doc.xpath("/response/*[@name='interestingTerms']")
         if len(termsNodes) == 1:
