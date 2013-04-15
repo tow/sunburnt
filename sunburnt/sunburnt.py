@@ -272,7 +272,6 @@ class SolrInterface(object):
             raise TypeError("This Solr instance is only for writing")
         kwargs['clustering'] = 'true'
         kwargs['clustering.results'] = 'true'
-        print('cluster_search params: %s ' % kwargs)
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.cluster(params, content=content))
 
