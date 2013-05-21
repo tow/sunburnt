@@ -100,7 +100,7 @@ class SolrConnection(object):
             return self.update_url
 
     def select(self, params):
-        qs = urllib.urlencode(params)
+        qs = urllib.urlencode(params, doseq=True)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:
             warnings.warn("Long query URL encountered - POSTing instead of "
