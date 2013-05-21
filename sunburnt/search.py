@@ -193,7 +193,7 @@ class LuceneQuery(object):
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
-            return newself.__unicode__(level=level, force_serialize=force_serialize)
+            return newself.__unicode_special__(level=level, force_serialize=force_serialize)
         else:
             alliter = [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
