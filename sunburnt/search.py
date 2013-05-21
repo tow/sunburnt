@@ -7,11 +7,12 @@ from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardField
 
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
-    def __init__(self, schema, option_flag=None, original=None):
+    def __init__(self, schema, option_flag=None, original=None, multiple_tags_allowed=False):
         self.schema = schema
         self.normalized = False
         if original is None:
             self.option_flag = option_flag
+            self.multiple_tags_allowed = multiple_tags_allowed
             self.terms = collections.defaultdict(set)
             self.phrases = collections.defaultdict(set)
             self.ranges = set()
@@ -21,6 +22,7 @@ class LuceneQuery(object):
             self.boosts = []
         else:
             self.option_flag = original.option_flag
+            self.multiple_tags_allowed = multiple_tags_allowed
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
@@ -34,9 +36,13 @@ class LuceneQuery(object):
     def clone(self):
         return LuceneQuery(self.schema, original=self)
 
-    def options(self):
+    def options(self, multiple_tags=False):
+        print self.option_flag, multiple_tags
         opts = {}
-        s = unicode(self)
+        if multiple_tags:
+            s = self.unicode_multiple()
+        else:
+            s = unicode(self)
         if s:
             opts[self.option_flag] = s
         return opts
@@ -67,7 +73,7 @@ class LuceneQuery(object):
         print '%s%s' % (indentspace, '}')
 
     # Below, we sort all our value_sets - this is for predictability when testing.
-    def serialize_term_queries(self, terms):
+    def serialize_term_queries(self, terms, multiple=False):
         s = []
         for name, value_set in terms.items():
             if name:
@@ -78,7 +84,10 @@ class LuceneQuery(object):
                 s += [u'%s:%s' % (name, value.to_query()) for value in value_set]
             else:
                 s += [value.to_query() for value in value_set]
-        return u' AND '.join(sorted(s))
+        if multiple:
+            return s
+        else:
+            return u' AND '.join(sorted(s))
 
     range_query_templates = {
         "any": u"[* TO *]",
@@ -178,7 +187,10 @@ class LuceneQuery(object):
         self.normalized = True
         return self, mutated
 
-    def __unicode__(self, level=0, op=None):
+    def unicode_multiple(self, level=0, op=None):
+        return self.__unicode__(level=level, op=op, multiple_tags=True)
+
+    def __unicode__(self, level=0, op=None, multiple_tags=False):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -191,10 +203,17 @@ class LuceneQuery(object):
             newself, _ = newself.normalize()
             return newself.__unicode__(level=level)
         else:
-            u = [s for s in [self.serialize_term_queries(self.terms),
+            alls = [self.serialize_term_queries(self.terms, multiple=multiple_tags),
                              self.serialize_term_queries(self.phrases),
                              self.serialize_range_queries()]
-                 if s]
+            u = []
+            for s in alls:
+                if not s:
+                    continue
+                if not isinstance(s, basestring):
+                    u.extend(s)
+                else:
+                    u.append(s)
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
@@ -202,7 +221,11 @@ class LuceneQuery(object):
                 else:
                     u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
             if self._and:
-                return u' AND '.join(u)
+                if level == 0 and multiple_tags:
+                    print u
+                    return u
+                else:
+                    return u' AND '.join(u)
             elif self._or:
                 return u' OR '.join(u)
             elif self._not:
@@ -265,7 +288,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -367,9 +390,11 @@ class BaseSearch(object):
 
     result_constructor = dict
 
+    multiple_tags_allowed = ('filter_obj',)
+
     def _init_common_modules(self):
         self.query_obj = LuceneQuery(self.schema, u'q')
-        self.filter_obj = LuceneQuery(self.schema, u'fq')
+        self.filter_obj = LuceneQuery(self.schema, u'fq', multiple_tags_allowed=True)
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
@@ -465,7 +490,10 @@ class BaseSearch(object):
     def options(self):
         options = {}
         for option_module in self.option_modules:
-            options.update(getattr(self, option_module).options())
+            if option_module in self.multiple_tags_allowed:
+                options.update(getattr(self, option_module).options(multiple_tags=True))
+            else:
+                options.update(getattr(self, option_module).options())
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
 
@@ -506,7 +534,7 @@ class BaseSearch(object):
 
     _count = None
     def count(self):
-        # get the total count for the current query without retrieving any results 
+        # get the total count for the current query without retrieving any results
         # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
