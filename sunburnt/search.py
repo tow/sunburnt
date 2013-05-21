@@ -4,7 +4,6 @@ import collections, copy, operator, re
 
 from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
 
-
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
     def __init__(self, schema, option_flag=None, original=None, multiple_tags_allowed=False):
@@ -22,7 +21,7 @@ class LuceneQuery(object):
             self.boosts = []
         else:
             self.option_flag = original.option_flag
-            self.multiple_tags_allowed = multiple_tags_allowed
+            self.multiple_tags_allowed = original.multiple_tags_allowed
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
@@ -36,13 +35,9 @@ class LuceneQuery(object):
     def clone(self):
         return LuceneQuery(self.schema, original=self)
 
-    def options(self, multiple_tags=False):
-        print self.option_flag, multiple_tags
+    def options(self):
         opts = {}
-        if multiple_tags:
-            s = self.unicode_multiple()
-        else:
-            s = unicode(self)
+        s = self.__unicode_special__()
         if s:
             opts[self.option_flag] = s
         return opts
@@ -73,7 +68,7 @@ class LuceneQuery(object):
         print '%s%s' % (indentspace, '}')
 
     # Below, we sort all our value_sets - this is for predictability when testing.
-    def serialize_term_queries(self, terms, multiple=False):
+    def serialize_term_queries(self, terms):
         s = []
         for name, value_set in terms.items():
             if name:
@@ -84,10 +79,7 @@ class LuceneQuery(object):
                 s += [u'%s:%s' % (name, value.to_query()) for value in value_set]
             else:
                 s += [value.to_query() for value in value_set]
-        if multiple:
-            return s
-        else:
-            return u' AND '.join(sorted(s))
+        return sorted(s)
 
     range_query_templates = {
         "any": u"[* TO *]",
@@ -104,7 +96,7 @@ class LuceneQuery(object):
             range_s = self.range_query_templates[rel] % \
                 tuple(value.to_query() for value in sorted(values, key=lambda x: getattr(x, "value")))
             s.append(u"%s:%s" % (name, range_s))
-        return u' AND '.join(s)
+        return s
 
     def child_needs_parens(self, child):
         if len(child) == 1:
@@ -187,10 +179,10 @@ class LuceneQuery(object):
         self.normalized = True
         return self, mutated
 
-    def unicode_multiple(self, level=0, op=None):
-        return self.__unicode__(level=level, op=op, multiple_tags=True)
+    def __unicode__(self):
+        return self.__unicode_special__(force_serialize=True)
 
-    def __unicode__(self, level=0, op=None, multiple_tags=False):
+    def __unicode_special__(self, level=0, op=None, force_serialize=False):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -201,28 +193,24 @@ class LuceneQuery(object):
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
-            return newself.__unicode__(level=level)
+            return newself.__unicode__(level=level, force_serialize=force_serialize)
         else:
-            alls = [self.serialize_term_queries(self.terms, multiple=multiple_tags),
+            alliter = [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
                              self.serialize_range_queries()]
             u = []
-            for s in alls:
-                if not s:
-                    continue
-                if not isinstance(s, basestring):
-                    u.extend(s)
-                else:
-                    u.append(s)
+            for iterator in alliter:
+                u.extend(iterator)
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"(%s)"%q.__unicode_special__(level=level+1, op=op_))
                 else:
-                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"%s"%q.__unicode_special__(level=level+1, op=op_))
             if self._and:
-                if level == 0 and multiple_tags:
-                    print u
+                if (not force_serialize and
+                    level == 0 and
+                    self.multiple_tags_allowed):
                     return u
                 else:
                     return u' AND '.join(u)
@@ -390,8 +378,6 @@ class BaseSearch(object):
 
     result_constructor = dict
 
-    multiple_tags_allowed = ('filter_obj',)
-
     def _init_common_modules(self):
         self.query_obj = LuceneQuery(self.schema, u'q')
         self.filter_obj = LuceneQuery(self.schema, u'fq', multiple_tags_allowed=True)
@@ -490,10 +476,7 @@ class BaseSearch(object):
     def options(self):
         options = {}
         for option_module in self.option_modules:
-            if option_module in self.multiple_tags_allowed:
-                options.update(getattr(self, option_module).options(multiple_tags=True))
-            else:
-                options.update(getattr(self, option_module).options())
+            options.update(getattr(self, option_module).options())
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
 
