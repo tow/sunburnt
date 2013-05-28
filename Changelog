@@ -1,4 +1,5 @@
 * 0.7 : unreleased
+ - Added handling for None values (@jod)
  - Provide default string-based field for schema field types unknown to
  - Escape forward slash characters for compatibility with Solr 4.0 (@davidjb)
    Sunburnt. (@davidjb)
