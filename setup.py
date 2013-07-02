@@ -2,7 +2,7 @@
 
 import distutils.core, os, re
 
-version = '0.7'
+version = '0.7lu'
 
 distutils.core.setup(
     name='sunburnt',
