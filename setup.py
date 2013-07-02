@@ -2,13 +2,11 @@
 
 import distutils.core, os, re
 
-version_number_re = "\s*__version__\s*=\s*((\"([^\"]|\\\\\")*\"|'([^']|\\\\')*'))"
-version_file = os.path.join(os.path.dirname(__file__), 'sunburnt', '__init__.py')
-version_number = re.search(version_number_re, open(version_file).read()).groups()[0][1:-1]
+version = '0.7'
 
 distutils.core.setup(
     name='sunburnt',
-    version=version_number,
+    version=version,
     description='Python interface to Solr',
     author='Toby White',
     author_email='toby@timetric.com',
