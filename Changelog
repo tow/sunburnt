@@ -1,4 +1,10 @@
 * 0.7 : unreleased
+0.8 (unreleased)
+                
+
+- Nothing changed yet.
+
+
 0.7lu (2013-07-02)
  - Provide default string-based field for schema field types unknown to
  - Escape forward slash characters for compatibility with Solr 4.0 (@davidjb)
