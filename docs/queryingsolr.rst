@@ -304,7 +304,7 @@ selection of fields.
 
 ::
 
- >>> for result in si.query("game").field_limit("id", score=True"):
+ >>> for result in si.query("game").field_limit("id", score=True):
  ...     print result
 
  {'score': 1.1931472000000001, 'id': u'0553573403'}
