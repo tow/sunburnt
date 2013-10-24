@@ -120,6 +120,25 @@ queries into the same ``query()`` call, but in a more complex environment,
 it can be useful to partially construct a query in one part of your program,
 then modify it later on in a separate part.
 
+Field names
+-----------
+
+To look at the list of available fields in the Solr schema, look at the ``si.schema.fields`` property:
+
+::
+
+ >>> print si.schema.fields.keys()
+ ['id', 'cat', 'name', 'price', 'author_t', 'series_t', 'sequence_i', 'genre_s']
+
+.. note:: If your field names contain undescores dots (.), you won't be able to use
+ them as parameter names in the query() method. Luckily, Python offers here something
+ called "keyword argument application from a dictionary", so you can specify
+ your field name - value pairs in a dictionary as follows:
+
+::
+
+ si.query({'name': "game", 'author_t': "Martin"})
+
 
 Executing queries and interpreting the response
 -----------------------------------------------
