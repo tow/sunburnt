@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import collections, copy, operator, re
 
 from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
-
+from datetime import datetime, timedelta
 
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
@@ -764,9 +764,9 @@ class FacetOptions(Options):
 
 class FacetRangeOptions(Options):
     option_name = "facet"
-    opts = {"range.start":int,
-            "range.gap":int,
-            "range.end":int,
+    opts = {"range.start": lambda self, v: self.__validate_int_or_datetime(v),
+            "range.gap": lambda self, v: self.__validate_int_or_string(v),
+            "range.end": lambda self, v: self.__validate_int_or_datetime(v),
             "sort":[True, False, "count", "index"],
             "limit":int,
             "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
@@ -781,6 +781,20 @@ class FacetRangeOptions(Options):
         else:
             self.fields = copy.copy(original.fields)
 
+    def __validate_int_or_datetime(self, v):
+        if isinstance(v, int):
+            return v
+        elif isinstance(v, datetime):
+            return v.isoformat() + "Z"
+        else:
+            return self.invalid_value()
+
+    def __validate_int_or_string(self, v):
+        if isinstance(v, int) or isinstance(v, str):
+            return v
+        else:
+            return self.invalid_value()
+
     def update(self, fields=None, **kwargs):
         assert isinstance(fields, dict)
         self.fields = dict()
@@ -790,8 +804,7 @@ class FacetRangeOptions(Options):
                 self.fields[field] = dict()
                 checked_kwargs = self.check_opts(dict(opts.items() + kwargs.items()))
                 for k, v in checked_kwargs.items():
-                    for field in fields:
-                        self.fields[field][k] = v
+                    self.fields[field][k] = v
 
     def options(self):
         opts = {}
@@ -808,8 +821,7 @@ class FacetRangeOptions(Options):
 
     def field_names_in_opts(self, opts, fields):
         if fields:
-            for field in fields:
-                opts["facet.range"] = field
+            opts["facet.range"] = fields
 
         return opts
 
