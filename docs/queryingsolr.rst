@@ -732,10 +732,69 @@ The facets are shown as a list of tuples, mapping query to number of results. Yo
 the above as saying '*of the results, 1 of them fulfilled the first facet-query (price greater than 7) and
 1 of them fulfilled the second query-facet (price less than 7)*'.
 
-.. note:: Other types of facet
+Sunburnt can also facet on numeric and date ranges. (See: Solr's `facet range documentation <http://wiki.apache.org/solr/SimpleFacetParameters#Facet_by_Range>`_.) Facet range options can be specified for each field using a dictionary.
 
- Currently, faceting by date and range are not currently supported (but some of their functionality can be replicated by using ``facet_query()``). Nor are LocalParams or pivot faceting.
+The most important options are ``range.start`` and ``range.end``, which specifies minimum and maximum values for the facet ranges to cover, and the ``range.gap``, which specifies how wide each range should be.
 
+In this first example, we ask Solr to create facet ranges on the price field, where the ranges are 1-5000, 5001-10000, etc.
+
+**Numeric Facet Range**
+
+ >>> from sunburnt import SolrInterface
+ >>> si = SolrInterface('http://some.url:8983/solr/')
+ >>> si.query('Query')
+ >>> si.facet_ranger.update({'price': {'range.start': 1, 'range.end': 99999, 'range.gap': 5000} })
+
+When using date ranges, you should pass the ``range.start`` and ``range.end`` as you
+can also use's Solr's special syntax for ``range.gap``, such as ``+1YEAR`` to make each
+gap 1 year wide.
+
+The next example demonstrates adding a facet range on the ``last_modified`` field where
+each range is 1 year, starting from the year 2000 up to the present year.
+
+The example also shows to how to limit which facets are displayed using the ``mincount``
+and ``limit`` parameters.
+
+**Date Facet Range**
+
+::
+
+ >>> from datetime import datetime
+ >>> from sunburnt import SolrInterface
+ >>> si = SolrInterface('http://some.url:8983/solr/')
+ >>> query = si.query('Query')
+ >>> query.facet_ranger.update('last_modified': {'range.start': datetime(2000,1,1), 'range.end': datetime.utcnow(): 'range.gap': "+1YEAR"} })
+ >>> resp = query[:10]
+ >>> resp.facet_counts.facet_ranges
+ [('modified_ts',
+   [('counts',
+     [('2000-01-01T00:00:00Z', 0),
+      ('2001-01-01T00:00:00Z', 0),
+      ('2002-01-01T00:00:00Z', 0),
+      ('2003-01-01T00:00:00Z', 0),
+      ('2004-01-01T00:00:00Z', 0),
+      ('2005-01-01T00:00:00Z', 0),
+      ('2006-01-01T00:00:00Z', 0),
+      ('2007-01-01T00:00:00Z', 8),
+      ('2008-01-01T00:00:00Z', 56),
+      ('2009-01-01T00:00:00Z', 37),
+      ('2010-01-01T00:00:00Z', 63),
+      ('2011-01-01T00:00:00Z', 141),
+      ('2012-01-01T00:00:00Z', 202),
+      ('2013-01-01T00:00:00Z', 88)]),
+    ('gap', '+1YEAR'),
+    ('start', datetime.datetime(2000, 1, 1, 0, 0)),
+    ('end', datetime.datetime(2014, 1, 1, 0, 0))])]
+
+The facet_ranges structure is a list with one element for each field that has a facet
+range. The structure contains the same start, end, and gap values that you passed into
+your request. It also contains a list called ``counts``. This is a list of tuples where
+each tuple corresponds to a facet range. The first item in the tuple is the beginning
+of the range, and the second item in the tuple is the count of search results that fall
+in that range.
+
+Notice that even though the query only asked for 10 results, Solr calculates the facets
+as if there was no limit on results.
 
 Highlighting
 ------------
