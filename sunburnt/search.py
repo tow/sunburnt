@@ -762,6 +762,31 @@ class FacetOptions(Options):
             opts["facet.field"] = sorted(fields)
 
 
+class FacetPivotOptions(Options):
+    option_name = "facet"
+    opts = {"prefix":unicode,
+            "sort":[True, False, "count", "index"],
+            "limit":int,
+            "offset":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
+            "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
+            "missing":bool,
+            "method":["enum", "fc"],
+            "enum.cache.minDf":int,
+            }
+
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["facet.pivot"] = sorted(fields)
+
+
+
 class HighlightOptions(Options):
     option_name = "hl"
     opts = {"snippets":int,

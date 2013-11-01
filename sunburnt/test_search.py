@@ -16,7 +16,7 @@ except ImportError:
     HAS_MX_DATETIME = False
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, FacetPivotOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
 from .sunburnt import SolrInterface
 
@@ -307,6 +307,12 @@ good_option_data = {
          {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3}),
         ({"fields":["int_field", "text_field"], "prefix":"abc", "limit":3},
          {"facet":True, "facet.field":["int_field", "text_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3, "f.text_field.facet.prefix":"abc", "f.text_field.facet.limit":3, }),
+        ),
+    FacetPivotOptions:(
+        ({"fields":["text_field"]},
+         {"facet":True, "facet.pivot":["text_field"]}),
+        ({"fields":["int_field", "text_field"]},
+         {"facet":True, "facet.pivot":["int_field","text_field"]})
         ),
     SortOptions:(
         ({"field":"int_field"},
