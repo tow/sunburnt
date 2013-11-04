@@ -1,4 +1,4 @@
-0.7.1lu (unreleased)
+0.7.1lu (2013-11-04)
 --------------------
 
 - Add support for hierarchical facet queryies, i.e. facet.pivot. (@florianpilz)
