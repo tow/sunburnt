@@ -227,8 +227,8 @@ good_query_data = {
     }
 if HAS_MX_DATETIME:
     good_query_data['query'] += \
-            ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
-             [("q", u"date_field:2009-01-01T00\\:00\\:00Z")])
+            (([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
+             [("q", u"date_field:2009\\-01\\-01T00\\:00\\:00Z")]),)
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
