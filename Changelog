@@ -1,4 +1,5 @@
 * 0.7 : unreleased
+ - Add support for hierarchical facet queryies, i.e. facet.pivot. (@florianpilz)
  - Provide default string-based field for schema field types unknown to
  - Escape forward slash characters for compatibility with Solr 4.0 (@davidjb)
    Sunburnt. (@davidjb)
