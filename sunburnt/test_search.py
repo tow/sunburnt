@@ -310,9 +310,11 @@ good_option_data = {
         ),
     FacetPivotOptions:(
         ({"fields":["text_field"]},
-         {"facet":True, "facet.pivot":["text_field"]}),
+         {"facet":True, "facet.pivot":"text_field"}),
         ({"fields":["int_field", "text_field"]},
-         {"facet":True, "facet.pivot":["int_field","text_field"]})
+         {"facet":True, "facet.pivot":"int_field,text_field"}),
+        ({"fields":["int_field", "text_field"], "mincount":2},
+         {"facet":True, "facet.pivot":"int_field,text_field", "facet.pivot.mincount":2}),
         ),
     SortOptions:(
         ({"field":"int_field"},

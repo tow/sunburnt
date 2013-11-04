@@ -363,7 +363,8 @@ class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
                       'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',)
+                      'sorter', 'facet_querier', 'field_limiter',
+                      'pivoter')
 
     result_constructor = dict
 
@@ -373,6 +374,7 @@ class BaseSearch(object):
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
+        self.pivoter = FacetPivotOptions(self.schema)
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
         self.facet_querier = FacetQueryOptions(self.schema)
@@ -430,6 +432,11 @@ class BaseSearch(object):
     def facet_by(self, field, **kwargs):
         newself = self.clone()
         newself.faceter.update(field, **kwargs)
+        return newself
+
+    def pivot_by(self, fields, **kwargs):
+        newself = self.clone()
+        newself.pivoter.update(fields, **kwargs)
         return newself
 
     def facet_query(self, *args, **kwargs):
@@ -763,16 +770,10 @@ class FacetOptions(Options):
 
 
 class FacetPivotOptions(Options):
-    option_name = "facet"
-    opts = {"prefix":unicode,
-            "sort":[True, False, "count", "index"],
-            "limit":int,
-            "offset":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
-            "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
-            "missing":bool,
-            "method":["enum", "fc"],
-            "enum.cache.minDf":int,
-            }
+    option_name = "facet.pivot"
+    opts = {
+        "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
+    }
 
     def __init__(self, schema, original=None):
         self.schema = schema
@@ -782,8 +783,14 @@ class FacetPivotOptions(Options):
             self.fields = copy.copy(original.fields)
 
     def field_names_in_opts(self, opts, fields):
+        opts["facet"] = True
         if fields:
-            opts["facet.pivot"] = sorted(fields)
+            field_opts = {}
+            for field in fields:
+                field_opts = dict(field_opts.items() + self.fields[field].items())
+                del(self.fields[field])
+            self.fields[None] = field_opts
+            opts["facet.pivot"] = ','.join(sorted(fields))
 
 
 
