@@ -16,7 +16,7 @@ except ImportError:
     HAS_MX_DATETIME = False
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, FacetPivotOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
 from .sunburnt import SolrInterface
 
@@ -227,8 +227,8 @@ good_query_data = {
     }
 if HAS_MX_DATETIME:
     good_query_data['query'] += \
-            ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
-             [("q", u"date_field:2009-01-01T00\\:00\\:00Z")])
+            (([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
+             [("q", u"date_field:2009\\-01\\-01T00\\:00\\:00Z")]),)
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
@@ -307,6 +307,14 @@ good_option_data = {
          {"facet":True, "facet.field":["int_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3}),
         ({"fields":["int_field", "text_field"], "prefix":"abc", "limit":3},
          {"facet":True, "facet.field":["int_field", "text_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3, "f.text_field.facet.prefix":"abc", "f.text_field.facet.limit":3, }),
+        ),
+    FacetPivotOptions:(
+        ({"fields":["text_field"]},
+         {"facet":True, "facet.pivot":"text_field"}),
+        ({"fields":["int_field", "text_field"]},
+         {"facet":True, "facet.pivot":"int_field,text_field"}),
+        ({"fields":["int_field", "text_field"], "mincount":2},
+         {"facet":True, "facet.pivot":"int_field,text_field", "facet.pivot.mincount":2}),
         ),
     SortOptions:(
         ({"field":"int_field"},

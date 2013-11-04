@@ -1,37 +1,51 @@
-* 0.7 : unreleased
-0.8 (unreleased)
-                
+0.7.1lu (unreleased)
+--------------------
 
-- Nothing changed yet.
-
+- Add support for hierarchical facet queryies, i.e. facet.pivot. (@florianpilz)
 
 0.7lu (2013-07-02)
- - Provide default string-based field for schema field types unknown to
- - Escape forward slash characters for compatibility with Solr 4.0 (@davidjb)
-   Sunburnt. (@davidjb)
- - Fix handling of queries with ``boost_relevancy`` applied - boost was 
-   previously lost in some cases. (@davidjb)
- - Ensure 'more like this' results are transformed using a query's
-   execute() `constructor`, as are normal query results. (@davidjb)
+------------------
 
-* 0.6 : 2012-01-01
- - Change license to MIT/X11
- - Integrate with Django Paginator (thanks @rlskoeser)
- - Add UUIDField support
- - Add MLT Handler support (thanks @ogrisel)
+- Provide default string-based field for schema field types unknown to
 
+- Escape forward slash characters for compatibility with Solr 4.0 (@davidjb)
+  Sunburnt. (@davidjb)
 
-* 0.5 : 2011-05-18
- - Add proper documentation
- - Add field_limit() option (thanks, @danaspiegel)
- - Add basic support for new Solr-3.1 datatypes
- - Add support for __any queries (thanks, @skarab)
- - Add experimental JSON output module
+- Fix handling of queries with ``boost_relevancy`` applied - boost was 
+  previously lost in some cases. (@davidjb)
 
- - Rationalize data normalization and quoting codepaths, fixing several bugs along the way
- - Fixes for correct serialization of complex nested query objects
+- Ensure 'more like this' results are transformed using a query's
+  execute() `constructor`, as are normal query results. (@davidjb)
 
+0.6 (2012-01-01)
+----------------
 
-* 0.4 : 2011-01-04
+- Change license to MIT/X11
 
- - First release on PyPi
+- Integrate with Django Paginator (thanks @rlskoeser)
+
+- Add UUIDField support
+
+- Add MLT Handler support (thanks @ogrisel)
+
+0.5 (2011-05-18)
+----------------
+
+- Add proper documentation
+
+- Add field_limit() option (thanks, @danaspiegel)
+
+- Add basic support for new Solr-3.1 datatypes
+
+- Add support for __any queries (thanks, @skarab)
+
+- Add experimental JSON output module
+
+- Rationalize data normalization and quoting codepaths, fixing several bugs along the way
+
+- Fixes for correct serialization of complex nested query objects
+
+0.4 (2011-01-04)
+----------------
+
+- First release on PyPi
