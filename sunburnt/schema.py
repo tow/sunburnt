@@ -8,6 +8,11 @@ import warnings
 from lxml.builder import E
 import lxml.etree
 
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
 from .dates import datetime_from_w3_datestring
 from .strings import RawString, SolrString, WildcardString
 
@@ -400,9 +405,10 @@ class SolrSchema(object):
         'solr.GeoHashField':SolrPoint2Field,
     }
 
-    def __init__(self, f):
+    def __init__(self, f, format='xml'):
         """initialize a schema object from a
         filename or file-like object."""
+        self.format = format
         self.fields, self.dynamic_fields, self.default_field_name, self.unique_key \
             = self.schema_parse(f)
         self.default_field = self.fields[self.default_field_name] \
@@ -518,7 +524,10 @@ class SolrSchema(object):
         return SolrDelete(self, docs, query)
 
     def parse_response(self, msg):
-        return SolrResponse.from_xml(self, msg)
+        if self.format == 'json':
+            return SolrResponse.from_json(self, msg)
+        else:
+            return SolrResponse.from_xml(self, msg)
 
     def parse_result_doc(self, doc, name=None):
         if name is None:
@@ -534,6 +543,26 @@ class SolrSchema(object):
         elif field_class is None:
             raise SolrError("unexpected field found in result (field name: %s)" % name)
         return name, SolrFieldInstance.from_solr(field_class, doc.text or '').to_user_data()
+
+    def parse_result_doc_json(self, doc):
+        result = {}
+        for name, value in doc.viewitems():
+            field_class = self.match_field(name)
+            if field_class is None and name == "score":
+                field_class = SolrScoreField()
+            elif field_class is None:
+                raise SolrError("unexpected field found in result (field name: %s)" % name)
+            if isinstance(value, list):
+                parsed_value = [self.cast_value(field_class, v) for v in value]
+            else:
+                parsed_value = self.cast_value(field_class, value)
+            result[name] = parsed_value
+        return result
+
+    def cast_value(self, field_class, value):
+        if isinstance(field_class, SolrUnicodeField):
+            return value
+        return SolrFieldInstance.from_solr(field_class, value).to_user_data()
 
 
 class SolrUpdate(object):
@@ -646,6 +675,25 @@ class SolrFacetCounts(object):
         facet_counts_dict = dict(response.get("facet_counts", {}))
         return SolrFacetCounts(**facet_counts_dict)
 
+    @classmethod
+    def from_response_json(cls, response):
+        try:
+            facet_counts_dict = response['facet_counts']
+        except KeyError:
+            return SolrFacetCounts()
+        facet_fields = {}
+        for facet_field, facet_values in facet_counts_dict['facet_fields'].viewitems():
+            facets = []
+            # Change each facet list from [a, 1, b, 2, c, 3 ...] to
+            # [(a, 1), (b, 2), (c, 3) ...]
+            for n, value in enumerate(facet_values):
+                if n&1 == 0:
+                    name = value
+                else:
+                    facets.append((name, value))
+            facet_fields[facet_field] = facets
+        facet_counts_dict['facet_fields'] = facet_fields
+        return SolrFacetCounts(**facet_counts_dict)
 
 class SolrResponse(object):
     @classmethod
@@ -686,6 +734,36 @@ class SolrResponse(object):
         self.interesting_terms = value
         return self
 
+    @classmethod
+    def from_json(cls, schema, jsonmsg):
+        self = cls()
+        self.schema = schema
+        self.original_json = jsonmsg
+        doc = json.loads(jsonmsg)
+        details = doc['responseHeader']
+        for attr in ["QTime", "params", "status"]:
+            setattr(self, attr, details.get(attr))
+        if self.status != 0:
+            raise ValueError("Response indicates an error")
+        self.result = SolrResult.from_json(schema, doc['response'])
+        self.facet_counts = SolrFacetCounts.from_response_json(doc)
+        self.highlighting = dict((k, dict(v))
+                                 for k, v in details.get("highlighting", ()))
+        self.more_like_these = dict((k, SolrResult.from_json(schema, v))
+                for (k, v) in doc['moreLikeThis'].viewitems())
+        if len(self.more_like_these) == 1:
+            self.more_like_this = self.more_like_these.values()[0]
+        else:
+            self.more_like_this = None
+        # can be computed by MoreLikeThisHandler
+        #termsNodes = doc.xpath("/response/*[@name='interestingTerms']")
+        #if len(termsNodes) == 1:
+        #    _, value = value_from_node(termsNodes[0])
+        #else:
+        #    value = None
+        self.interesting_terms = None
+        return self
+
     def __str__(self):
         return str(self.result)
 
@@ -705,6 +783,16 @@ class SolrResult(object):
         self.numFound = int(node.attrib['numFound'])
         self.start = int(node.attrib['start'])
         self.docs = [schema.parse_result_doc(n) for n in node.xpath("doc")]
+        return self
+
+    @classmethod
+    def from_json(cls, schema, node):
+        self = cls()
+        self.schema = schema
+        self.name = 'response'
+        self.numFound = int(node['numFound'])
+        self.start = int(node['start'])
+        self.docs = [schema.parse_result_doc_json(n) for n in node["docs"]]
         return self
 
     def __str__(self):
