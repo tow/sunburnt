@@ -1,9 +1,7 @@
 from __future__ import absolute_import
 
-import cgi
 import cStringIO as StringIO
 from itertools import islice
-import logging
 import socket, time, urllib, urlparse
 import warnings
 
@@ -38,11 +36,11 @@ class SolrConnection(object):
             return self.http_connection.request(*args, **kwargs)
 
     def commit(self, waitSearcher=None, expungeDeletes=None, softCommit=None):
-        response = self.update('<commit/>', commit=True,
+        self.update('<commit/>', commit=True,
                 waitSearcher=waitSearcher, expungeDeletes=expungeDeletes, softCommit=softCommit)
 
     def optimize(self, waitSearcher=None, maxSegments=None):
-        response = self.update('<optimize/>', optimize=True,
+        self.update('<optimize/>', optimize=True,
             waitSearcher=waitSearcher, maxSegments=maxSegments)
 
     # For both commit & optimize above, we use the XML body instead
@@ -50,7 +48,7 @@ class SolrConnection(object):
     # should) then only the former works.
 
     def rollback(self):
-        response = self.update("<rollback/>")
+        self.update("<rollback/>")
 
     def update(self, update_doc, **kwargs):
         body = update_doc
