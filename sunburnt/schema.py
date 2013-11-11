@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-import datetime
 import math
 import operator
 import uuid
@@ -712,9 +711,9 @@ class SolrResult(object):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
 
-def object_to_dict(o, names):
-    return dict((name, getattr(o, name)) for name in names
-                 if (hasattr(o, name) and getattr(o, name) is not None))
+# def object_to_dict(o, names):
+#     return dict((name, getattr(o, name)) for name in names
+#                  if (hasattr(o, name) and getattr(o, name) is not None))
 
 # This is over twice the speed of the shorter one immediately above.
 # apparently hasattr is really slow; try/except is faster.
