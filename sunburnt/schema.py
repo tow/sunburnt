@@ -551,7 +551,8 @@ class SolrSchema(object):
 
     def parse_result_doc_json(self, doc):
         # Note: for efficiency's sake this modifies the original dict
-        # in place
+        # in place. This doesn't make much difference on 20 documents
+        # but it does on 20,000
         for name, value in doc.viewitems():
             field_class = self.match_field(name)
             # If the field type is a string then we don't need to modify it
@@ -763,8 +764,7 @@ class SolrResponse(object):
         if len(interesting_terms) == 1:
             self.interesting_terms = interesting_terms.values()[0]
         else:
-            self.interetsing_terms = None
-        self.interesting_terms = None
+            self.interesting_terms = None
         return self
 
     def __str__(self):
