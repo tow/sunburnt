@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import collections, copy, operator, re
 
 from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
+from .walktree import walk, event, leaf, exit
 
 
 class LuceneQuery(object):
@@ -31,8 +32,11 @@ class LuceneQuery(object):
             self._pow = original._pow
             self.boosts = copy.copy(original.boosts)
 
-    def clone(self):
-        return LuceneQuery(self.schema, original=self)
+    def clone(self, **kwargs):
+        q = LuceneQuery(self.schema, original=self)
+        for k, v in kwargs.items():
+            setattr(q, k, v)
+        return q
 
     def options(self):
         opts = {}
@@ -109,76 +113,86 @@ class LuceneQuery(object):
         else:
             return True
 
+    def normalize(self):
+        # shortcut to avoid re-normalization no-ops
+        if self.normalized:
+            return self, False
+
+        changed = False
+        for path in walk(self, lambda q: q.subqueries, event(exit|leaf)):
+            if len(path) == 1:
+                # last time around, so:
+                break
+            this = path[-1]
+            obj = self.normalize_node(this)
+            obj.normalized = True
+            if obj != this:
+                siblings = path[-2].subqueries
+                i = siblings.index(this)
+                siblings[i] = obj
+                changed = True
+
+        obj = self.normalize_node(self)
+        return obj, (changed or obj == self)
+
     @staticmethod
-    def merge_term_dicts(*args):
+    def merge_term_dicts(args):
         d = collections.defaultdict(set)
         for arg in args:
             for k, v in arg.items():
                 d[k].update(v)
         return dict((k, v) for k, v in d.items())
 
-    def normalize(self):
-        if self.normalized:
-            return self, False
+    @staticmethod
+    def normalize_node(obj):
+        """ Normalize a query node provided all its sub-queries
+        are already normalized"""
+        # Recalculate terms/phrases/ranges/subqueries as appropriate given immediate subqueries
+        terms = [obj.terms]
+        phrases = [obj.phrases]
+        ranges = [obj.ranges]
+        subqueries = []
+
         mutated = False
-        _subqueries = []
-        _terms = self.terms
-        _phrases = self.phrases
-        _ranges = self.ranges
-        for s in self.subqueries:
-            _s, changed = s.normalize()
-            if not _s or changed:
+        for s in obj.subqueries:
+            if not s:
+                mutated = True # we're dropping a subquery
+                continue # don't append
+            if (s._and and obj._and) or (s._or and obj._or):
+                # then hoist the contents up
+                terms.append(s.terms)
+                phrases.append(s.phrases)
+                ranges.append(s.ranges)
+                subqueries.extend(s.subqueries)
                 mutated = True
-            if _s:
-                if (_s._and and self._and) or (_s._or and self._or):
-                    mutated = True
-                    _terms = self.merge_term_dicts(_terms, _s.terms)
-                    _phrases = self.merge_term_dicts(_phrases, _s.phrases)
-                    _ranges = _ranges.union(_s.ranges)
-                    _subqueries.extend(_s.subqueries)
-                else:
-                    _subqueries.append(_s)
+            else: # just keep it unchanged
+                subqueries.append(s)
+
+        # and clone if there have been any changes
         if mutated:
-            newself = self.clone()
-            newself.terms = _terms
-            newself.phrases = _phrases
-            newself.ranges = _ranges
-            newself.subqueries = _subqueries
-            self = newself
+            obj = obj.clone(terms = obj.merge_term_dicts(terms),
+                            phrases = obj.merge_term_dicts(phrases),
+                            ranges = reduce(operator.or_, ranges),
+                            subqueries = subqueries)
 
-        if self._not:
-            if not len(self.subqueries):
-                newself = self.clone()
-                newself._not = False
-                newself._and = True
-                self = newself
-                mutated = True
-            elif len(self.subqueries) == 1:
-                if self.subqueries[0]._not:
-                    newself = self.clone()
-                    newself.subqueries = self.subqueries[0].subqueries
-                    newself._not = False
-                    newself._and = True
-                    self = newself
-                    mutated = True
-            else:
-                raise ValueError
-        elif self._pow:
-            if not len(self.subqueries):
-                newself = self.clone()
-                newself._pow = False
-                self = newself
-                mutated = True
-        elif self._and or self._or:
-            if not self.terms and not self.phrases and not self.ranges \
-               and not self.boosts:
-                if len(self.subqueries) == 1:
-                    self = self.subqueries[0]
-                    mutated = True
-        self.normalized = True
-        return self, mutated
+        # having recalculated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
+        if not len(obj.subqueries):
+            if obj._not:
+                obj = obj.clone(_not=False, _and=True)
+            elif obj._pow:
+                obj = obj.clone(_pow=False)
+        elif len(obj.subqueries) == 1:
+            if obj._not and obj.subqueries[0]._not:
+                obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
+            elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges and not obj.boosts:
+                obj = obj.subqueries[0]
+        obj.normalized = True
+        return obj
 
-    def __unicode__(self, level=0, op=None):
+    def __unicode__(self):
+        return self.serialize_to_unicode(level=0, op=None)
+
+    def serialize_to_unicode(self, level=0, op=None):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -189,7 +203,7 @@ class LuceneQuery(object):
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
-            return newself.__unicode__(level=level)
+            return newself.serialize_to_unicode(level=level)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
@@ -198,9 +212,9 @@ class LuceneQuery(object):
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"(%s)"%q.serialize_to_unicode(level=level+1, op=op_))
                 else:
-                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"%s"%q.serialize_to_unicode(level=level+1, op=op_))
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
@@ -353,7 +367,7 @@ class LuceneQuery(object):
             if not field:
                 raise ValueError("%s is not a valid field name" % k)
             elif not field.indexed:
-                raise SolrError("Can't query on non-indexed field '%s'" % field_name)
+                raise SolrError("Can't query on non-indexed field '%s'" % k)
             value = field.instance_from_user_data(v)
         self.boosts.append((kwargs, boost_score))
 
