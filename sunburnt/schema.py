@@ -415,6 +415,7 @@ class SolrSchema(object):
             if self.default_field_name else None
         self.unique_field = self.fields[self.unique_key] \
             if self.unique_key else None
+        self.dynamic_field_cache = {}
 
     def Q(self, *args, **kwargs):
         from .search import LuceneQuery
@@ -500,9 +501,13 @@ class SolrSchema(object):
             raise SolrError("Fields not defined in schema: %s" % list(undefined_field_names))
 
     def match_dynamic_field(self, name):
-        for field in self.dynamic_fields:
-            if field.match(name):
-                return field
+        try:
+            return self.dynamic_field_cache[name]
+        except KeyError:
+            for field in self.dynamic_fields:
+                if field.match(name):
+                    self.dynamic_field_cache[name] = field
+                    return field
 
     def match_field(self, name):
         try:
@@ -545,24 +550,23 @@ class SolrSchema(object):
         return name, SolrFieldInstance.from_solr(field_class, doc.text or '').to_user_data()
 
     def parse_result_doc_json(self, doc):
-        result = {}
+        # Note: for efficiency's sake this modifies the original dict
+        # in place
         for name, value in doc.viewitems():
             field_class = self.match_field(name)
+            # If the field type is a string then we don't need to modify it
+            if isinstance(field_class, SolrUnicodeField):
+                continue
             if field_class is None and name == "score":
                 field_class = SolrScoreField()
             elif field_class is None:
                 raise SolrError("unexpected field found in result (field name: %s)" % name)
             if isinstance(value, list):
-                parsed_value = [self.cast_value(field_class, v) for v in value]
+                parsed_value = [SolrFieldInstance.from_solr(field_class, v).to_user_data() for v in value]
             else:
-                parsed_value = self.cast_value(field_class, value)
-            result[name] = parsed_value
-        return result
-
-    def cast_value(self, field_class, value):
-        if isinstance(field_class, SolrUnicodeField):
-            return value
-        return SolrFieldInstance.from_solr(field_class, value).to_user_data()
+                parsed_value = SolrFieldInstance.from_solr(field_class, value).to_user_data()
+            doc[name] = parsed_value
+        return doc
 
 
 class SolrUpdate(object):
@@ -747,20 +751,19 @@ class SolrResponse(object):
             raise ValueError("Response indicates an error")
         self.result = SolrResult.from_json(schema, doc['response'])
         self.facet_counts = SolrFacetCounts.from_response_json(doc)
-        self.highlighting = dict((k, dict(v))
-                                 for k, v in details.get("highlighting", ()))
+        self.highlighting = doc.get("highlighting", {})
         self.more_like_these = dict((k, SolrResult.from_json(schema, v))
-                for (k, v) in doc['moreLikeThis'].viewitems())
+                for (k, v) in doc.get('moreLikeThis', {}).viewitems())
         if len(self.more_like_these) == 1:
             self.more_like_this = self.more_like_these.values()[0]
         else:
             self.more_like_this = None
         # can be computed by MoreLikeThisHandler
-        #termsNodes = doc.xpath("/response/*[@name='interestingTerms']")
-        #if len(termsNodes) == 1:
-        #    _, value = value_from_node(termsNodes[0])
-        #else:
-        #    value = None
+        interesting_terms = doc.get('interestingTerms', ())
+        if len(interesting_terms) == 1:
+            self.interesting_terms = interesting_terms.values()[0]
+        else:
+            self.interetsing_terms = None
         self.interesting_terms = None
         return self
 
@@ -792,7 +795,15 @@ class SolrResult(object):
         self.name = 'response'
         self.numFound = int(node['numFound'])
         self.start = int(node['start'])
-        self.docs = [schema.parse_result_doc_json(n) for n in node["docs"]]
+        docs = node['docs']
+        for doc in docs:
+            parsed_doc = schema.parse_result_doc_json(doc)
+            # We're relying here on the fact that parse_result_doc_json
+            # modifies the document in place which allows us to use the
+            # original list and avoid building a new one. This assertion
+            # checks that this assumption still holds.
+            assert parsed_doc is doc
+        self.docs = docs
         return self
 
     def __str__(self):
