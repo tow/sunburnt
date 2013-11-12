@@ -4,6 +4,7 @@ import math
 import operator
 import uuid
 import warnings
+import decimal
 
 from lxml.builder import E
 import lxml.etree
@@ -123,6 +124,21 @@ def solr_point_factory(dimension):
 
     return solr_point
 
+class solr_currency(object):
+    def __init__(self, value, currency=None):
+        if not currency:
+            # XXX get from schema
+            self.currency = "USD"
+        else:
+            self.currency = currency
+
+        self.value = value
+
+    def __repr__(self):
+        return "solr_currency(%s)" % unicode(self)
+
+    def __unicode__(self):
+        return u"%s,%s" % (self.value, self.currency)
 
 class SolrField(object):
     def __init__(self, name, indexed=None, stored=None, required=False, multiValued=False, dynamic=False, **kwargs):
@@ -207,8 +223,8 @@ class SolrBooleanField(SolrField):
             elif value.lower() == "false":
                 return False
             else:
-                raise ValueError("sorry, I only understand simple boolean strings (field %s)" % 
-                        self.name)
+                raise ValueError("sorry, I only understand simple boolean strings (field %s, value %s)" % 
+                        self.name, value)
         return bool(value)
 
 
@@ -239,6 +255,18 @@ class SolrNumericalField(SolrField):
                     (value, self.__class__, self.name))
         return v
 
+class SolrCurrencyField(SolrField):
+    def normalize(self, value):
+        return solr_currency(v)
+
+    def from_user_data(self, value):
+        return solr_currency(*value.split(","))        
+
+    def to_solr(self, value):
+        return unicode(value)
+
+    def from_solr(self, value):
+        return solr_currency(*value.split(","))        
 
 class SolrShortField(SolrNumericalField):
     base_type = int
@@ -403,6 +431,7 @@ class SolrSchema(object):
         'solr.PointType':SolrPointField,
         'solr.LatLonType':SolrPoint2Field,
         'solr.GeoHashField':SolrPoint2Field,
+        'solr.CurrencyField':SolrCurrencyField
     }
 
     def __init__(self, f, format='xml'):
