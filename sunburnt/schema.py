@@ -810,40 +810,29 @@ class SolrResult(object):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
 
-# def object_to_dict(o, names):
-#     return dict((name, getattr(o, name)) for name in names
-#                  if (hasattr(o, name) and getattr(o, name) is not None))
-
-# This is over twice the speed of the shorter one immediately above.
-# apparently hasattr is really slow; try/except is faster.
-# Also, the one above doesn't and can't do callables with exception handling
 def object_to_dict(o, schema):
-    d = {}
-    for name in schema.fields.keys():
-        a = get_attribute_or_callable(o, name)
-        if a is not None:
-            d[name] = a
-    # and now try for dynamicFields:
+    # Don't modify if it's already a dict
+    if hasattr(o, 'items'):
+        return o
+    # Get fields from schema
+    fields = schema.fields.keys()
+    # Check if any attributes defined on object match
+    # dynamic field patterns
     try:
         names = o.__dict__.keys()
     except AttributeError:
         names = []
-    for name in names:
-        field = schema.match_dynamic_field(name)
-        if field:
-            a = get_attribute_or_callable(o, name)
-            if a is not None:
-                d[name] = a
     try:
-        names = o.__class__.__dict__.keys()
+        names.extend(o.__class__.__dict__.keys())
     except AttributeError:
-        names = []
-    for name in names:
-        field = schema.match_dynamic_field(name)
-        if field:
-            a = get_attribute_or_callable(o, name)
-            if a is not None:
-                d[name] = a
+        pass
+    fields.extend([name for name in names
+                   if schema.match_dynamic_field(name)])
+    d = {}
+    for field in fields:
+        value = get_attribute_or_callable(o, field)
+        if value is not None:
+            d[field] = value
     return d
 
 def get_attribute_or_callable(o, name):
