@@ -13,12 +13,18 @@ MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
 
 class SolrConnection(object):
-    def __init__(self, url, http_connection, retry_timeout, max_length_get_url, format):
+    readable = True
+    writeable = True
+    def __init__(self, url, http_connection, mode, retry_timeout, max_length_get_url, format):
         if http_connection:
             self.http_connection = http_connection
         else:
             import httplib2
             self.http_connection = httplib2.Http()
+        if mode == 'r':
+            self.writeable = False
+        elif mode == 'w':
+            self.readable = False
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
@@ -52,6 +58,8 @@ class SolrConnection(object):
         self.update("<rollback/>")
 
     def update(self, update_doc, **kwargs):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         body = update_doc
         if body:
             headers = {"Content-Type":"text/xml; charset=utf-8"}
@@ -99,6 +107,8 @@ class SolrConnection(object):
             return self.update_url
 
     def select(self, params):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
         if self.format == 'json':
             params.append(('wt', 'json'))
         qs = urllib.urlencode(params)
@@ -123,6 +133,8 @@ class SolrConnection(object):
         """Perform a MoreLikeThis query using the content specified
         There may be no content if stream.url is specified in the params.
         """
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
         qs = urllib.urlencode(params)
         base_url = "%s?%s" % (self.mlt_url, qs)
         if content is None:
@@ -141,17 +153,11 @@ class SolrConnection(object):
 
 
 class SolrInterface(object):
-    readable = True
-    writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
     def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1,
             max_length_get_url=MAX_LENGTH_GET_URL, format='xml'):
-        self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url, format)
+        self.conn = SolrConnection(url, http_connection, mode, retry_timeout, max_length_get_url, format)
         self.schemadoc = schemadoc
-        if mode == 'r':
-            self.writeable = False
-        elif mode == 'w':
-            self.readable = False
         allowed_formats = ('xml', 'json')
         if format not in allowed_formats:
             raise ValueError("Unsupported format '%s': allowed are %s" %
@@ -171,8 +177,6 @@ class SolrInterface(object):
         self.schema = SolrSchema(schemadoc, format=self.format)
 
     def add(self, docs, chunk=100, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
             docs = [docs]
         # to avoid making messages too large, we break the message every
@@ -182,8 +186,6 @@ class SolrInterface(object):
             self.conn.update(str(update_message), **kwargs)
 
     def delete(self, docs=None, queries=None, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         if not docs and not queries:
             raise SolrError("No docs or query specified for deletion")
         elif docs is not None and (hasattr(docs, "items") or not hasattr(docs, "__iter__")):
@@ -192,35 +194,23 @@ class SolrInterface(object):
         self.conn.update(str(delete_message), **kwargs)
 
     def commit(self, *args, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         self.conn.commit(*args, **kwargs)
 
     def optimize(self, *args, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         self.conn.optimize(*args, **kwargs)
 
     def rollback(self):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         self.conn.rollback()
 
     def delete_all(self):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         # When deletion is fixed to escape query strings, this will need fixed.
         self.delete(queries=self.Q(**{"*":"*"}))
 
     def search(self, **kwargs):
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.select(params))
 
     def query(self, *args, **kwargs):
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         q = SolrSearch(self)
         if len(args) + len(kwargs) > 0:
             return q.query(*args, **kwargs)
@@ -228,8 +218,6 @@ class SolrInterface(object):
             return q
 
     def mlt_search(self, content=None, **kwargs):
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.mlt(params, content=content))
 
@@ -248,8 +236,6 @@ class SolrInterface(object):
         Other MoreLikeThis specific parameters can be passed as kwargs without
         the 'mlt.' prefix.
         """
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         q = MltSolrSearch(self, content=content, content_charset=content_charset, url=url)
         return q.mlt(fields=fields, query_fields=query_fields, **kwargs)
 
