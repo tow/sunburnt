@@ -811,23 +811,11 @@ class SolrResult(object):
 
 
 def object_to_dict(o, schema):
-    # Don't modify if it's already a dict
-    if hasattr(o, 'items'):
-        return o
     # Get fields from schema
     fields = schema.fields.keys()
     # Check if any attributes defined on object match
     # dynamic field patterns
-    try:
-        names = o.__dict__.keys()
-    except AttributeError:
-        names = []
-    try:
-        names.extend(o.__class__.__dict__.keys())
-    except AttributeError:
-        pass
-    fields.extend([name for name in names
-                   if schema.match_dynamic_field(name)])
+    fields.extend([f for f in dir(o) if schema.match_dynamic_field(f)])
     d = {}
     for field in fields:
         value = get_attribute_or_callable(o, field)
