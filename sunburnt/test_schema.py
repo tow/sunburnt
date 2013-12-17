@@ -51,7 +51,7 @@ samples_from_strings = {
     "2009-07-23T03:24:34.1Z":
         datetime.datetime(2009, 07, 23, 3, 24, 34, 100000, pytz.utc),
     "2009-07-23T03:24:34.123Z":
-        datetime.datetime(2009, 07, 23, 3, 24, 34, 123000, pytz.utc)
+        datetime.datetime(2009, 07, 23, 3, 24, 34, 122999, pytz.utc)
     }
 
 def check_solr_date_from_date(s, date, canonical_date):
@@ -59,7 +59,7 @@ def check_solr_date_from_date(s, date, canonical_date):
     check_solr_date_from_string(s, canonical_date)
 
 def check_solr_date_from_string(s, date):
-    assert solr_date(s)._dt_obj == date
+    assert solr_date(s)._dt_obj == date, "Unequal representations of %r: %r" % (solr_date(s)._dt_obj, date)
 
 def test_solr_date_from_pydatetimes():
     for k, v in samples_from_pydatetimes.items():

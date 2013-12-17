@@ -376,8 +376,8 @@ class LuceneQuery(object):
 class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',
+                      'more_like_this', 'highlighter', 'postings_highlighter',
+                      'faceter', 'sorter', 'facet_querier', 'field_limiter',
                       'pivoter')
 
     result_constructor = dict
@@ -387,6 +387,7 @@ class BaseSearch(object):
         self.filter_obj = LuceneQuery(self.schema, u'fq')
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
+        self.postings_highlighter = PostingsHighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
         self.pivoter = FacetPivotOptions(self.schema)
         self.sorter = SortOptions(self.schema)
@@ -461,6 +462,11 @@ class BaseSearch(object):
     def highlight(self, fields=None, **kwargs):
         newself = self.clone()
         newself.highlighter.update(fields, **kwargs)
+        return newself
+
+    def postings_highlight(self, fields=None, **kwargs):
+        newself = self.clone()
+        newself.postings_highlighter.update(fields, **kwargs)
         return newself
 
     def mlt(self, fields, query_fields=None, **kwargs):
@@ -828,6 +834,38 @@ class HighlightOptions(Options):
             "regex.pattern":unicode,
             "regex.maxAnalyzedChars":int
             }
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["hl.fl"] = ",".join(sorted(fields))
+
+
+class PostingsHighlightOptions(Options):
+
+    option_name = "hl"
+    opts = {"snippets": int,
+            "tag.pre": unicode,
+            "tag.post": unicode,
+            "tag.ellipsis": unicode,
+            "defaultSummary": bool,
+            "encoder": unicode,
+            "score.k1": float,
+            "score.b": float,
+            "score.pivot": float,
+            "bs.type": unicode,
+            "bs.language": unicode,
+            "bs.country": unicode,
+            "bs.variant": unicode,
+            "maxAnalyzedChars": unicode,
+            "multiValuedSeperatorChar": unicode
+            }
+
     def __init__(self, schema, original=None):
         self.schema = schema
         if original is None:

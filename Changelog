@@ -1,7 +1,11 @@
 0.8 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Fixed tests.
+  [jod]
+
+- Use setuptools in setup.py.
+  [jod]
 
 0.7.1lu (2013-11-04)
 --------------------

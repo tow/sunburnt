@@ -16,7 +16,10 @@ except ImportError:
     HAS_MX_DATETIME = False
 
 from .schema import SolrSchema, SolrError
-from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, FacetPivotOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .search import (SolrSearch, MltSolrSearch, PaginateOptions, SortOptions,
+                     FieldLimitOptions, FacetOptions, FacetPivotOptions,
+                     HighlightOptions, MoreLikeThisOptions, params_from_dict,
+                     PostingsHighlightOptions)
 from .strings import RawString
 from .sunburnt import SolrInterface
 
@@ -338,6 +341,35 @@ good_option_data = {
         ({"fields":["int_field", "text_field"], "snippets":3, "fragsize":5},
          {"hl":True, "hl.fl":"int_field,text_field", "f.int_field.hl.snippets":3, "f.int_field.hl.fragsize":5, "f.text_field.hl.snippets":3, "f.text_field.hl.fragsize":5}),
         ),
+    PostingsHighlightOptions:(
+        ({"fields":"int_field"},
+         {"hl":True, "hl.fl":"int_field"}),
+        ({"fields":["int_field", "text_field"]},
+         {"hl":True, "hl.fl":"int_field,text_field"}),
+        ({"snippets":3},
+         {"hl":True, "hl.snippets":3}),
+        ({"fields":["int_field", "text_field"], "snippets":1,
+          "tag.pre":"&lt;em&gt;", "tag.post": "&lt;em&gt;",
+          "tag.ellipsis": "...", "defaultSummary": True, "encoder": "simple",
+          "score.k1": 1.2, "score.b": 0.75, "score.pivot": 87,
+          "bs.type": "SENTENCE", "maxAnalyzedChars": 10000,},
+         {'f.text_field.hl.score.b': 0.75, 'f.int_field.hl.encoder': u'simple',
+          'f.int_field.hl.tag.pre': u'&lt;em&gt;', 'f.text_field.hl.tag.pre':
+          u'&lt;em&gt;', 'f.text_field.hl.defaultSummary': True,
+          'f.text_field.hl.tag.post': u'&lt;em&gt;', 'f.text_field.hl.bs.type':
+          u'SENTENCE', 'f.int_field.hl.tag.ellipsis': u'...',
+          'f.text_field.hl.score.k1': 1.2, 'f.text_field.hl.tag.ellipsis':
+          u'...', 'f.int_field.hl.score.pivot': 87.0,
+          'f.int_field.hl.tag.post': u'&lt;em&gt;', 'f.int_field.hl.bs.type':
+          u'SENTENCE', 'f.int_field.hl.score.b': 0.75,
+          'f.text_field.hl.maxAnalyzedChars': u'10000', 'hl': True,
+          'f.text_field.hl.encoder': u'simple', 'hl.fl':
+          'int_field,text_field', 'f.int_field.hl.snippets': 1,
+          'f.text_field.hl.snippets': 1, 'f.int_field.hl.maxAnalyzedChars':
+          u'10000', 'f.int_field.hl.score.k1': 1.2,
+          'f.int_field.hl.defaultSummary': True, 'f.text_field.hl.score.pivot':
+          87.0}),
+        ),
     MoreLikeThisOptions:(
         ({"fields":"int_field"},
          {"mlt":True, "mlt.fl":"int_field"}),
@@ -367,7 +399,8 @@ good_option_data = {
 def check_good_option_data(OptionClass, kwargs, output):
     optioner = OptionClass(schema)
     optioner.update(**kwargs)
-    assert optioner.options() == output
+    assert optioner.options() == output, "Unequal: %r, %r" % (
+        optioner.options(), output)
 
 def test_good_option_data():
     for OptionClass, option_data in good_option_data.items():
