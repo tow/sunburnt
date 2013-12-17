@@ -832,7 +832,13 @@ class HighlightOptions(Options):
             "highlightMultiTerm":bool,
             "regex.slop":float,
             "regex.pattern":unicode,
-            "regex.maxAnalyzedChars":int
+            "regex.maxAnalyzedChars":int,
+            "boundaryScanner": unicode,
+            "bs.maxScan": unicode,
+            "bs.chars": unicode,
+            "bs.type": unicode,
+            "bs.language": unicode,
+            "bs.country": unicode,
             }
     def __init__(self, schema, original=None):
         self.schema = schema

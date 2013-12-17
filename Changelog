@@ -1,6 +1,9 @@
 0.8 (unreleased)
 ----------------
 
+- Added boundaryScanner options to HighlightOptions.
+  [jod]
+
 - Fixed tests.
   [jod]
 
