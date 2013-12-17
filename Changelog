@@ -7,6 +7,9 @@
 - Use setuptools in setup.py.
   [jod]
 
+- Added https://wiki.apache.org/solr/PostingsHighlighter
+  [jod]
+
 0.7.1lu (2013-11-04)
 --------------------
 
