@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-version = '0.8.dev0'
+version = '0.8lu'
 
 setup(
     name='sunburnt',
