@@ -279,7 +279,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -377,7 +377,8 @@ class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
                       'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',)
+                      'sorter', 'facet_querier', 'field_limiter',
+                      'extra')
 
     result_constructor = dict
 
@@ -390,6 +391,7 @@ class BaseSearch(object):
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
         self.facet_querier = FacetQueryOptions(self.schema)
+        self.extra = ExtraOptions(self.schema)
 
     def clone(self):
         return self.__class__(interface=self.interface, original=self)
@@ -476,6 +478,11 @@ class BaseSearch(object):
         newself.field_limiter.update(fields, score, all_fields)
         return newself
 
+    def add_extra(self, **kwargs):
+        newself = self.clone()
+        newself.extra.update(kwargs)
+        return newself
+
     def options(self):
         options = {}
         for option_module in self.option_modules:
@@ -520,7 +527,7 @@ class BaseSearch(object):
 
     _count = None
     def count(self):
-        # get the total count for the current query without retrieving any results 
+        # get the total count for the current query without retrieving any results
         # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
@@ -1021,6 +1028,22 @@ class FacetQueryOptions(Options):
                     'facet':True}
         else:
             return {}
+
+
+class ExtraOptions(Options):
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.option_dict = {}
+        else:
+            self.option_dict = original.option_dict.copy()
+
+    def update(self, extra_options):
+        self.option_dict.update(extra_options)
+
+    def options(self):
+        return self.option_dict
+
 
 def params_from_dict(**kwargs):
     utf8_params = []
