@@ -553,7 +553,7 @@ class SolrSchema(object):
         # Note: for efficiency's sake this modifies the original dict
         # in place. This doesn't make much difference on 20 documents
         # but it does on 20,000
-        for name, value in doc.viewitems():
+        for name, value in doc.items():
             field_class = self.match_field(name)
             # If the field type is a string then we don't need to modify it
             if isinstance(field_class, SolrUnicodeField):
@@ -687,7 +687,7 @@ class SolrFacetCounts(object):
         except KeyError:
             return SolrFacetCounts()
         facet_fields = {}
-        for facet_field, facet_values in facet_counts_dict['facet_fields'].viewitems():
+        for facet_field, facet_values in facet_counts_dict['facet_fields'].items():
             facets = []
             # Change each facet list from [a, 1, b, 2, c, 3 ...] to
             # [(a, 1), (b, 2), (c, 3) ...]
@@ -754,7 +754,7 @@ class SolrResponse(object):
         self.facet_counts = SolrFacetCounts.from_response_json(doc)
         self.highlighting = doc.get("highlighting", {})
         self.more_like_these = dict((k, SolrResult.from_json(schema, v))
-                for (k, v) in doc.get('moreLikeThis', {}).viewitems())
+                for (k, v) in doc.get('moreLikeThis', {}).items())
         if len(self.more_like_these) == 1:
             self.more_like_this = self.more_like_these.values()[0]
         else:
