@@ -141,7 +141,7 @@ class SolrField(object):
             elif self.name.endswith("*"):
                 self.wildcard_at_start = False
             else:
-                raise SolrError("Dynamic fields must have * at start or end of name (field %s)" % 
+                raise SolrError("Dynamic fields must have * at start or end of name (field %s)" %
                         self.name)
 
     def match(self, name):
@@ -153,7 +153,7 @@ class SolrField(object):
 
     def normalize(self, value):
         """ Normalize the given value according to the field type.
-        
+
         This method does nothing by default, returning the given value
         as is. Child classes may override this method as required.
         """
@@ -192,7 +192,7 @@ class SolrUnicodeField(SolrField):
         try:
             return unicode(value)
         except UnicodeError:
-            raise SolrError("%s could not be coerced to unicode (field %s)" % 
+            raise SolrError("%s could not be coerced to unicode (field %s)" %
                     (value, self.name))
 
 
@@ -207,7 +207,7 @@ class SolrBooleanField(SolrField):
             elif value.lower() == "false":
                 return False
             else:
-                raise ValueError("sorry, I only understand simple boolean strings (field %s)" % 
+                raise ValueError("sorry, I only understand simple boolean strings (field %s)" %
                         self.name)
         return bool(value)
 
@@ -217,7 +217,7 @@ class SolrBinaryField(SolrField):
         try:
             return str(value)
         except (TypeError, ValueError):
-            raise SolrError("Could not convert data to binary string (field %s)" % 
+            raise SolrError("Could not convert data to binary string (field %s)" %
                     self.name)
 
     def to_solr(self, value):
@@ -232,7 +232,7 @@ class SolrNumericalField(SolrField):
         try:
             v = self.base_type(value)
         except (OverflowError, TypeError, ValueError):
-            raise SolrError("%s is invalid value for %s (field %s)" % 
+            raise SolrError("%s is invalid value for %s (field %s)" %
                     (value, self.__class__, self.name))
         if v < self.min or v > self.max:
             raise SolrError("%s out of range for a %s (field %s)" %
@@ -424,10 +424,14 @@ class SolrSchema(object):
         return q
 
     def schema_parse(self, f):
-        try:
-            schemadoc = lxml.etree.parse(f)
-        except lxml.etree.XMLSyntaxError, e:
-            raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
+        # hack as we might pass in an already parsed doc
+        if hasattr(f, 'getroot'):
+            schemadoc = f
+        else:
+            try:
+                schemadoc = lxml.etree.parse(f)
+            except lxml.etree.XMLSyntaxError, e:
+                raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
         field_type_classes = {}
         for field_type_node in schemadoc.xpath("/schema/types/fieldType|/schema/types/fieldtype"):
