@@ -121,7 +121,11 @@ class MockConnection(object):
                                   headers=headers or {})
 
         if method == 'GET' and u.path.endswith('/admin/file/'):
-            return self.MockStatus(200), self.file_dict[params.get("file")[0]]
+            filename = params.get("file")[0]
+            if filename in self.file_dict:
+                return self.MockStatus(200), self.file_dict[filename]
+            else:
+                return self.MockStatus(404), None
 
         rc = self._handle_request(u, params, method, body, headers)
         if rc is not None:
@@ -297,6 +301,9 @@ schema_string_with_xinclude = \
   <xi:include href="schema_extra_fields.xml" xmlns:xi="http://www.w3.org/2001/XInclude">
     <xi:fallback/>
   </xi:include>
+  <xi:include href="schema_not_available.xml" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <xi:fallback/>
+  </xi:include>
   <defaultSearchField>text_field</defaultSearchField>
   <uniqueKey>int_field</uniqueKey>
 </schema>"""
@@ -356,7 +363,7 @@ def test_schema_file_cache_gets_filled():
 
 def test_all_xincludes_found():
     si = SolrInterface("http://test.example.com/", http_connection=XincludeMockConnection())
-    assert_equal(2, len(si.get_xinclude_list_for_file('schema.xml')))
+    assert_equal(3, len(si.get_xinclude_list_for_file('schema.xml')))
     assert_equal(0, len(si.get_xinclude_list_for_file('schema_extra_fields.xml')))
 
 
