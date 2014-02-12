@@ -12,7 +12,7 @@ from lxml.etree import tostring
 
 from .sunburnt import SolrInterface
 
-from nose.tools import assert_equal
+from nose.tools import assert_equal, assert_in
 
 debug = False
 
@@ -97,6 +97,9 @@ class MockResponse(object):
 
 
 class MockConnection(object):
+
+    file_dict = {'schema.xml': schema_string}
+
     class MockStatus(object):
         def __init__(self, status):
             self.status = status
@@ -117,8 +120,8 @@ class MockConnection(object):
                                   body=body or '',
                                   headers=headers or {})
 
-        if method == 'GET' and u.path.endswith('/admin/file/') and params.get("file") == ["schema.xml"]:
-            return self.MockStatus(200), schema_string
+        if method == 'GET' and u.path.endswith('/admin/file/'):
+            return self.MockStatus(200), self.file_dict[params.get("file")[0]]
 
         rc = self._handle_request(u, params, method, body, headers)
         if rc is not None:
@@ -174,7 +177,7 @@ pagination_slice_tests = (
      slice(5, 6, None),
      slice(0, 5, 2),
      slice(3, 6, 2),
-     slice(5, None, -1), 
+     slice(5, None, -1),
      slice(None, 0, -1),
     # out of range but ok
      slice(0, 12, None),
@@ -284,3 +287,83 @@ def check_mlt_query(i, o, E):
 def test_mlt_queries():
     for i, o, E in mlt_query_tests:
         yield check_mlt_query, i, o, E
+
+schema_string_with_xinclude = \
+"""<schema name="timetric" version="1.1">
+  <xi:include href="schema_extra_types.xml" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <xi:fallback/>
+  </xi:include>
+  <!-- Following is a dynamic way to include other fields, added by other contrib modules -->
+  <xi:include href="schema_extra_fields.xml" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <xi:fallback/>
+  </xi:include>
+  <defaultSearchField>text_field</defaultSearchField>
+  <uniqueKey>int_field</uniqueKey>
+</schema>"""
+
+schema_fieldtypes_to_be_included = \
+"""<types>
+    <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="text" class="solr.TextField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="int" class="solr.IntField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="long" class="solr.LongField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="slong" class="solr.SortableLongField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="float" class="solr.FloatField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="sfloat" class="solr.SortableFloatField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="double" class="solr.DoubleField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="sdouble" class="solr.SortableDoubleField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="date" class="solr.DateField" sortMissingLast="true" omitNorms="true"/>
+  </types>"""
+
+schema_fields_to_be_included = \
+"""<fields>
+    <field name="string_field" required="true" type="string" multiValued="true"/>
+    <field name="text_field" required="true" type="text"/>
+    <field name="boolean_field" required="false" type="boolean"/>
+    <field name="int_field" required="true" type="int"/>
+    <field name="sint_field" type="sint"/>
+    <field name="long_field" type="long"/>
+    <field name="slong_field" type="slong"/>
+    <field name="float_field" type="float"/>
+    <field name="sfloat_field" type="sfloat"/>
+    <field name="double_field" type="double"/>
+    <field name="sdouble_field" type="sdouble"/>
+    <field name="date_field" type="date"/>
+  </fields>"""
+
+
+class XincludeMockConnection(MockConnection):
+    file_dict = {
+        'schema.xml': schema_string_with_xinclude,
+        'schema_extra_types.xml': schema_fieldtypes_to_be_included,
+        'schema_extra_fields.xml': schema_fields_to_be_included,
+    }
+
+
+def test_schema_with_xinclude_gets_assembled():
+    si = SolrInterface("http://test.example.com/", http_connection=XincludeMockConnection())
+    assert_equal(12, len(si.schema.fields))
+
+
+def test_schema_file_cache_gets_filled():
+    si = SolrInterface("http://test.example.com/", http_connection=XincludeMockConnection())
+    assert_equal(schema_string_with_xinclude, si.file_cache['schema.xml'])
+    assert_equal(schema_fieldtypes_to_be_included, si.file_cache['schema_extra_types.xml'])
+    assert_equal(schema_fields_to_be_included, si.file_cache['schema_extra_fields.xml'])
+
+
+def test_all_xincludes_found():
+    si = SolrInterface("http://test.example.com/", http_connection=XincludeMockConnection())
+    assert_equal(2, len(si.get_xinclude_list_for_file('schema.xml')))
+    assert_equal(0, len(si.get_xinclude_list_for_file('schema_extra_fields.xml')))
+
+
+def test_get_file_and_included_files_list_includes_all_required_files():
+    si = SolrInterface("http://test.example.com/", http_connection=XincludeMockConnection())
+    file_list = si.get_file_and_included_files('schema.xml')
+    assert_equal(3, len(file_list))
+    assert_in('schema.xml', file_list)
+    assert_in('schema_extra_fields.xml', file_list)
+    assert_in('schema_extra_types.xml', file_list)
