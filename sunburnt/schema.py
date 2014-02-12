@@ -141,7 +141,7 @@ class SolrField(object):
             elif self.name.endswith("*"):
                 self.wildcard_at_start = False
             else:
-                raise SolrError("Dynamic fields must have * at start or end of name (field %s)" % 
+                raise SolrError("Dynamic fields must have * at start or end of name (field %s)" %
                         self.name)
 
     def match(self, name):
@@ -153,7 +153,7 @@ class SolrField(object):
 
     def normalize(self, value):
         """ Normalize the given value according to the field type.
-        
+
         This method does nothing by default, returning the given value
         as is. Child classes may override this method as required.
         """
@@ -192,7 +192,7 @@ class SolrUnicodeField(SolrField):
         try:
             return unicode(value)
         except UnicodeError:
-            raise SolrError("%s could not be coerced to unicode (field %s)" % 
+            raise SolrError("%s could not be coerced to unicode (field %s)" %
                     (value, self.name))
 
 
@@ -207,7 +207,7 @@ class SolrBooleanField(SolrField):
             elif value.lower() == "false":
                 return False
             else:
-                raise ValueError("sorry, I only understand simple boolean strings (field %s)" % 
+                raise ValueError("sorry, I only understand simple boolean strings (field %s)" %
                         self.name)
         return bool(value)
 
@@ -217,7 +217,7 @@ class SolrBinaryField(SolrField):
         try:
             return str(value)
         except (TypeError, ValueError):
-            raise SolrError("Could not convert data to binary string (field %s)" % 
+            raise SolrError("Could not convert data to binary string (field %s)" %
                     self.name)
 
     def to_solr(self, value):
@@ -232,7 +232,7 @@ class SolrNumericalField(SolrField):
         try:
             v = self.base_type(value)
         except (OverflowError, TypeError, ValueError):
-            raise SolrError("%s is invalid value for %s (field %s)" % 
+            raise SolrError("%s is invalid value for %s (field %s)" %
                     (value, self.__class__, self.name))
         if v < self.min or v > self.max:
             raise SolrError("%s out of range for a %s (field %s)" %
@@ -477,7 +477,7 @@ class SolrSchema(object):
     attrib_translator = {"true": True, "1": True, "false": False, "0": False}
     def translate_attributes(self, attribs):
         return dict((k, self.attrib_translator.get(v, v))
-            for k, v in attribs.items())
+            for k, v in attribs.iteritems())
 
     def missing_fields(self, field_names):
         return [name for name in set(self.fields.keys()) - set(field_names)
@@ -494,7 +494,7 @@ class SolrSchema(object):
             if not field:
                 undefined_field_names.append(field_name)
             else:
-                for k, v in required_atts.items():
+                for k, v in required_atts.iteritems():
                     if getattr(field, k) != v:
                         raise SolrError("Field '%s' does not have %s=%s" % (field_name, k, v))
         if undefined_field_names:
@@ -553,7 +553,7 @@ class SolrSchema(object):
         # Note: for efficiency's sake this modifies the original dict
         # in place. This doesn't make much difference on 20 documents
         # but it does on 20,000
-        for name, value in doc.items():
+        for name, value in doc.iteritems():
             field_class = self.match_field(name)
             # If the field type is a string then we don't need to modify it
             if isinstance(field_class, SolrUnicodeField):
@@ -597,7 +597,7 @@ class SolrUpdate(object):
         else:
             return self.DOC(*reduce(operator.add,
                                     [self.fields(name, values)
-                                     for name, values in doc.items()]))
+                                     for name, values in doc.iteritems()]))
 
     def add(self, docs):
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
@@ -687,7 +687,7 @@ class SolrFacetCounts(object):
         except KeyError:
             return SolrFacetCounts()
         facet_fields = {}
-        for facet_field, facet_values in facet_counts_dict['facet_fields'].items():
+        for facet_field, facet_values in facet_counts_dict['facet_fields'].iteritems():
             facets = []
             # Change each facet list from [a, 1, b, 2, c, 3 ...] to
             # [(a, 1), (b, 2), (c, 3) ...]
@@ -754,7 +754,7 @@ class SolrResponse(object):
         self.facet_counts = SolrFacetCounts.from_response_json(doc)
         self.highlighting = doc.get("highlighting", {})
         self.more_like_these = dict((k, SolrResult.from_json(schema, v))
-                for (k, v) in doc.get('moreLikeThis', {}).items())
+                for (k, v) in doc.get('moreLikeThis', {}).iteritems())
         if len(self.more_like_these) == 1:
             self.more_like_this = self.more_like_these.values()[0]
         else:
