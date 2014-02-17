@@ -13,7 +13,7 @@ distutils.core.setup(
     author='Toby White',
     author_email='toby@timetric.com',
     packages=['sunburnt'],
-    requires=['httplib2', 'lxml', 'pytz'],
+    requires=['lxml', 'pytz'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',

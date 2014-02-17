@@ -22,7 +22,7 @@ Dependencies
 
 - Requirements:
 
-  * `httplib2 <http://code.google.com/p/httplib2/>`_
+  * `httplib2 <http://code.google.com/p/httplib2/>`_ **or** `requests <http://requests.readthedocs.org/>`_
   * `lxml <http://lxml.de>`_
 
 - Strongly recommended:
