@@ -122,7 +122,7 @@ class SolrConnection(object):
         response = self.request(method, url, **kwargs)
         if response.status_code != 200:
             raise SolrError(response)
-        return response.bytes
+        return response.content
 
     def mlt(self, params, content=None):
         """Perform a MoreLikeThis query using the content specified
@@ -149,7 +149,7 @@ class SolrConnection(object):
         response = self.request(method, url, **kwargs)
         if response.status_code != 200:
             raise SolrError(response)
-        return response.bytes
+        return response.content
 
 
 class SolrInterface(object):
@@ -172,8 +172,8 @@ class SolrInterface(object):
             response = self.conn.request('GET',
                 urlparse.urljoin(self.conn.url, self.remote_schema_file))
             if response.status_code != 200:
-                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (response.status_code, response.bytes))
-            schemadoc = StringIO.StringIO(response.bytes)
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (response.status_code, response.content))
+            schemadoc = StringIO.StringIO(response.content)
         self.schema = SolrSchema(schemadoc, format=self.format)
 
     def add(self, docs, chunk=100, **kwargs):

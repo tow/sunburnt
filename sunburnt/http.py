@@ -46,5 +46,5 @@ class ResponseWrapper(object):
     """
     def __init__(self, response, content):
         self.status_code = response.status
-        self.bytes = content
+        self.content = content
 
