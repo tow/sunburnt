@@ -383,7 +383,7 @@ class BaseSearch(object):
 
     def _init_common_modules(self):
         self.query_obj = LuceneQuery(self.schema, u'q')
-        self.filter_obj = LuceneQuery(self.schema, u'fq')
+        self.filter_obj = FilterOptions(self.schema)
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
@@ -750,6 +750,33 @@ class Options(object):
                 for field_opt, v in field_opts.items():
                     opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
         return opts
+
+
+class FilterOptions(object):
+    """
+    This class creates a list of filters, so that we end up with multiple
+    fq arguments to Solr.
+    """
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.filters = []
+        else:
+            self.filters = [copy.copy(f) for f in original.filters]
+
+    def clone(self):
+        return self.__class__(self.schema, self)
+
+    def add(self, *args, **kwargs):
+        fq_filter = LuceneQuery(self.schema)
+        fq_filter.add(*args, **kwargs)
+        self.filters.append(fq_filter)
+
+    def options(self):
+        if self.filters:
+            return {'fq': [f.options()[None] for f in self.filters]}
+        else:
+            return {}
 
 
 class FacetOptions(Options):
