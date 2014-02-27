@@ -26,6 +26,18 @@ from nose.tools import assert_equal
 
 debug = False
 
+def check_equal_with_debug(val1, val2):
+    try:
+        assert val1 == val2, "Unequal: %r, %r" % (val1, val2)
+    except AssertionError:
+        if debug:
+            print val1
+            print val2
+            import pdb;pdb.set_trace()
+            raise
+        else:
+            raise
+
 schema_string = \
 """<schema name="timetric" version="1.1">
   <types>
@@ -233,16 +245,7 @@ if HAS_MX_DATETIME:
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
     p = getattr(solr_search, method)(*args, **kwargs).params()
-    try:
-        assert p == output, "Unequal: %r, %r" % (p, output)
-    except AssertionError:
-        if debug:
-            print p
-            print output
-            import pdb;pdb.set_trace()
-            raise
-        else:
-            raise
+    check_equal_with_debug(p, output)
 
 def test_query_data():
     for method, data in good_query_data.items():
@@ -491,26 +494,10 @@ complex_boolean_queries = (
 
 def check_complex_boolean_query(solr_search, query, output):
     p = query(solr_search).params()
-    try:
-        assert p == output
-    except AssertionError:
-        if debug:
-            print p
-            print output
-            import pdb;pdb.set_trace()
-            raise
-        else:
-            raise
+    check_equal_with_debug(p, output)
     # And check no mutation of the base object
     q = query(solr_search).params()
-    try:
-        assert p == q
-    except AssertionError:
-        if debug:
-            print p
-            print q
-            import pdb;pdb.set_trace()
-            raise
+    check_equal_with_debug(p, q)
 
 def test_complex_boolean_queries():
     solr_search = SolrSearch(interface)
@@ -539,6 +526,7 @@ def check_url_encode_data(kwargs, output):
 def test_url_encode_data():
     for kwargs, output in param_encode_data:
         yield check_url_encode_data, kwargs, output
+
 
 mlt_query_options_data = (
     ('text_field', {}, {},
