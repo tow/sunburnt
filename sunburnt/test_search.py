@@ -252,6 +252,38 @@ def test_query_data():
         for args, kwargs, output in data:
             yield check_query_data, method, args, kwargs, output
 
+
+multiple_call_data = (
+    ([([], {"int_field":3}), ([], {"string_field":"string"})],
+     [("q", u"int_field:3 AND string_field:string")],
+     [("fq", u"int_field:3"), ("fq", u"string_field:string"), ("q", "*:*")]),
+
+    ([(["hello"], {}), (["world"], {})],
+     [("q", u"hello AND world")],
+     [("fq", u"hello"), ("fq", u"world"), ("q", "*:*")]),
+
+    ([(["hello"], {"int_field":3}), (["world"], {"string_field":"string"})],
+     [("q", u"hello AND int_field:3 AND string_field:string AND world")],
+     [("fq", "hello AND int_field:3"), ("fq", "string_field:string AND world"), ("q", "*:*")]),
+)
+
+def check_multiple_call_data(arg_kw_list, query_output, filter_output):
+    solr_search = SolrSearch(interface)
+    q = solr_search.query()
+    f = solr_search.query()
+    for args, kwargs in arg_kw_list:
+        q = q.query(*args, **kwargs)
+        f = f.filter(*args, **kwargs)
+    qp = q.params()
+    fp = f.params()
+    check_equal_with_debug(qp, query_output)
+    check_equal_with_debug(fp, filter_output)
+
+def test_multiple_call_data():
+    for arg_kw_list, query_output, filter_output in multiple_call_data:
+        yield check_multiple_call_data, arg_kw_list, query_output, filter_output
+
+
 bad_query_data = (
     {"int_field":"a"},
     {"int_field":2**31},
