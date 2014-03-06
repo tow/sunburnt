@@ -2,10 +2,10 @@ from __future__ import absolute_import
 
 import cStringIO as StringIO
 from itertools import islice
-import socket, time, urllib, urlparse
+import time, urllib, urlparse
 import warnings
 
-
+from .http import ConnectionError, wrap_http_connection
 from .schema import SolrSchema, SolrError
 from .search import LuceneQuery, MltSolrSearch, SolrSearch, params_from_dict
 
@@ -16,11 +16,7 @@ class SolrConnection(object):
     readable = True
     writeable = True
     def __init__(self, url, http_connection, mode, retry_timeout, max_length_get_url, format):
-        if http_connection:
-            self.http_connection = http_connection
-        else:
-            import httplib2
-            self.http_connection = httplib2.Http()
+        self.http_connection = wrap_http_connection(http_connection)
         if mode == 'r':
             self.writeable = False
         elif mode == 'w':
@@ -36,7 +32,7 @@ class SolrConnection(object):
     def request(self, *args, **kwargs):
         try:
             return self.http_connection.request(*args, **kwargs)
-        except socket.error:
+        except ConnectionError:
             if self.retry_timeout < 0:
                 raise
             time.sleep(self.retry_timeout)
@@ -66,10 +62,9 @@ class SolrConnection(object):
         else:
             headers = {}
         url = self.url_for_update(**kwargs)
-        r, c = self.request(url, method="POST", body=body,
-                            headers=headers)
-        if r.status != 200:
-            raise SolrError(r, c)
+        response = self.request('POST', url, data=body, headers=headers)
+        if response.status_code != 200:
+            raise SolrError(response)
 
     def url_for_update(self, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
         extra_params = {}
@@ -117,17 +112,17 @@ class SolrConnection(object):
             warnings.warn("Long query URL encountered - POSTing instead of "
                 "GETting. This query will not be cached at the HTTP layer")
             url = self.select_url
-            kwargs = dict(
-                method="POST",
-                body=qs,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+            method = 'POST'
+            kwargs = {
+                'data': qs,
+                'headers': {"Content-Type": "application/x-www-form-urlencoded"}}
         else:
-            kwargs = dict(method="GET")
-        r, c = self.request(url, **kwargs)
-        if r.status != 200:
-            raise SolrError(r, c)
-        return c
+            method = 'GET'
+            kwargs = {}
+        response = self.request(method, url, **kwargs)
+        if response.status_code != 200:
+            raise SolrError(response)
+        return response.content
 
     def mlt(self, params, content=None):
         """Perform a MoreLikeThis query using the content specified
@@ -137,19 +132,24 @@ class SolrConnection(object):
             raise TypeError("This Solr instance is only for writing")
         qs = urllib.urlencode(params)
         base_url = "%s?%s" % (self.mlt_url, qs)
+        method = 'GET'
+        kwargs = {}
         if content is None:
-            kwargs = {'uri': base_url, 'method': "GET"}
+            url = base_url
         else:
             get_url = "%s&stream.body=%s" % (base_url, urllib.quote_plus(content))
             if len(get_url) <= self.max_length_get_url:
-                kwargs = {'uri': get_url, 'method': "GET"}
+                url = get_url
             else:
-                kwargs = {'uri': base_url, 'method': "POST",
-                    'body': content, 'headers': {"Content-Type": "text/plain; charset=utf-8"}}
-        r, c = self.request(**kwargs)
-        if r.status != 200:
-            raise SolrError(r, c)
-        return c
+                url = base_url
+                method = 'POST'
+                kwargs = {
+                    'data': content,
+                    'headers': {"Content-Type": "text/plain; charset=utf-8"}}
+        response = self.request(method, url, **kwargs)
+        if response.status_code != 200:
+            raise SolrError(response)
+        return response.content
 
 
 class SolrInterface(object):
@@ -169,11 +169,11 @@ class SolrInterface(object):
         if self.schemadoc:
             schemadoc = self.schemadoc
         else:
-            r, c = self.conn.request(
+            response = self.conn.request('GET',
                 urlparse.urljoin(self.conn.url, self.remote_schema_file))
-            if r.status != 200:
-                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
-            schemadoc = StringIO.StringIO(c)
+            if response.status_code != 200:
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (response.status_code, response.content))
+            schemadoc = StringIO.StringIO(response.content)
         self.schema = SolrSchema(schemadoc, format=self.format)
 
     def add(self, docs, chunk=100, **kwargs):
