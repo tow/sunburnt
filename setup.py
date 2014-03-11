@@ -1,19 +1,17 @@
 #!/usr/bin/env python
 
-import distutils.core, os, re
+from setuptools import setup
 
-version_number_re = "\s*__version__\s*=\s*((\"([^\"]|\\\\\")*\"|'([^']|\\\\')*'))"
-version_file = os.path.join(os.path.dirname(__file__), 'sunburnt', '__init__.py')
-version_number = re.search(version_number_re, open(version_file).read()).groups()[0][1:-1]
+version = '0.8.1lu.dev0'
 
-distutils.core.setup(
+setup(
     name='sunburnt',
-    version=version_number,
+    version=version,
     description='Python interface to Solr',
     author='Toby White',
     author_email='toby@timetric.com',
     packages=['sunburnt'],
-    requires=['lxml', 'pytz'],
+    install_requires=['httplib2', 'lxml', 'pytz', 'setuptools'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',

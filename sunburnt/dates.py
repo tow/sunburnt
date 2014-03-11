@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import datetime, math, re, warnings
+import pytz
 
 try:
     import mx.DateTime
@@ -55,6 +56,7 @@ def datetime_from_w3_datestring(s):
     del d['tzd_sign']
     del d['tzd_hour']
     del d['tzd_minute']
+    d['tzinfo'] = pytz.utc
     try:
         dt = datetime_factory(**d) + tz_delta
     except DateTimeRangeError:

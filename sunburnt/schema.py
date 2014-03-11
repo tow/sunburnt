@@ -595,9 +595,14 @@ class SolrUpdate(object):
         if not doc:
             return self.DOC()
         else:
-            return self.DOC(*reduce(operator.add,
-                                    [self.fields(name, values)
-                                     for name, values in doc.items()]))
+            # XXX remove all None fields this is needed for adding date fields 
+            fields = []
+            for name, values in doc.items():
+                if values is None:
+                    doc.pop(name)
+                    continue
+                fields.append(self.fields(name, values))
+            return self.DOC(*reduce(operator.add, fields))
 
     def add(self, docs):
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
@@ -669,7 +674,7 @@ class SolrDelete(object):
 
 
 class SolrFacetCounts(object):
-    members= ["facet_dates", "facet_fields", "facet_queries"]
+    members= ["facet_dates", "facet_fields", "facet_queries", "facet_pivot"]
     def __init__(self, **kwargs):
         for member in self.members:
             setattr(self, member, kwargs.get(member, ()))

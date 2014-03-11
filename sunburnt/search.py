@@ -376,8 +376,9 @@ class LuceneQuery(object):
 class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',)
+                      'more_like_this', 'highlighter', 'postings_highlighter',
+                      'faceter', 'sorter', 'facet_querier', 'field_limiter',
+                      'pivoter')
 
     result_constructor = dict
 
@@ -386,7 +387,9 @@ class BaseSearch(object):
         self.filter_obj = LuceneQuery(self.schema, u'fq')
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
+        self.postings_highlighter = PostingsHighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
+        self.pivoter = FacetPivotOptions(self.schema)
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
         self.facet_querier = FacetQueryOptions(self.schema)
@@ -446,6 +449,11 @@ class BaseSearch(object):
         newself.faceter.update(field, **kwargs)
         return newself
 
+    def pivot_by(self, fields, **kwargs):
+        newself = self.clone()
+        newself.pivoter.update(fields, **kwargs)
+        return newself
+
     def facet_query(self, *args, **kwargs):
         newself = self.clone()
         newself.facet_querier.update(self.Q(*args, **kwargs))
@@ -454,6 +462,11 @@ class BaseSearch(object):
     def highlight(self, fields=None, **kwargs):
         newself = self.clone()
         newself.highlighter.update(fields, **kwargs)
+        return newself
+
+    def postings_highlight(self, fields=None, **kwargs):
+        newself = self.clone()
+        newself.postings_highlighter.update(fields, **kwargs)
         return newself
 
     def mlt(self, fields, query_fields=None, **kwargs):
@@ -776,6 +789,31 @@ class FacetOptions(Options):
             opts["facet.field"] = sorted(fields)
 
 
+class FacetPivotOptions(Options):
+    option_name = "facet.pivot"
+    opts = {
+        "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
+    }
+
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def field_names_in_opts(self, opts, fields):
+        opts["facet"] = True
+        if fields:
+            field_opts = {}
+            for field in fields:
+                field_opts = dict(field_opts.items() + self.fields[field].items())
+                del(self.fields[field])
+            self.fields[None] = field_opts
+            opts["facet.pivot"] = ','.join(sorted(fields))
+
+
+
 class HighlightOptions(Options):
     option_name = "hl"
     opts = {"snippets":int,
@@ -794,8 +832,46 @@ class HighlightOptions(Options):
             "highlightMultiTerm":bool,
             "regex.slop":float,
             "regex.pattern":unicode,
-            "regex.maxAnalyzedChars":int
+            "regex.maxAnalyzedChars":int,
+            "boundaryScanner": unicode,
+            "bs.maxScan": unicode,
+            "bs.chars": unicode,
+            "bs.type": unicode,
+            "bs.language": unicode,
+            "bs.country": unicode,
             }
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["hl.fl"] = ",".join(sorted(fields))
+
+
+class PostingsHighlightOptions(Options):
+
+    option_name = "hl"
+    opts = {"snippets": int,
+            "tag.pre": unicode,
+            "tag.post": unicode,
+            "tag.ellipsis": unicode,
+            "defaultSummary": bool,
+            "encoder": unicode,
+            "score.k1": float,
+            "score.b": float,
+            "score.pivot": float,
+            "bs.type": unicode,
+            "bs.language": unicode,
+            "bs.country": unicode,
+            "bs.variant": unicode,
+            "maxAnalyzedChars": unicode,
+            "multiValuedSeperatorChar": unicode
+            }
+
     def __init__(self, schema, original=None):
         self.schema = schema
         if original is None:
