@@ -58,8 +58,14 @@ def check_solr_date_from_date(s, date, canonical_date):
     assert unicode(solr_date(date)) == s, "Unequal representations of %r: %r and %r" % (date, unicode(solr_date(date)), s)
     check_solr_date_from_string(s, canonical_date)
 
-def check_solr_date_from_string(s, date):
-    assert solr_date(s)._dt_obj == date
+def check_solr_date_from_string(s, expected_date):
+    actual_date = solr_date(s)._dt_obj
+
+    if actual_date.tzinfo is None:
+        expected_date = expected_date.replace(tzinfo=None)
+
+    print(actual_date, expected_date)
+    assert actual_date == expected_date
 
 def test_solr_date_from_pydatetimes():
     for k, v in samples_from_pydatetimes.items():

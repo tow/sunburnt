@@ -57,14 +57,14 @@ def datetime_from_w3_datestring(s):
     del d['tzd_minute']
     try:
         dt = datetime_factory(**d) + tz_delta
-    except DateTimeRangeError:
+    except DateTimeRangeError as e:
         raise ValueError(e.args[0])
     return dt
 
 
 class DateTimeRangeError(ValueError):
     pass
-    
+
 
 if mx:
     def datetime_factory(**kwargs):
@@ -76,12 +76,14 @@ else:
     def datetime_factory(**kwargs):
         second = kwargs.get('second')
         if second is not None:
-            f, i = math.modf(second)
-            kwargs['second'] = int(i)
-            kwargs['microsecond'] = int(f * 1000000)
+            microseconds = int(second * 1000000)
+            seconds = microseconds / 1000000
+            microseconds -= seconds * 1000000
+            kwargs['second'] = seconds
+            kwargs['microsecond'] = microseconds
         try:
             return datetime.datetime(**kwargs)
-        except ValueError, e:
+        except ValueError as e:
             raise DateTimeRangeError(e.args[0])
 
 if mx:
