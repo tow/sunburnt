@@ -101,7 +101,6 @@ class SolrConnection(object):
     def select(self, params):
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
-        logging.debug(url)
         if len(url) > self.max_length_get_url:
             warnings.warn("Long query URL encountered - POSTing instead of "
                 "GETting. This query will not be cached at the HTTP layer")

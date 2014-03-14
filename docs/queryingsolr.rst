@@ -225,7 +225,7 @@ Finally, ``response.result`` itself has the following attributes
 
 * ``response.result.numFound`` : total number of docs in the index which fulfilled the query.
 * ``response.result.docs`` : the actual results themselves (more easily extracted as ``list(response)``).
-* ``response.result.start`` : if the number of docs is less than numFound, then this is the pagination offset. 
+* ``response.result.start`` : if the number of docs is less than numFound, then this is the pagination offset.
 
 
 Pagination
@@ -310,7 +310,7 @@ selection of fields.
  {'score': 1.1931472000000001, 'id': u'0553573403'}
  {'score': 1.1931472000000001, 'id': u'0812550706'}
 
-  
+
 
 More complex queries
 --------------------
@@ -684,7 +684,7 @@ will also return zero results, just the facet output.
 The ``facet_counts`` objects contains several sets of results - here, we're only
 interested in the ``facet_fields`` object. This contains a dictionary of results,
 keyed by each field where faceting was requested. (In this case, we only requested
-faceting on one field). The dictionary value is a list of two-tuples, mapping the 
+faceting on one field). The dictionary value is a list of two-tuples, mapping the
 value of the faceted field (in this case, ``sequence_i`` takes the values '1', '2', or '3')
 to the numbers of results for each value.
 
@@ -694,7 +694,7 @@ title, 2 of them have ``sequence_i=1``, 0 of them have ``sequence_i=2``, and 0 o
 
 You can facet on more than one field at a time:
 
-:: 
+::
 
  si.query(...).facet_by(fields=["field1", "field2, ...])
 
@@ -743,7 +743,7 @@ In this first example, we ask Solr to create facet ranges on the price field, wh
  >>> from sunburnt import SolrInterface
  >>> si = SolrInterface('http://some.url:8983/solr/')
  >>> si.query('Query')
- >>> si.facet_ranger.update({'price': {'range.start': 1, 'range.end': 99999, 'range.gap': 5000} })
+ >>> si.facet_by_range({'price': {'range.start': 1, 'range.end': 99999, 'range.gap': 5000} })
 
 When using date ranges, you should pass the ``range.start`` and ``range.end`` as you
 can also use's Solr's special syntax for ``range.gap``, such as ``+1YEAR`` to make each
@@ -763,7 +763,7 @@ and ``limit`` parameters.
  >>> from sunburnt import SolrInterface
  >>> si = SolrInterface('http://some.url:8983/solr/')
  >>> query = si.query('Query')
- >>> query.facet_ranger.update('last_modified': {'range.start': datetime(2000,1,1), 'range.end': datetime.utcnow(): 'range.gap': "+1YEAR"} })
+ >>> query.facet_by_range({'last_modified': {'range.start': datetime(2000,1,1), 'range.end': datetime.utcnow(): 'range.gap': "+1YEAR"} })
  >>> resp = query[:10]
  >>> resp.facet_counts.facet_ranges
  [('modified_ts',
@@ -837,7 +837,7 @@ convenient for displaying highlighted text snippets in a template;
 e.g., displaying highlights in a Django template might look like this:
 
 ::
-    
+
   {% for snippet in book.solr_highlights.name %}
      <p>... {{ snippet|safe }} ...</p>
   {% endfor %}
@@ -856,7 +856,7 @@ and all of these are exposed through sunburnt. The full list of supported option
  fields, snippets, fragsize, mergeContinuous, requireFieldMatch, maxAnalyzedChars,
  alternateField, maxAlternateFieldLength, formatter, simple.pre.simple.post,
  fragmenter, usePhrasehighlighter, hilightMultiTerm, regex.slop, regex.pattern,
- regex.maxAnalyzedChars            
+ regex.maxAnalyzedChars
 
 See the note above in `Faceting`_ about using keyword arguments with periods.
 
@@ -907,7 +907,7 @@ standard behaviour.
 The ``SolrResponse`` object has a ``more_like_these`` attribute. This is
 a dictionary of ``SolrResult`` objects, one dictionary entry for each
 result of the main query. Here, the query only produced one result (because
-we searched on the ``uniqueKey``. Inspecting the ``SolrResult`` object, we 
+we searched on the ``uniqueKey``. Inspecting the ``SolrResult`` object, we
 find that it contains only one document.
 
 We can read the above result as saying that under the ``mlt()`` parameters

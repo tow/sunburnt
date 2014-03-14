@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import collections, copy, operator, re
 
-from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
+from .schema import solr_date, SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
 from datetime import datetime, timedelta
 
 class LuceneQuery(object):
@@ -265,7 +265,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -433,6 +433,11 @@ class BaseSearch(object):
         newself.faceter.update(field, **kwargs)
         return newself
 
+    def facet_by_range(self, field, **kwargs):
+        newself = self.clone()
+        newself.facet_ranger.update(field, **kwargs)
+        return newself
+
     def facet_query(self, *args, **kwargs):
         newself = self.clone()
         newself.facet_querier.update(self.Q(*args, **kwargs))
@@ -507,7 +512,7 @@ class BaseSearch(object):
 
     _count = None
     def count(self):
-        # get the total count for the current query without retrieving any results 
+        # get the total count for the current query without retrieving any results
         # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
@@ -763,16 +768,19 @@ class FacetOptions(Options):
             opts["facet.field"] = sorted(fields)
 
 class FacetRangeOptions(Options):
-    option_name = "facet"
-    opts = {"range.start": lambda self, v: self.__validate_int_or_datetime(v),
-            "range.gap": lambda self, v: self.__validate_int_or_string(v),
-            "range.end": lambda self, v: self.__validate_int_or_datetime(v),
-            "sort":[True, False, "count", "index"],
-            "limit":int,
-            "mincount":lambda self, x: int(x) >= 0 and int(x) or self.invalid_value(),
-            "missing":bool,
+    option_name = "facet.range"
+    opts = {"end": lambda self, v: self.__validate_range_endpoint(v),
+            "gap": lambda self, v: self.__validate_range_gap(v),
+            "start": lambda self, v: self.__validate_range_endpoint(v),
             }
     facets = []
+
+    # Scroll to makeUnitsMap() for list of valid units:
+    # http://svn.apache.org/repos/asf/lucene/dev/trunk/solr/core/src/java/org/apache/solr/util/DateMathParser.java
+    lucene_units = ["YEAR", "YEARS", "MONTH", "MONTHS", "DAY", "DAYS", "DATE",
+                    "HOUR", "HOURS", "MINUTE", "MINUTES", "SECOND", "SECONDS",
+                    "MILLI", "MILLIS", "MILLISECOND", "MILLISECONDS",]
+    lucene_unit_pattern = re.compile(r'^([-+])(\d+)(\w+)$')
 
     def __init__(self, schema, original=None):
         self.schema = schema
@@ -781,16 +789,32 @@ class FacetRangeOptions(Options):
         else:
             self.fields = copy.copy(original.fields)
 
-    def __validate_int_or_datetime(self, v):
-        if isinstance(v, int):
+    def __validate_range_endpoint(self, v):
+        """
+        Validate that the argument is a valid endpoint for a Solr range facet.
+
+        This includes integers, floats, and special strings like "+1YEAR".
+        """
+        if isinstance(v, (int, float)):
             return v
-        elif isinstance(v, datetime):
-            return v.isoformat() + "Z"
+        elif isinstance(v, solr_date):
+            return unicode(v)
         else:
             return self.invalid_value()
 
-    def __validate_int_or_string(self, v):
-        if isinstance(v, int) or isinstance(v, str):
+    def __validate_range_gap(self, v):
+        if isinstance(v, (int, float)):
+            return v
+        elif isinstance(v, basestring):
+            # A string gap must use Lucene syntax:
+            # http://lucene.apache.org/solr/4_0_0/solr-core/org/apache/solr/util/DateMathParser.html
+            match = FacetRangeOptions.lucene_unit_pattern.match(v)
+
+            if match is None:
+                return self.invalid_value()
+            elif match.group(3) not in FacetRangeOptions.lucene_units:
+                return self.invalid_value()
+
             return v
         else:
             return self.invalid_value()
