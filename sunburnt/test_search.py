@@ -224,6 +224,16 @@ good_query_data = {
         ([], {'string_field':RawString("abc*???")},
          [("q", "string_field:abc\\*\\?\\?\\?")]),
         ),
+
+    # test join queries (solr 4.x)
+    "join":(
+        (["string_field", "int_field", "hello"], {},
+         [("q", u"{!join from=string_field to=int_field}hello")]),
+        (["string_field", "int_field"], {"string_field": "hello"},
+         [("q", u"{!join from=string_field to=int_field}string_field:hello")]),
+        (["string_field", "int_field"], {"boolean_field": True},
+         [("q", u"{!join from=string_field to=int_field}boolean_field:true")]),
+        ),
     }
 if HAS_MX_DATETIME:
     good_query_data['query'] += \

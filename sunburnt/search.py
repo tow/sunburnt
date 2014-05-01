@@ -16,6 +16,7 @@ class LuceneQuery(object):
             self.terms = collections.defaultdict(set)
             self.phrases = collections.defaultdict(set)
             self.ranges = set()
+            self.joins = set()
             self.subqueries = []
             self._and = True
             self._or = self._not = self._pow = False
@@ -25,6 +26,7 @@ class LuceneQuery(object):
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
+            self.joins = copy.copy(original.joins)
             self.subqueries = copy.copy(original.subqueries)
             self._or = original._or
             self._and = original._and
@@ -100,6 +102,13 @@ class LuceneQuery(object):
                 tuple(value.to_query() for value in sorted(values, key=lambda x: getattr(x, "value")))
             s.append(u"%s:%s" % (name, range_s))
         return u' AND '.join(s)
+
+    def serialize_join_queries(self):
+        s = []
+        for join_from, join_to, query in sorted(self.joins):
+            s.append(u"{!join from=%s to=%s}%s" % (join_from, join_to, query))
+        return u' AND '.join(s)
+
 
     def child_needs_parens(self, child):
         if len(child) == 1:
@@ -207,7 +216,8 @@ class LuceneQuery(object):
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
-                             self.serialize_range_queries()]
+                             self.serialize_range_queries(),
+                             self.serialize_join_queries()]
                  if s]
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
@@ -358,6 +368,16 @@ class LuceneQuery(object):
             insts = (field.instance_from_user_data(value),)
         self.ranges.add((field_name, rel, insts))
 
+    def join(self, join_from, join_to, *args, **kwargs):
+        for fieldname in [join_from, join_to]:
+            field = self.schema.match_field(fieldname)
+            if not field:
+                raise ValueError("%s is not a valid field name" % fieldname)
+            elif not field.indexed:
+                raise SolrError("Can't join on non-indexed field '%s'" % fieldname)
+        query = self.Q(*args, **kwargs)
+        self.joins.add((join_from, join_to, query))
+
     def term_or_phrase(self, arg, force=None):
         return 'terms' if self.default_term_re.match(arg) else 'phrases'
 
@@ -370,7 +390,6 @@ class LuceneQuery(object):
                 raise SolrError("Can't query on non-indexed field '%s'" % k)
             value = field.instance_from_user_data(v)
         self.boosts.append((kwargs, boost_score))
-
 
 
 class BaseSearch(object):
@@ -474,6 +493,11 @@ class BaseSearch(object):
     def field_limit(self, fields=None, score=False, all_fields=False):
         newself = self.clone()
         newself.field_limiter.update(fields, score, all_fields)
+        return newself
+
+    def join(self, join_from, join_to, *args, **kwargs):
+        newself = self.clone()
+        newself.query_obj.join(join_from, join_to, *args, **kwargs)
         return newself
 
     def options(self):
