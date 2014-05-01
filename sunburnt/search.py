@@ -490,11 +490,6 @@ class BaseSearch(object):
 
     def transform_result(self, result, constructor):
         if constructor is not dict:
-<<<<<<< HEAD
-            result.result.docs = [constructor(**d) for d in result.result.docs]
-            # perhaps make highlighting available in custom results if
-            # the class provides a set_highlighting method or some such ?
-=======
             construct_docs = lambda docs: [constructor(**d) for d in docs]
             result.result.docs = construct_docs(result.result.docs)
             for key in result.more_like_these:
