@@ -1,13 +1,11 @@
 from __future__ import absolute_import
 
-import cgi
 import cStringIO as StringIO
 from itertools import islice
-import logging
-import socket, time, urllib, urlparse
+import time, urllib, urlparse
 import warnings
 
-
+from .http import ConnectionError, wrap_http_connection
 from .schema import SolrSchema, SolrError
 from .search import LuceneQuery, MltSolrSearch, SolrSearch, params_from_dict
 
@@ -15,34 +13,37 @@ MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
 
 class SolrConnection(object):
-    def __init__(self, url, http_connection, retry_timeout, max_length_get_url):
-        if http_connection:
-            self.http_connection = http_connection
-        else:
-            import httplib2
-            self.http_connection = httplib2.Http()
+    readable = True
+    writeable = True
+    def __init__(self, url, http_connection, mode, retry_timeout, max_length_get_url, format):
+        self.http_connection = wrap_http_connection(http_connection)
+        if mode == 'r':
+            self.writeable = False
+        elif mode == 'w':
+            self.readable = False
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
         self.mlt_url = self.url + "mlt/"
         self.retry_timeout = retry_timeout
         self.max_length_get_url = max_length_get_url
+        self.format = format
 
     def request(self, *args, **kwargs):
         try:
             return self.http_connection.request(*args, **kwargs)
-        except socket.error:
+        except ConnectionError:
             if self.retry_timeout < 0:
                 raise
             time.sleep(self.retry_timeout)
             return self.http_connection.request(*args, **kwargs)
 
     def commit(self, waitSearcher=None, expungeDeletes=None, softCommit=None):
-        response = self.update('<commit/>', commit=True,
+        self.update('<commit/>', commit=True,
                 waitSearcher=waitSearcher, expungeDeletes=expungeDeletes, softCommit=softCommit)
 
     def optimize(self, waitSearcher=None, maxSegments=None):
-        response = self.update('<optimize/>', optimize=True,
+        self.update('<optimize/>', optimize=True,
             waitSearcher=waitSearcher, maxSegments=maxSegments)
 
     # For both commit & optimize above, we use the XML body instead
@@ -50,19 +51,20 @@ class SolrConnection(object):
     # should) then only the former works.
 
     def rollback(self):
-        response = self.update("<rollback/>")
+        self.update("<rollback/>")
 
-    def update(self, **kwargs):
+    def update(self, update_doc, **kwargs):
+        if not self.writeable:
+            raise TypeError("This Solr instance is only for reading")
         body = update_doc
         if body:
             headers = {"Content-Type":"text/xml; charset=utf-8"}
         else:
             headers = {}
         url = self.url_for_update(**kwargs)
-        r, c = self.request(url, method="POST", body=body,
-                            headers=headers)
-        if r.status != 200:
-            raise SolrError(r, c)
+        response = self.request('POST', url, data=body, headers=headers)
+        if response.status_code != 200:
+            raise SolrError(response)
 
     def url_for_update(self, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
         extra_params = {}
@@ -70,7 +72,7 @@ class SolrConnection(object):
             extra_params['commit'] = "true" if commit else "false"
         if commitWithin is not None:
             try:
-                extra_params['commitWithin'] = str(float(commitWithin))
+                extra_params['commitWithin'] = str(int(commitWithin))
             except (TypeError, ValueError):
                 raise ValueError("commitWithin should be a number in milliseconds")
             if extra_params['commitWithin'] < 0:
@@ -100,72 +102,81 @@ class SolrConnection(object):
             return self.update_url
 
     def select(self, params):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        if self.format == 'json':
+            params.append(('wt', 'json'))
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:
             warnings.warn("Long query URL encountered - POSTing instead of "
                 "GETting. This query will not be cached at the HTTP layer")
             url = self.select_url
-            kwargs = dict(
-                method="POST",
-                body=qs,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+            method = 'POST'
+            kwargs = {
+                'data': qs,
+                'headers': {"Content-Type": "application/x-www-form-urlencoded"}}
         else:
-            kwargs = dict(method="GET")
-        r, c = self.request(url, **kwargs)
-        if r.status != 200:
-            raise SolrError(r, c)
-        return c
+            method = 'GET'
+            kwargs = {}
+        response = self.request(method, url, **kwargs)
+        if response.status_code != 200:
+            raise SolrError(response)
+        return response.content
 
     def mlt(self, params, content=None):
         """Perform a MoreLikeThis query using the content specified
         There may be no content if stream.url is specified in the params.
         """
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
         qs = urllib.urlencode(params)
         base_url = "%s?%s" % (self.mlt_url, qs)
+        method = 'GET'
+        kwargs = {}
         if content is None:
-            kwargs = {'uri': base_url, 'method': "GET"}
+            url = base_url
         else:
             get_url = "%s&stream.body=%s" % (base_url, urllib.quote_plus(content))
             if len(get_url) <= self.max_length_get_url:
-                kwargs = {'uri': get_url, 'method': "GET"}
+                url = get_url
             else:
-                kwargs = {'uri': base_url, 'method': "POST",
-                    'body': content, 'headers': {"Content-Type": "text/plain; charset=utf-8"}}
-        r, c = self.request(**kwargs)
-        if r.status != 200:
-            raise SolrError(r, c)
-        return c
+                url = base_url
+                method = 'POST'
+                kwargs = {
+                    'data': content,
+                    'headers': {"Content-Type": "text/plain; charset=utf-8"}}
+        response = self.request(method, url, **kwargs)
+        if response.status_code != 200:
+            raise SolrError(response)
+        return response.content
 
 
 class SolrInterface(object):
-    readable = True
-    writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1, max_length_get_url=MAX_LENGTH_GET_URL):
-        self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url)
+    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1,
+            max_length_get_url=MAX_LENGTH_GET_URL, format='xml'):
+        self.conn = SolrConnection(url, http_connection, mode, retry_timeout, max_length_get_url, format)
         self.schemadoc = schemadoc
-        if mode == 'r':
-            self.writeable = False
-        elif mode == 'w':
-            self.readable = False
+        allowed_formats = ('xml', 'json')
+        if format not in allowed_formats:
+            raise ValueError("Unsupported format '%s': allowed are %s" %
+                    (format, ','.join(allowed_formats)))
+        self.format = format
         self.init_schema()
 
     def init_schema(self):
         if self.schemadoc:
             schemadoc = self.schemadoc
         else:
-            r, c = self.conn.request(
+            response = self.conn.request('GET',
                 urlparse.urljoin(self.conn.url, self.remote_schema_file))
-            if r.status != 200:
-                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
-            schemadoc = StringIO.StringIO(c)
-        self.schema = SolrSchema(schemadoc)
+            if response.status_code != 200:
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (response.status_code, response.content))
+            schemadoc = StringIO.StringIO(response.content)
+        self.schema = SolrSchema(schemadoc, format=self.format)
 
     def add(self, docs, chunk=100, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
             docs = [docs]
         # to avoid making messages too large, we break the message every
@@ -175,8 +186,6 @@ class SolrInterface(object):
             self.conn.update(str(update_message), **kwargs)
 
     def delete(self, docs=None, queries=None, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         if not docs and not queries:
             raise SolrError("No docs or query specified for deletion")
         elif docs is not None and (hasattr(docs, "items") or not hasattr(docs, "__iter__")):
@@ -185,35 +194,23 @@ class SolrInterface(object):
         self.conn.update(str(delete_message), **kwargs)
 
     def commit(self, *args, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         self.conn.commit(*args, **kwargs)
 
     def optimize(self, *args, **kwargs):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         self.conn.optimize(*args, **kwargs)
 
     def rollback(self):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         self.conn.rollback()
 
     def delete_all(self):
-        if not self.writeable:
-            raise TypeError("This Solr instance is only for reading")
         # When deletion is fixed to escape query strings, this will need fixed.
         self.delete(queries=self.Q(**{"*":"*"}))
 
     def search(self, **kwargs):
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.select(params))
 
     def query(self, *args, **kwargs):
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         q = SolrSearch(self)
         if len(args) + len(kwargs) > 0:
             return q.query(*args, **kwargs)
@@ -221,8 +218,6 @@ class SolrInterface(object):
             return q
 
     def mlt_search(self, content=None, **kwargs):
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         params = params_from_dict(**kwargs)
         return self.schema.parse_response(self.conn.mlt(params, content=content))
 
@@ -241,8 +236,6 @@ class SolrInterface(object):
         Other MoreLikeThis specific parameters can be passed as kwargs without
         the 'mlt.' prefix.
         """
-        if not self.readable:
-            raise TypeError("This Solr instance is only for writing")
         q = MltSolrSearch(self, content=content, content_charset=content_charset, url=url)
         return q.mlt(fields=fields, query_fields=query_fields, **kwargs)
 

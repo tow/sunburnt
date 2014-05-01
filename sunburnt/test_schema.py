@@ -4,7 +4,11 @@ import cStringIO as StringIO
 import datetime
 import uuid
 
-import mx.DateTime
+try:
+    import mx.DateTime
+    HAS_MX_DATETIME = True
+except ImportError:
+    HAS_MX_DATETIME = False
 import pytz
 
 from .schema import solr_date, SolrSchema, SolrError, SolrUpdate, SolrDelete
@@ -21,22 +25,23 @@ samples_from_pydatetimes = {
     "2009-07-23T00:24:34.000376Z":
         [not_utc.localize(datetime.datetime(2009, 07, 23, 3, 24, 34, 376)),
          datetime.datetime(2009, 07, 23, 0, 24, 34, 376, pytz.utc)],
-    "2009-07-23T03:24:34.000000Z":
+    "2009-07-23T03:24:34Z":
         [datetime.datetime(2009, 07, 23, 3, 24, 34),
          datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
-    "2009-07-23T00:24:34.000000Z":
+    "2009-07-23T00:24:34Z":
         [not_utc.localize(datetime.datetime(2009, 07, 23, 3, 24, 34)),
          datetime.datetime(2009, 07, 23, 0, 24, 34, tzinfo=pytz.utc)]
     }
 
-samples_from_mxdatetimes = {
-    "2009-07-23T03:24:34.000376Z":
-        [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34.000376),
-         datetime.datetime(2009, 07, 23, 3, 24, 34, 376, pytz.utc)],
-    "2009-07-23T03:24:34.000000Z":
-        [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34),
-         datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
-    }
+if HAS_MX_DATETIME:
+    samples_from_mxdatetimes = {
+        "2009-07-23T03:24:34.000376Z":
+            [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34.000376),
+             datetime.datetime(2009, 07, 23, 3, 24, 34, 376, pytz.utc)],
+        "2009-07-23T03:24:34Z":
+            [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34),
+             datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
+        }
 
 
 samples_from_strings = {
@@ -50,20 +55,20 @@ samples_from_strings = {
     }
 
 def check_solr_date_from_date(s, date, canonical_date):
-    assert unicode(solr_date(date)) == s
+    assert unicode(solr_date(date)) == s, "Unequal representations of %r: %r and %r" % (date, unicode(solr_date(date)), s)
     check_solr_date_from_string(s, canonical_date)
 
 def check_solr_date_from_string(s, date):
     assert solr_date(s)._dt_obj == date
-
 
 def test_solr_date_from_pydatetimes():
     for k, v in samples_from_pydatetimes.items():
         yield check_solr_date_from_date, k, v[0], v[1]
 
 def test_solr_date_from_mxdatetimes():
-    for k, v in samples_from_mxdatetimes.items():
-        yield check_solr_date_from_date, k, v[0], v[1]
+    if HAS_MX_DATETIME:
+        for k, v in samples_from_mxdatetimes.items():
+            yield check_solr_date_from_date, k, v[0], v[1]
 
 def test_solr_date_from_strings():
     for k, v in samples_from_strings.items():
@@ -77,11 +82,13 @@ good_schema = \
     <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
     <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true" omitNorms="true"/>
+    <fieldType name="location_rpt" class="solr.SpatialRecursivePrefixTreeFieldType" geo="true" distErrPct="0.025" maxDistErr="0.000009" units="degrees" />
   </types>
   <fields>
     <field name="int_field" required="true" type="sint"/>
     <field name="text_field" required="true" type="string" multiValued="true"/>
     <field name="boolean_field" required="false" type="boolean"/>
+    <field name="location_field" required="false" type="location_rpt"/>
   </fields>
   <defaultSearchField>text_field</defaultSearchField>
   <uniqueKey>int_field</uniqueKey>
@@ -98,7 +105,10 @@ class TestReadingSchema(object):
         that we get the right set of fields, the right
         default field, and the right unique key"""
         assert set(self.s.fields.keys()) \
-            == set(['boolean_field', 'int_field', 'text_field'])
+            == set(['boolean_field',
+                    'int_field',
+                    'text_field',
+                    'location_field'])
         assert self.s.default_field_name == 'text_field'
         assert self.s.unique_key == 'int_field'
 
@@ -108,8 +118,9 @@ class TestReadingSchema(object):
         for k, v, v2 in (('int_field', 1, u'1'),
                          ('text_field', 'text', u'text'),
                          ('text_field', u'text', u'text'),
-                         ('boolean_field', True, u'true')):
-                             assert self.s.field_from_user_data(k, v).to_solr() == v2
+                         ('boolean_field', True, u'true'),
+                         ('location_field', 'POINT (30 10)', 'POINT (30 10)')):
+            assert self.s.field_from_user_data(k, v).to_solr() == v2
 
     def test_missing_fields(self):
         assert set(self.s.missing_fields([])) \
@@ -133,6 +144,31 @@ class TestReadingSchema(object):
             pass
         else:
             assert False
+
+    def test_unknown_field_type(self):
+        """ Check operation of a field type that is unknown to Sunburnt.
+        """
+        assert 'solr.SpatialRecursivePrefixTreeFieldType' \
+                not in SolrSchema.solr_data_types
+        field = self.s.fields['location_field']
+        assert field
+
+        #Boolean attributes are converted accordingly
+        assert field.geo == True
+        #All other attributes are strings
+        assert field.units == 'degrees'
+        assert field.distErrPct == '0.025'
+        assert field.maxDistErr == '0.000009'
+
+        #Test that the value is always consistent - both to and from Solr
+        value = 'POLYGON ((30 10, 10 20, 20 40, 40 40, 30 10))'
+        assert field.to_user_data(value) \
+                == field.from_user_data(value) \
+                == field.to_solr(value) \
+                == field.from_solr(value)
+
+        #Queried values will be escaped accordingly
+        assert field.to_query(value) == u'POLYGON\\ \\(\\(30\\ 10,\\ 10\\ 20,\\ 20\\ 40,\\ 40\\ 40,\\ 30\\ 10\\)\\)'
 
 
 broken_schemata = {

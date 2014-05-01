@@ -30,6 +30,7 @@ Contents:
    addingdocuments
    deletingdocuments
    indexmanagement
+   contributing
 
 ..
  Indices and tables

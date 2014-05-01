@@ -120,6 +120,25 @@ queries into the same ``query()`` call, but in a more complex environment,
 it can be useful to partially construct a query in one part of your program,
 then modify it later on in a separate part.
 
+Field names
+-----------
+
+To look at the list of available fields in the Solr schema, look at the ``si.schema.fields`` property:
+
+::
+
+ >>> print si.schema.fields.keys()
+ ['id', 'cat', 'name', 'price', 'author_t', 'series_t', 'sequence_i', 'genre_s']
+
+.. note:: If your field names contain undescores dots (.), you won't be able to use
+ them as parameter names in the query() method. Luckily, Python offers here something
+ called "keyword argument application from a dictionary", so you can specify
+ your field name - value pairs in a dictionary as follows:
+
+::
+
+ si.query({'name': "game", 'author_t': "Martin"})
+
 
 Executing queries and interpreting the response
 -----------------------------------------------
@@ -304,7 +323,7 @@ selection of fields.
 
 ::
 
- >>> for result in si.query("game").field_limit("id", score=True"):
+ >>> for result in si.query("game").field_limit("id", score=True):
  ...     print result
 
  {'score': 1.1931472000000001, 'id': u'0553573403'}
@@ -696,16 +715,17 @@ You can facet on more than one field at a time:
 
 :: 
 
- si.query(...).facet_by(fields=["field1", "field2, ...])
+ si.query(...).facet_by(field=["field1", "field2, ...])
 
 and the ``facet_fields`` dictionary will have more than one key.
 
-Solr supports a number of parameters to the faceting operation. All of the basic options
-are exposed through sunburnt:
+Solr supports a number of parameters to the faceting operation. These are described in detail
+at http://wiki.apache.org/solr/SimpleFacetParameters#Field_Value_Faceting_Parameters.
+All of the basic options are exposed through sunburnt:
 
 ::
 
- fields, prefix, sort, limit, offset, mincount, missing, method, enum.cache.minDf
+ field, prefix, sort, limit, offset, mincount, missing, method, enum.cache.minDf
 
 All of these can be used as keyword arguments to the ``facet()`` call, except of course the
 last one since it contains periods. To pass keyword arguments with periods in them, you
@@ -763,7 +783,31 @@ The results are shown as a dictionary of dictionaries. The top-level key is the 
 mapping field names to fragments of highlighted text. In this case we only asked for
 highlighting on the ``name`` field. Multiple fragments might be returned for each field,
 though in this case we only get one fragment each. The text is highlighted with HTML, and
-the fragments should be suitable for dropping straight into a search template.
+the fragments should be suitable for dropping straight into a search
+template.
+
+If you are using the default result format (that is, if you are not
+specifying a ``constructor`` option when you call
+:meth:`~sunburnt.search.SolrSearch.execute`), highlighting results for
+a single result can be accessed on the individual result item as a
+dictionary in a ``solr_highlights`` field.  For example, with the
+highlighted query above, you could access highlight snippets for the
+``name`` field on an individual result as
+``result['solr_highlights']['name']``.  This is particularly
+convenient for displaying highlighted text snippets in a template;
+e.g., displaying highlights in a Django template might look like this:
+
+::
+    
+  {% for snippet in book.solr_highlights.name %}
+     <p>... {{ snippet|safe }} ...</p>
+  {% endfor %}
+
+.. Note::
+
+  The ``solr_highlights`` field will only be available on a result
+  item if highlights were found for that record.
+
 
 Again, Solr supports a large number of options to the highlighting command,
 and all of these are exposed through sunburnt. The full list of supported options is:

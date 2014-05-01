@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import collections, copy, operator, re
 
 from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
+from .walktree import walk, event, leaf, exit
 
 
 class LuceneQuery(object):
@@ -31,8 +32,11 @@ class LuceneQuery(object):
             self._pow = original._pow
             self.boosts = copy.copy(original.boosts)
 
-    def clone(self):
-        return LuceneQuery(self.schema, original=self)
+    def clone(self, **kwargs):
+        q = LuceneQuery(self.schema, original=self)
+        for k, v in kwargs.items():
+            setattr(q, k, v)
+        return q
 
     def options(self):
         opts = {}
@@ -109,75 +113,86 @@ class LuceneQuery(object):
         else:
             return True
 
+    def normalize(self):
+        # shortcut to avoid re-normalization no-ops
+        if self.normalized:
+            return self, False
+
+        changed = False
+        for path in walk(self, lambda q: q.subqueries, event(exit|leaf)):
+            if len(path) == 1:
+                # last time around, so:
+                break
+            this = path[-1]
+            obj = self.normalize_node(this)
+            obj.normalized = True
+            if obj != this:
+                siblings = path[-2].subqueries
+                i = siblings.index(this)
+                siblings[i] = obj
+                changed = True
+
+        obj = self.normalize_node(self)
+        return obj, (changed or obj == self)
+
     @staticmethod
-    def merge_term_dicts(*args):
+    def merge_term_dicts(args):
         d = collections.defaultdict(set)
         for arg in args:
             for k, v in arg.items():
                 d[k].update(v)
         return dict((k, v) for k, v in d.items())
 
-    def normalize(self):
-        if self.normalized:
-            return self, False
+    @staticmethod
+    def normalize_node(obj):
+        """ Normalize a query node provided all its sub-queries
+        are already normalized"""
+        # Recalculate terms/phrases/ranges/subqueries as appropriate given immediate subqueries
+        terms = [obj.terms]
+        phrases = [obj.phrases]
+        ranges = [obj.ranges]
+        subqueries = []
+
         mutated = False
-        _subqueries = []
-        _terms = self.terms
-        _phrases = self.phrases
-        _ranges = self.ranges
-        for s in self.subqueries:
-            _s, changed = s.normalize()
-            if not _s or changed:
+        for s in obj.subqueries:
+            if not s:
+                mutated = True # we're dropping a subquery
+                continue # don't append
+            if (s._and and obj._and) or (s._or and obj._or):
+                # then hoist the contents up
+                terms.append(s.terms)
+                phrases.append(s.phrases)
+                ranges.append(s.ranges)
+                subqueries.extend(s.subqueries)
                 mutated = True
-            if _s:
-                if (_s._and and self._and) or (_s._or and self._or):
-                    mutated = True
-                    _terms = self.merge_term_dicts(_terms, _s.terms)
-                    _phrases = self.merge_term_dicts(_phrases, _s.phrases)
-                    _ranges = _ranges.union(_s.ranges)
-                    _subqueries.extend(_s.subqueries)
-                else:
-                    _subqueries.append(_s)
+            else: # just keep it unchanged
+                subqueries.append(s)
+
+        # and clone if there have been any changes
         if mutated:
-            newself = self.clone()
-            newself.terms = _terms
-            newself.phrases = _phrases
-            newself.ranges = _ranges
-            newself.subqueries = _subqueries
-            self = newself
+            obj = obj.clone(terms = obj.merge_term_dicts(terms),
+                            phrases = obj.merge_term_dicts(phrases),
+                            ranges = reduce(operator.or_, ranges),
+                            subqueries = subqueries)
 
-        if self._not:
-            if not len(self.subqueries):
-                newself = self.clone()
-                newself._not = False
-                newself._and = True
-                self = newself
-                mutated = True
-            elif len(self.subqueries) == 1:
-                if self.subqueries[0]._not:
-                    newself = self.clone()
-                    newself.subqueries = self.subqueries[0].subqueries
-                    newself._not = False
-                    newself._and = True
-                    self = newself
-                    mutated = True
-            else:
-                raise ValueError
-        elif self._pow:
-            if not len(self.subqueries):
-                newself = self.clone()
-                newself._pow = False
-                self = newself
-                mutated = True
-        elif self._and or self._or:
-            if not self.terms and not self.phrases and not self.ranges:
-                if len(self.subqueries) == 1:
-                    self = self.subqueries[0]
-                    mutated = True
-        self.normalized = True
-        return self, mutated
+        # having recalculated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
+        if not len(obj.subqueries):
+            if obj._not:
+                obj = obj.clone(_not=False, _and=True)
+            elif obj._pow:
+                obj = obj.clone(_pow=False)
+        elif len(obj.subqueries) == 1:
+            if obj._not and obj.subqueries[0]._not:
+                obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
+            elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges and not obj.boosts:
+                obj = obj.subqueries[0]
+        obj.normalized = True
+        return obj
 
-    def __unicode__(self, level=0, op=None):
+    def __unicode__(self):
+        return self.serialize_to_unicode(level=0, op=None)
+
+    def serialize_to_unicode(self, level=0, op=None):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -188,7 +203,7 @@ class LuceneQuery(object):
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
-            return newself.__unicode__(level=level)
+            return newself.serialize_to_unicode(level=level)
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
@@ -197,9 +212,9 @@ class LuceneQuery(object):
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"(%s)"%q.serialize_to_unicode(level=level+1, op=op_))
                 else:
-                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"%s"%q.serialize_to_unicode(level=level+1, op=op_))
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
@@ -264,7 +279,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -352,7 +367,7 @@ class LuceneQuery(object):
             if not field:
                 raise ValueError("%s is not a valid field name" % k)
             elif not field.indexed:
-                raise SolrError("Can't query on non-indexed field '%s'" % field_name)
+                raise SolrError("Can't query on non-indexed field '%s'" % k)
             value = field.instance_from_user_data(v)
         self.boosts.append((kwargs, boost_score))
 
@@ -363,6 +378,8 @@ class BaseSearch(object):
     option_modules = ('query_obj', 'filter_obj', 'paginator',
                       'more_like_this', 'highlighter', 'faceter',
                       'sorter', 'facet_querier', 'field_limiter',)
+
+    result_constructor = dict
 
     def _init_common_modules(self):
         self.query_obj = LuceneQuery(self.schema, u'q')
@@ -466,22 +483,39 @@ class BaseSearch(object):
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
 
+    def results_as(self, constructor):
+        newself = self.clone()
+        newself.result_constructor = constructor
+        return newself
+
     def transform_result(self, result, constructor):
         if constructor is not dict:
+<<<<<<< HEAD
             result.result.docs = [constructor(**d) for d in result.result.docs]
             # perhaps make highlighting available in custom results if
             # the class provides a set_highlighting method or some such ?
+=======
+            construct_docs = lambda docs: [constructor(**d) for d in docs]
+            result.result.docs = construct_docs(result.result.docs)
+            for key in result.more_like_these:
+                result.more_like_these[key].docs = \
+                        construct_docs(result.more_like_these[key].docs)
+            # in future, highlighting chould be made available to
+            # custom constructors; perhaps document additional
+            # arguments result constructors are required to support, or check for
+            # an optional set_highlighting method
         else:
             if result.highlighting:
                 for d in result.result.docs:
                     # if the unique key for a result doc is present in highlighting,
                     # add the highlighting for that document into the result dict
                     # (but don't override any existing content)
-                    if 'highlighting' not in d and \
-                           d[self.schema.unique_key] in result.highlighting:
-                        d['highlighting'] = result.highlighting[d[self.schema.unique_key]]
-                        # NOTE: should this be a more unique field
-                        # name to reduce potential conflicts?
+                    # If unique key field is not a string field (eg int) then we need to
+                    # convert it to its solr representation
+                    unique_key = self.schema.fields[self.schema.unique_key].to_solr(d[self.schema.unique_key])
+                    if 'solr_highlights' not in d and \
+                           unique_key in result.highlighting:
+                        d['solr_highlights'] = result.highlighting[unique_key]
         return result
 
     def params(self):
@@ -491,7 +525,7 @@ class BaseSearch(object):
 
     _count = None
     def count(self):
-        # get the total count for the current query without retrieving any results 
+        # get the total count for the current query without retrieving any results
         # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
@@ -511,8 +545,6 @@ class BaseSearch(object):
     def __getitem__(self, k):
         """Return a single result or slice of results from the query.
         """
-        # NOTE: only supports the default result constructor.
-
         # are we already paginated? if so, we'll apply this getitem to the
         # paginated result - else we'll apply it to the whole.
         offset = 0 if self.paginator.start is None else self.paginator.start
@@ -551,13 +583,14 @@ class BaseSearch(object):
             rows = stop - start
             if self.paginator.rows is not None:
                 rows = min(rows, self.paginator.rows)
-
-            if rows <= 0:
-                return []
+            rows = max(rows, 0)
 
             start += offset
 
-            return self.paginate(start=start, rows=rows).execute()[::step]
+            response = self.paginate(start=start, rows=rows).execute()
+            if step != 1:
+                response.result.docs = response.result.docs[::step]
+            return response
 
         else:
             # if not a slice, a single result is being requested
@@ -585,6 +618,7 @@ class SolrSearch(BaseSearch):
         else:
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
+            self.result_constructor = original.result_constructor
 
     def options(self):
         options = super(SolrSearch, self).options()
@@ -592,7 +626,9 @@ class SolrSearch(BaseSearch):
             options['q'] = '*:*' # search everything
         return options
 
-    def execute(self, constructor=dict):
+    def execute(self, constructor=None):
+        if constructor is None:
+            constructor = self.result_constructor
         result = self.interface.search(**self.options())
         return self.transform_result(result, constructor)
 

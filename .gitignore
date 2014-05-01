@@ -1,4 +1,5 @@
 *.pyc
+*.swp
 .cache
 MANIFEST
 build

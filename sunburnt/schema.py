@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-import datetime
 import math
 import operator
 import uuid
@@ -8,6 +7,11 @@ import warnings
 
 from lxml.builder import E
 import lxml.etree
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 from .dates import datetime_from_w3_datestring
 from .strings import RawString, SolrString, WildcardString
@@ -49,7 +53,7 @@ class solr_date(object):
         if hasattr(dt_obj, 'tzinfo') and dt_obj.tzinfo:
             # but Solr requires UTC times.
             if pytz:
-                return dt_obj.astimezone(pytz.utc)
+                return dt_obj.astimezone(pytz.utc).replace(tzinfo=None)
             else:
                 raise EnvironmentError("pytz not available, cannot do timezone conversions")
         else:
@@ -69,8 +73,13 @@ class solr_date(object):
         """ Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
-        return u"%s.%sZ" % (self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S"),
-                            "%06d" % self.microsecond)
+        if hasattr(self._dt_obj, 'isoformat'):
+            return "%sZ" % (self._dt_obj.isoformat(), )
+        strtime = self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S")
+        microsecond = self.microsecond
+        if microsecond:
+            return u"%s.%06dZ" % (strtime, microsecond)
+        return u"%sZ" % (strtime,)
 
     def __cmp__(self, other):
         try:
@@ -141,6 +150,14 @@ class SolrField(object):
                 return name.endswith(self.name[1:])
             else:
                 return name.startswith(self.name[:-1])
+
+    def normalize(self, value):
+        """ Normalize the given value according to the field type.
+        
+        This method does nothing by default, returning the given value
+        as is. Child classes may override this method as required.
+        """
+        return value
 
     def instance_from_user_data(self, data):
         return SolrFieldInstance.from_user_data(self, data)
@@ -387,15 +404,18 @@ class SolrSchema(object):
         'solr.LatLonType':SolrPoint2Field,
         'solr.GeoHashField':SolrPoint2Field,
     }
-    def __init__(self, f):
+
+    def __init__(self, f, format='xml'):
         """initialize a schema object from a
         filename or file-like object."""
+        self.format = format
         self.fields, self.dynamic_fields, self.default_field_name, self.unique_key \
             = self.schema_parse(f)
         self.default_field = self.fields[self.default_field_name] \
             if self.default_field_name else None
         self.unique_field = self.fields[self.unique_key] \
             if self.unique_key else None
+        self.dynamic_field_cache = {}
 
     def Q(self, *args, **kwargs):
         from .search import LuceneQuery
@@ -436,10 +456,8 @@ class SolrSchema(object):
             name, class_name = field_type_node.attrib['name'], field_type_node.attrib['class']
         except KeyError, e:
             raise SolrError("Invalid schema.xml: missing %s attribute on fieldType" % e.args[0])
-        try:
-            field_class = self.solr_data_types[class_name]
-        except KeyError:
-            raise SolrError("Unknown field_class '%s'" % class_name)
+        #Obtain field type for given class. Defaults to generic SolrField.
+        field_class = self.solr_data_types.get(class_name, SolrField)
         return name, SolrFieldTypeFactory(field_class,
             **self.translate_attributes(field_type_node.attrib))
 
@@ -483,9 +501,13 @@ class SolrSchema(object):
             raise SolrError("Fields not defined in schema: %s" % list(undefined_field_names))
 
     def match_dynamic_field(self, name):
-        for field in self.dynamic_fields:
-            if field.match(name):
-                return field
+        try:
+            return self.dynamic_field_cache[name]
+        except KeyError:
+            for field in self.dynamic_fields:
+                if field.match(name):
+                    self.dynamic_field_cache[name] = field
+                    return field
 
     def match_field(self, name):
         try:
@@ -507,7 +529,10 @@ class SolrSchema(object):
         return SolrDelete(self, docs, query)
 
     def parse_response(self, msg):
-        return SolrResponse(self, msg)
+        if self.format == 'json':
+            return SolrResponse.from_json(self, msg)
+        else:
+            return SolrResponse.from_xml(self, msg)
 
     def parse_result_doc(self, doc, name=None):
         if name is None:
@@ -521,8 +546,28 @@ class SolrSchema(object):
         if field_class is None and name == "score":
             field_class = SolrScoreField()
         elif field_class is None:
-            raise SolrError("unexpected field found in result")
+            raise SolrError("unexpected field found in result (field name: %s)" % name)
         return name, SolrFieldInstance.from_solr(field_class, doc.text or '').to_user_data()
+
+    def parse_result_doc_json(self, doc):
+        # Note: for efficiency's sake this modifies the original dict
+        # in place. This doesn't make much difference on 20 documents
+        # but it does on 20,000
+        for name, value in doc.viewitems():
+            field_class = self.match_field(name)
+            # If the field type is a string then we don't need to modify it
+            if isinstance(field_class, SolrUnicodeField):
+                continue
+            if field_class is None and name == "score":
+                field_class = SolrScoreField()
+            elif field_class is None:
+                raise SolrError("unexpected field found in result (field name: %s)" % name)
+            if isinstance(value, list):
+                parsed_value = [SolrFieldInstance.from_solr(field_class, v).to_user_data() for v in value]
+            else:
+                parsed_value = SolrFieldInstance.from_solr(field_class, value).to_user_data()
+            doc[name] = parsed_value
+        return doc
 
 
 class SolrUpdate(object):
@@ -635,10 +680,32 @@ class SolrFacetCounts(object):
         facet_counts_dict = dict(response.get("facet_counts", {}))
         return SolrFacetCounts(**facet_counts_dict)
 
+    @classmethod
+    def from_response_json(cls, response):
+        try:
+            facet_counts_dict = response['facet_counts']
+        except KeyError:
+            return SolrFacetCounts()
+        facet_fields = {}
+        for facet_field, facet_values in facet_counts_dict['facet_fields'].viewitems():
+            facets = []
+            # Change each facet list from [a, 1, b, 2, c, 3 ...] to
+            # [(a, 1), (b, 2), (c, 3) ...]
+            for n, value in enumerate(facet_values):
+                if n&1 == 0:
+                    name = value
+                else:
+                    facets.append((name, value))
+            facet_fields[facet_field] = facets
+        facet_counts_dict['facet_fields'] = facet_fields
+        return SolrFacetCounts(**facet_counts_dict)
 
 class SolrResponse(object):
-    def __init__(self, schema, xmlmsg):
+    @classmethod
+    def from_xml(cls, schema, xmlmsg):
+        self = cls()
         self.schema = schema
+        self.original_xml = xmlmsg
         doc = lxml.etree.fromstring(xmlmsg)
         details = dict(value_from_node(n) for n in
                        doc.xpath("/response/lst[@name!='moreLikeThis']"))
@@ -648,13 +715,13 @@ class SolrResponse(object):
         if self.status != 0:
             raise ValueError("Response indicates an error")
         result_node = doc.xpath("/response/result")[0]
-        self.result = SolrResult(schema, result_node)
+        self.result = SolrResult.from_xml(schema, result_node)
         self.facet_counts = SolrFacetCounts.from_response(details)
         self.highlighting = dict((k, dict(v))
                                  for k, v in details.get("highlighting", ()))
         more_like_these_nodes = \
             doc.xpath("/response/lst[@name='moreLikeThis']/result")
-        more_like_these_results = [SolrResult(schema, node)
+        more_like_these_results = [SolrResult.from_xml(schema, node)
                                   for node in more_like_these_nodes]
         self.more_like_these = dict((n.name, n)
                                          for n in more_like_these_results)
@@ -670,6 +737,35 @@ class SolrResponse(object):
         else:
             value = None
         self.interesting_terms = value
+        return self
+
+    @classmethod
+    def from_json(cls, schema, jsonmsg):
+        self = cls()
+        self.schema = schema
+        self.original_json = jsonmsg
+        doc = json.loads(jsonmsg)
+        details = doc['responseHeader']
+        for attr in ["QTime", "params", "status"]:
+            setattr(self, attr, details.get(attr))
+        if self.status != 0:
+            raise ValueError("Response indicates an error")
+        self.result = SolrResult.from_json(schema, doc['response'])
+        self.facet_counts = SolrFacetCounts.from_response_json(doc)
+        self.highlighting = doc.get("highlighting", {})
+        self.more_like_these = dict((k, SolrResult.from_json(schema, v))
+                for (k, v) in doc.get('moreLikeThis', {}).viewitems())
+        if len(self.more_like_these) == 1:
+            self.more_like_this = self.more_like_these.values()[0]
+        else:
+            self.more_like_this = None
+        # can be computed by MoreLikeThisHandler
+        interesting_terms = doc.get('interestingTerms', ())
+        if len(interesting_terms) == 1:
+            self.interesting_terms = interesting_terms.values()[0]
+        else:
+            self.interesting_terms = None
+        return self
 
     def __str__(self):
         return str(self.result)
@@ -682,51 +778,49 @@ class SolrResponse(object):
 
 
 class SolrResult(object):
-    def __init__(self, schema, node):
+    @classmethod
+    def from_xml(cls, schema, node):
+        self = cls()
         self.schema = schema
         self.name = node.attrib['name']
         self.numFound = int(node.attrib['numFound'])
         self.start = int(node.attrib['start'])
         self.docs = [schema.parse_result_doc(n) for n in node.xpath("doc")]
+        return self
+
+    @classmethod
+    def from_json(cls, schema, node):
+        self = cls()
+        self.schema = schema
+        self.name = 'response'
+        self.numFound = int(node['numFound'])
+        self.start = int(node['start'])
+        docs = node['docs']
+        for doc in docs:
+            parsed_doc = schema.parse_result_doc_json(doc)
+            # We're relying here on the fact that parse_result_doc_json
+            # modifies the document in place which allows us to use the
+            # original list and avoid building a new one. This assertion
+            # checks that this assumption still holds.
+            assert parsed_doc is doc
+        self.docs = docs
+        return self
 
     def __str__(self):
         return "%(numFound)s results found, starting at #%(start)s\n\n" % self.__dict__ + str(self.docs)
 
 
-def object_to_dict(o, names):
-    return dict((name, getattr(o, name)) for name in names
-                 if (hasattr(o, name) and getattr(o, name) is not None))
-
-# This is over twice the speed of the shorter one immediately above.
-# apparently hasattr is really slow; try/except is faster.
-# Also, the one above doesn't and can't do callables with exception handling
 def object_to_dict(o, schema):
+    # Get fields from schema
+    fields = schema.fields.keys()
+    # Check if any attributes defined on object match
+    # dynamic field patterns
+    fields.extend([f for f in dir(o) if schema.match_dynamic_field(f)])
     d = {}
-    for name in schema.fields.keys():
-        a = get_attribute_or_callable(o, name)
-        if a is not None:
-            d[name] = a
-    # and now try for dynamicFields:
-    try:
-        names = o.__dict__.keys()
-    except AttributeError:
-        names = []
-    for name in names:
-        field = schema.match_dynamic_field(name)
-        if field:
-            a = get_attribute_or_callable(o, name)
-            if a is not None:
-                d[name] = a
-    try:
-        names = o.__class__.__dict__.keys()
-    except AttributeError:
-        names = []
-    for name in names:
-        field = schema.match_dynamic_field(name)
-        if field:
-            a = get_attribute_or_callable(o, name)
-            if a is not None:
-                d[name] = a
+    for field in fields:
+        value = get_attribute_or_callable(o, field)
+        if value is not None:
+            d[field] = value
     return d
 
 def get_attribute_or_callable(o, name):

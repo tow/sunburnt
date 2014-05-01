@@ -5,7 +5,7 @@ class SolrString(unicode):
     # The behaviour below is only really relevant for String fields rather
     # than Text fields - most queryparsers will strip these characters out
     # for a text field anyway.
-    lucene_special_chars = '+-&|!(){}[]^"~*?: \t\v\\'
+    lucene_special_chars = '+-&|!(){}[]^"~*?: \t\v\\/'
     def escape_for_lqs_term(self):
         if self in ["AND", "OR", "NOT", ""]:
             return u'"%s"' % self

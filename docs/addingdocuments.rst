@@ -92,6 +92,34 @@ huge update POST. You can do this by doing:
 
 where ``chunk`` controls how many documents are put into each update chunk.
 
+.. note:: Multi-valued fields:
+
+Often, a particular document can
+have more than one instance of some fields - for instance, a book may
+have more than one author.  To include more than one value for a given
+field, simply use a list of values rather than a single value:
+
+::
+
+ game_of_thrones_graphic_novel['author_t'] = [
+    'George R.R. Martin',
+    'Daniel Abraham'
+ ]
+
+Even single-valued fields can have values enclosed in lists of length one,
+this doesn't hurt anything.
+
+When constructing a ``dict`` with ``list`` values, it's often useful to
+use the built-in class ``collections.defaultdict``:
+
+::
+
+ import collections
+ book_to_insert = collections.defaultdict(list)
+ book_to_insert['author_t'].append('Albert Einstein')
+ book_to_insert['author_t'].append('Linus Torvalds')
+
+
 .. note:: Optional arguments to add:
 
  ``add()`` takes additional optional arguments: ``commit``, ``commitWithin``, ``softCommit``, ``expungeDeletes``, ``waitSearcher``, ``optimize``, ``maxSegments``.
