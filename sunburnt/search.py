@@ -57,6 +57,8 @@ class LuceneQuery(object):
             print '%s%s' % (indentspace, phrase)
         for range in self.ranges:
             print '%s%s' % (indentspace, range)
+        for join in self.joins:
+            print '%s%s' % (indentspace, join)
         if self.subqueries:
             if self._and:
                 print '%sAND:' % indentspace
@@ -160,6 +162,7 @@ class LuceneQuery(object):
         terms = [obj.terms]
         phrases = [obj.phrases]
         ranges = [obj.ranges]
+        joins = [obj.joins]
         subqueries = []
 
         mutated = False
@@ -172,6 +175,7 @@ class LuceneQuery(object):
                 terms.append(s.terms)
                 phrases.append(s.phrases)
                 ranges.append(s.ranges)
+                joins.append(s.joins)
                 subqueries.extend(s.subqueries)
                 mutated = True
             else: # just keep it unchanged
@@ -182,6 +186,7 @@ class LuceneQuery(object):
             obj = obj.clone(terms = obj.merge_term_dicts(terms),
                             phrases = obj.merge_term_dicts(phrases),
                             ranges = reduce(operator.or_, ranges),
+                            joins = reduce(operator.or_, joins),  # ??
                             subqueries = subqueries)
 
         # having recalculated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
@@ -193,7 +198,8 @@ class LuceneQuery(object):
         elif len(obj.subqueries) == 1:
             if obj._not and obj.subqueries[0]._not:
                 obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
-            elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges and not obj.boosts:
+            elif (obj._and or obj._or) and not obj.terms and not obj.phrases \
+              and not obj.ranges and not obj.joins and not obj.boosts:
                 obj = obj.subqueries[0]
         obj.normalized = True
         return obj
@@ -216,8 +222,7 @@ class LuceneQuery(object):
         else:
             u = [s for s in [self.serialize_term_queries(self.terms),
                              self.serialize_term_queries(self.phrases),
-                             self.serialize_range_queries(),
-                             self.serialize_join_queries()]
+                             self.serialize_range_queries()]
                  if s]
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
@@ -225,6 +230,14 @@ class LuceneQuery(object):
                     u.append(u"(%s)"%q.serialize_to_unicode(level=level+1, op=op_))
                 else:
                     u.append(u"%s"%q.serialize_to_unicode(level=level+1, op=op_))
+
+            # NOTE: for some reason, combining other search terms with AND directly
+            # after join query generates no results; correct results are present
+            # without the AND
+            # for now, simply add any join queries last to avoid this behavior
+            if self.serialize_join_queries():
+                u.append(self.serialize_join_queries())
+
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
@@ -250,6 +263,7 @@ class LuceneQuery(object):
         return sum([sum(len(v) for v in self.terms.values()),
                     sum(len(v) for v in self.phrases.values()),
                     len(self.ranges),
+                    len(self.joins),
                     subquery_length])
 
     def Q(self, *args, **kwargs):
@@ -258,7 +272,8 @@ class LuceneQuery(object):
         return q
 
     def __nonzero__(self):
-        return bool(self.terms) or bool(self.phrases) or bool(self.ranges) or bool(self.subqueries)
+        return bool(self.terms) or bool(self.phrases) or bool(self.ranges) or \
+               bool(self.joins) or bool(self.subqueries)
 
     def __or__(self, other):
         q = LuceneQuery(self.schema)
