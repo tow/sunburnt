@@ -794,7 +794,8 @@ class HighlightOptions(Options):
             "highlightMultiTerm":bool,
             "regex.slop":float,
             "regex.pattern":unicode,
-            "regex.maxAnalyzedChars":int
+            "regex.maxAnalyzedChars":int,
+            "q":unicode
             }
     def __init__(self, schema, original=None):
         self.schema = schema
