@@ -817,7 +817,6 @@ class HighlightOptions(Options):
             self.fields = copy.copy(original.fields)
 
     def field_names_in_opts(self, opts, fields):
-        import pdb; pdb.set_trace()
         if fields:
             opts["hl.fl"] = ",".join(sorted(fields))
 
