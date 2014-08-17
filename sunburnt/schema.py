@@ -708,7 +708,7 @@ class SolrResponse(object):
         self.original_xml = xmlmsg
         doc = lxml.etree.fromstring(xmlmsg)
         details = dict(value_from_node(n) for n in
-                       doc.xpath("/response/lst[@name!='moreLikeThis']"))
+                       doc.xpath("/response/lst[@name!='moreLikeThis' and @name!='termVectors']"))
         details['responseHeader'] = dict(details['responseHeader'])
         for attr in ["QTime", "params", "status"]:
             setattr(self, attr, details['responseHeader'].get(attr))
@@ -717,8 +717,18 @@ class SolrResponse(object):
         result_node = doc.xpath("/response/result")[0]
         self.result = SolrResult.from_xml(schema, result_node)
         self.facet_counts = SolrFacetCounts.from_response(details)
-        self.highlighting = dict((k, dict(v))
-                                 for k, v in details.get("highlighting", ()))
+        self.highlighting = dict(
+            (k, dict(v))
+            for k, v in details.get('highlighting', ())
+        )
+        self.term_vectors = dict(
+            [(
+                x.attrib['name'],
+                dict([(
+                    y.attrib['name'], y.xpath("int")[0].text) for y in x.xpath("lst/lst")
+                ])
+            ) for x in doc.xpath("//response/lst[@name='termVectors']/lst")]
+        )
         more_like_these_nodes = \
             doc.xpath("/response/lst[@name='moreLikeThis']/result")
         more_like_these_results = [SolrResult.from_xml(schema, node)

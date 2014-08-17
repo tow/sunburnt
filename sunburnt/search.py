@@ -376,8 +376,8 @@ class LuceneQuery(object):
 class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
-                      'sorter', 'facet_querier', 'field_limiter',)
+                      'more_like_this', 'highlighter', 'term_vectorizer',
+                      'faceter', 'sorter', 'facet_querier', 'field_limiter',)
 
     result_constructor = dict
 
@@ -386,6 +386,7 @@ class BaseSearch(object):
         self.filter_obj = LuceneQuery(self.schema, u'fq')
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
+        self.term_vectorizer = TermVectorOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
@@ -456,6 +457,11 @@ class BaseSearch(object):
         newself.highlighter.update(fields, **kwargs)
         return newself
 
+    def terms(self, fields=None, **kwargs):
+        newself = self.clone()
+        newself.term_vectorizer.update(fields, **kwargs)
+        return newself
+
     def mlt(self, fields, query_fields=None, **kwargs):
         newself = self.clone()
         newself.more_like_this.update(fields, query_fields, **kwargs)
@@ -511,6 +517,13 @@ class BaseSearch(object):
                     if 'solr_highlights' not in d and \
                            unique_key in result.highlighting:
                         d['solr_highlights'] = result.highlighting[unique_key]
+            if result.term_vectors:
+                for d in result.result.docs:
+                    unique_key = self.schema.fields[self.schema.unique_key].to_solr(d[self.schema.unique_key])
+                    if 'term_vectors' not in d and \
+                           unique_key in result.term_vectors:
+                        d['term_vectors'] = result.term_vectors[unique_key]
+
         return result
 
     def params(self):
@@ -804,9 +817,32 @@ class HighlightOptions(Options):
             self.fields = copy.copy(original.fields)
 
     def field_names_in_opts(self, opts, fields):
+        import pdb; pdb.set_trace()
         if fields:
             opts["hl.fl"] = ",".join(sorted(fields))
 
+class TermVectorOptions(Options):
+    option_name = "tv"
+    opts = {
+            "tv":bool,
+            "tf":bool,
+            "df":bool,
+            "positions":bool,
+            "offsets":bool,
+            "tf_idf":bool,
+            "all":bool,
+            "docIds":list
+            }
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["tv.fl"] = ",".join(sorted(fields))
 
 class MoreLikeThisOptions(Options):
     option_name = "mlt"
