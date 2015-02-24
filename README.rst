@@ -1,3 +1,9 @@
+Unmaintained
+============
+
+This project is unmaintained.  A fork called "scorched" which has some maintenance
+is at https://github.com/lugensa/scorched
+
 Sunburnt
 ========
 
