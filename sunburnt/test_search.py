@@ -27,6 +27,18 @@ from nose.tools import assert_equal
 
 debug = False
 
+def check_equal_with_debug(val1, val2):
+    try:
+        assert val1 == val2, "Unequal: %r, %r" % (val1, val2)
+    except AssertionError:
+        if debug:
+            print val1
+            print val2
+            import pdb;pdb.set_trace()
+            raise
+        else:
+            raise
+
 schema_string = \
 """<schema name="timetric" version="1.1">
   <types>
@@ -234,21 +246,44 @@ if HAS_MX_DATETIME:
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
     p = getattr(solr_search, method)(*args, **kwargs).params()
-    try:
-        assert p == output, "Unequal: %r, %r" % (p, output)
-    except AssertionError:
-        if debug:
-            print p
-            print output
-            import pdb;pdb.set_trace()
-            raise
-        else:
-            raise
+    check_equal_with_debug(p, output)
 
 def test_query_data():
     for method, data in good_query_data.items():
         for args, kwargs, output in data:
             yield check_query_data, method, args, kwargs, output
+
+
+multiple_call_data = (
+    ([([], {"int_field":3}), ([], {"string_field":"string"})],
+     [("q", u"int_field:3 AND string_field:string")],
+     [("fq", u"int_field:3"), ("fq", u"string_field:string"), ("q", "*:*")]),
+
+    ([(["hello"], {}), (["world"], {})],
+     [("q", u"hello AND world")],
+     [("fq", u"hello"), ("fq", u"world"), ("q", "*:*")]),
+
+    ([(["hello"], {"int_field":3}), (["world"], {"string_field":"string"})],
+     [("q", u"hello AND int_field:3 AND string_field:string AND world")],
+     [("fq", "hello AND int_field:3"), ("fq", "string_field:string AND world"), ("q", "*:*")]),
+)
+
+def check_multiple_call_data(arg_kw_list, query_output, filter_output):
+    solr_search = SolrSearch(interface)
+    q = solr_search.query()
+    f = solr_search.query()
+    for args, kwargs in arg_kw_list:
+        q = q.query(*args, **kwargs)
+        f = f.filter(*args, **kwargs)
+    qp = q.params()
+    fp = f.params()
+    check_equal_with_debug(qp, query_output)
+    check_equal_with_debug(fp, filter_output)
+
+def test_multiple_call_data():
+    for arg_kw_list, query_output, filter_output in multiple_call_data:
+        yield check_multiple_call_data, arg_kw_list, query_output, filter_output
+
 
 bad_query_data = (
     {"int_field":"a"},
@@ -512,26 +547,10 @@ complex_boolean_queries = (
 
 def check_complex_boolean_query(solr_search, query, output):
     p = query(solr_search).params()
-    try:
-        assert p == output
-    except AssertionError:
-        if debug:
-            print p
-            print output
-            import pdb;pdb.set_trace()
-            raise
-        else:
-            raise
+    check_equal_with_debug(p, output)
     # And check no mutation of the base object
     q = query(solr_search).params()
-    try:
-        assert p == q
-    except AssertionError:
-        if debug:
-            print p
-            print q
-            import pdb;pdb.set_trace()
-            raise
+    check_equal_with_debug(p, q)
 
 def test_complex_boolean_queries():
     solr_search = SolrSearch(interface)
@@ -560,6 +579,7 @@ def check_url_encode_data(kwargs, output):
 def test_url_encode_data():
     for kwargs, output in param_encode_data:
         yield check_url_encode_data, kwargs, output
+
 
 mlt_query_options_data = (
     ('text_field', {}, {},
