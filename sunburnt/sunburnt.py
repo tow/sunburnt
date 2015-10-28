@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 
+from os import path
+from lxml import etree
 import cStringIO as StringIO
 from itertools import islice
-import time, urllib, urlparse
+import shutil, tempfile, time, urllib, urlparse
 import warnings
 
 from .http import ConnectionError, wrap_http_connection
@@ -153,7 +155,7 @@ class SolrConnection(object):
 
 
 class SolrInterface(object):
-    remote_schema_file = "admin/file/?file=schema.xml"
+
     def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1,
             max_length_get_url=MAX_LENGTH_GET_URL, format='xml'):
         self.conn = SolrConnection(url, http_connection, mode, retry_timeout, max_length_get_url, format)
@@ -163,17 +165,82 @@ class SolrInterface(object):
             raise ValueError("Unsupported format '%s': allowed are %s" %
                     (format, ','.join(allowed_formats)))
         self.format = format
+        self.file_cache = {}
         self.init_schema()
+
+    def make_file_url(self, filename):
+        return urlparse.urljoin(self.conn.url, 'admin/file/?file=') + filename
+
+    def get_file(self, filename):
+        # return remote file as StringIO and cache the contents
+        if filename not in self.file_cache:
+            response = self.conn.request('GET', self.make_file_url(filename))
+            if response.status_code == 200:
+                self.file_cache[filename] = response.content
+            elif response.status_code == 404:
+                return None
+            else:
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (response.status_code, content))
+        return StringIO.StringIO(self.file_cache[filename])
+
+    def save_file_cache(self, dirname):
+        # take the file cache and save to a directory
+        for filename in self.file_cache:
+            open(path.join(dirname, filename), 'w').write(self.file_cache[filename])
+
+    def get_xinclude_list_for_file(self, filename):
+        # return a list of xinclude elements in this file
+        file_contents = self.get_file(filename)
+        if file_contents is None:
+            return None
+        else:
+            tree = etree.parse(self.get_file(filename))
+            return tree.getroot().findall('{http://www.w3.org/2001/XInclude}include')
+
+    def get_file_and_included_files(self, filename):
+        # return a list containing this file, and all files this file includes
+        # via xinclude.  And do this recursively to ensure we have all we need.
+        file_list = [filename]
+        xinclude_list = self.get_xinclude_list_for_file(filename)
+        if xinclude_list is None:
+            # this means we didn't even find the top level file
+            return []
+        for xinclude_node in xinclude_list:
+            included_file = xinclude_node.get('href')
+            file_list += self.get_file_and_included_files(included_file)
+        return file_list
+
+    def get_parsed_schema_file_with_xincludes(self, filename):
+        # get the parsed schema file, and ensure we also get any files
+        # required for any xinclude.  If an xinclude is required, we need
+        # to save the files to the local disk before we call xinclude()
+        try:
+            file_list = self.get_file_and_included_files(filename)
+            if len(file_list) == 0:
+                # this means we didn't even find the top level file
+                raise EnvironmentError("Couldn't retrieve schema document from server - received status code 404\n")
+            if len(file_list) == 1:
+                # there are no xincludes, we can do this the easy way
+                schemadoc = etree.parse(self.get_file(filename))
+            else:
+                # save all contents to files, then load from file and xinclude
+                dirname = tempfile.mkdtemp()
+                try:
+                    self.save_file_cache(dirname)
+                    schemadoc = etree.parse(path.join(dirname, filename))
+                    schemadoc.xinclude()
+                finally:
+                    # delete dirname
+                    shutil.rmtree(dirname)
+        except etree.XMLSyntaxError, e:
+            raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
+        return schemadoc
 
     def init_schema(self):
         if self.schemadoc:
             schemadoc = self.schemadoc
         else:
-            response = self.conn.request('GET',
-                urlparse.urljoin(self.conn.url, self.remote_schema_file))
-            if response.status_code != 200:
-                raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (response.status_code, response.content))
-            schemadoc = StringIO.StringIO(response.content)
+            schemadoc = self.get_parsed_schema_file_with_xincludes('schema.xml')
         self.schema = SolrSchema(schemadoc, format=self.format)
 
     def add(self, docs, chunk=100, **kwargs):
