@@ -375,8 +375,9 @@ class LuceneQuery(object):
 class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter', 'facet_ranger',
-                      'sorter', 'facet_querier', 'field_limiter',)
+                      'more_like_this', 'highlighter', 'faceter',
+                      'facet_ranger', 'sorter', 'facet_querier',
+                      'field_limiter', 'extra')
 
     result_constructor = dict
 
@@ -390,6 +391,7 @@ class BaseSearch(object):
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
         self.facet_querier = FacetQueryOptions(self.schema)
+        self.extra = ExtraOptions(self.schema)
 
     def clone(self):
         return self.__class__(interface=self.interface, original=self)
@@ -479,6 +481,11 @@ class BaseSearch(object):
     def field_limit(self, fields=None, score=False, all_fields=False):
         newself = self.clone()
         newself.field_limiter.update(fields, score, all_fields)
+        return newself
+
+    def add_extra(self, **kwargs):
+        newself = self.clone()
+        newself.extra.update(kwargs)
         return newself
 
     def options(self):
@@ -1155,6 +1162,22 @@ class FacetQueryOptions(Options):
                     'facet':True}
         else:
             return {}
+
+
+class ExtraOptions(Options):
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.option_dict = {}
+        else:
+            self.option_dict = original.option_dict.copy()
+
+    def update(self, extra_options):
+        self.option_dict.update(extra_options)
+
+    def options(self):
+        return self.option_dict
+
 
 def params_from_dict(**kwargs):
     utf8_params = []
