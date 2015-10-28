@@ -10,6 +10,22 @@ except ImportError:
         ImportWarning)
     mx = None
 
+try:
+    import pytz
+    utc = pytz.utc
+except ImportError:
+    warnings.warn(
+        "pytz not found, limited timezone conversion possible",
+        ImportWarning)
+    class UTC(datetime.tzinfo):
+        def utcoffset(self, dt):
+            return datetime.timedelta(0)
+        def tzname(self, dt):
+            return "UTC"
+        def dst(self, dt):
+            return datetime.timedelta(0)
+    utc = UTC()
+
 
 year = r'[+/-]?\d+'
 tzd = r'Z|((?P<tzd_sign>[-+])(?P<tzd_hour>\d\d):(?P<tzd_minute>\d\d))'
@@ -74,11 +90,12 @@ if mx:
             raise DateTimeRangeError(e.args[0])
 else:
     def datetime_factory(**kwargs):
+        kwargs['tzinfo'] = utc
         second = kwargs.get('second')
         if second is not None:
             f, i = math.modf(second)
             kwargs['second'] = int(i)
-            kwargs['microsecond'] = int(f * 1000000)
+            kwargs['microsecond'] = int(round(f * 1000000))
         try:
             return datetime.datetime(**kwargs)
         except ValueError, e:

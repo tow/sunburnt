@@ -13,16 +13,8 @@ try:
 except ImportError:
     import json
 
-from .dates import datetime_from_w3_datestring
+from .dates import datetime_from_w3_datestring, utc
 from .strings import RawString, SolrString, WildcardString
-
-try:
-    import pytz
-except ImportError:
-    warnings.warn(
-        "pytz not found; cannot do timezone conversions for Solr DateFields",
-        ImportWarning)
-    pytz = None
 
 
 class SolrError(Exception):
@@ -52,10 +44,7 @@ class solr_date(object):
         # Python datetime objects may include timezone information
         if hasattr(dt_obj, 'tzinfo') and dt_obj.tzinfo:
             # but Solr requires UTC times.
-            if pytz:
-                return dt_obj.astimezone(pytz.utc).replace(tzinfo=None)
-            else:
-                raise EnvironmentError("pytz not available, cannot do timezone conversions")
+            return dt_obj.astimezone(utc).replace(tzinfo=None)
         else:
             return dt_obj
 
