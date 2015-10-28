@@ -15,6 +15,7 @@ class LuceneQuery(object):
             self.terms = collections.defaultdict(set)
             self.phrases = collections.defaultdict(set)
             self.ranges = set()
+            self.joins = set()
             self.subqueries = []
             self._and = True
             self._or = self._not = self._pow = False
@@ -24,6 +25,7 @@ class LuceneQuery(object):
             self.terms = copy.copy(original.terms)
             self.phrases = copy.copy(original.phrases)
             self.ranges = copy.copy(original.ranges)
+            self.joins = copy.copy(original.joins)
             self.subqueries = copy.copy(original.subqueries)
             self._or = original._or
             self._and = original._and
@@ -54,6 +56,8 @@ class LuceneQuery(object):
             print '%s%s' % (indentspace, phrase)
         for range in self.ranges:
             print '%s%s' % (indentspace, range)
+        for join in self.joins:
+            print '%s%s' % (indentspace, join)
         if self.subqueries:
             if self._and:
                 print '%sAND:' % indentspace
@@ -99,6 +103,13 @@ class LuceneQuery(object):
                 tuple(value.to_query() for value in sorted(values, key=lambda x: getattr(x, "value")))
             s.append(u"%s:%s" % (name, range_s))
         return u' AND '.join(s)
+
+    def serialize_join_queries(self):
+        s = []
+        for join_from, join_to, query in sorted(self.joins):
+            s.append(u"{!join from=%s to=%s}%s" % (join_from, join_to, query))
+        return u' AND '.join(s)
+
 
     def child_needs_parens(self, child):
         if len(child) == 1:
@@ -150,6 +161,7 @@ class LuceneQuery(object):
         terms = [obj.terms]
         phrases = [obj.phrases]
         ranges = [obj.ranges]
+        joins = [obj.joins]
         subqueries = []
 
         mutated = False
@@ -162,6 +174,7 @@ class LuceneQuery(object):
                 terms.append(s.terms)
                 phrases.append(s.phrases)
                 ranges.append(s.ranges)
+                joins.append(s.joins)
                 subqueries.extend(s.subqueries)
                 mutated = True
             else: # just keep it unchanged
@@ -172,6 +185,7 @@ class LuceneQuery(object):
             obj = obj.clone(terms = obj.merge_term_dicts(terms),
                             phrases = obj.merge_term_dicts(phrases),
                             ranges = reduce(operator.or_, ranges),
+                            joins = reduce(operator.or_, joins),  # ??
                             subqueries = subqueries)
 
         # having recalculated subqueries, there may be the opportunity for further normalization, if we have zero or one subqueries left
@@ -183,7 +197,8 @@ class LuceneQuery(object):
         elif len(obj.subqueries) == 1:
             if obj._not and obj.subqueries[0]._not:
                 obj = obj.clone(subqueries=obj.subqueries[0].subqueries, _not=False, _and=True)
-            elif (obj._and or obj._or) and not obj.terms and not obj.phrases and not obj.ranges and not obj.boosts:
+            elif (obj._and or obj._or) and not obj.terms and not obj.phrases \
+              and not obj.ranges and not obj.joins and not obj.boosts:
                 obj = obj.subqueries[0]
         obj.normalized = True
         return obj
@@ -214,6 +229,14 @@ class LuceneQuery(object):
                     u.append(u"(%s)"%q.serialize_to_unicode(level=level+1, op=op_))
                 else:
                     u.append(u"%s"%q.serialize_to_unicode(level=level+1, op=op_))
+
+            # NOTE: for some reason, combining other search terms with AND directly
+            # after join query generates no results; correct results are present
+            # without the AND
+            # for now, simply add any join queries last to avoid this behavior
+            if self.serialize_join_queries():
+                u.append(self.serialize_join_queries())
+
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
@@ -239,6 +262,7 @@ class LuceneQuery(object):
         return sum([sum(len(v) for v in self.terms.values()),
                     sum(len(v) for v in self.phrases.values()),
                     len(self.ranges),
+                    len(self.joins),
                     subquery_length])
 
     def Q(self, *args, **kwargs):
@@ -247,7 +271,8 @@ class LuceneQuery(object):
         return q
 
     def __nonzero__(self):
-        return bool(self.terms) or bool(self.phrases) or bool(self.ranges) or bool(self.subqueries)
+        return bool(self.terms) or bool(self.phrases) or bool(self.ranges) or \
+               bool(self.joins) or bool(self.subqueries)
 
     def __or__(self, other):
         q = LuceneQuery(self.schema)
@@ -357,6 +382,16 @@ class LuceneQuery(object):
             insts = (field.instance_from_user_data(value),)
         self.ranges.add((field_name, rel, insts))
 
+    def join(self, join_from, join_to, *args, **kwargs):
+        for fieldname in [join_from, join_to]:
+            field = self.schema.match_field(fieldname)
+            if not field:
+                raise ValueError("%s is not a valid field name" % fieldname)
+            elif not field.indexed:
+                raise SolrError("Can't join on non-indexed field '%s'" % fieldname)
+        query = self.Q(*args, **kwargs)
+        self.joins.add((join_from, join_to, query))
+
     def term_or_phrase(self, arg, force=None):
         return 'terms' if self.default_term_re.match(arg) else 'phrases'
 
@@ -369,7 +404,6 @@ class LuceneQuery(object):
                 raise SolrError("Can't query on non-indexed field '%s'" % k)
             value = field.instance_from_user_data(v)
         self.boosts.append((kwargs, boost_score))
-
 
 
 class BaseSearch(object):
@@ -479,6 +513,11 @@ class BaseSearch(object):
     def field_limit(self, fields=None, score=False, all_fields=False):
         newself = self.clone()
         newself.field_limiter.update(fields, score, all_fields)
+        return newself
+
+    def join(self, join_from, join_to, *args, **kwargs):
+        newself = self.clone()
+        newself.query_obj.join(join_from, join_to, *args, **kwargs)
         return newself
 
     def options(self):

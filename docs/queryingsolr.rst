@@ -244,7 +244,7 @@ Finally, ``response.result`` itself has the following attributes
 
 * ``response.result.numFound`` : total number of docs in the index which fulfilled the query.
 * ``response.result.docs`` : the actual results themselves (more easily extracted as ``list(response)``).
-* ``response.result.start`` : if the number of docs is less than numFound, then this is the pagination offset. 
+* ``response.result.start`` : if the number of docs is less than numFound, then this is the pagination offset.
 
 
 Pagination
@@ -329,7 +329,7 @@ selection of fields.
  {'score': 1.1931472000000001, 'id': u'0553573403'}
  {'score': 1.1931472000000001, 'id': u'0812550706'}
 
-  
+
 
 More complex queries
 --------------------
@@ -703,7 +703,7 @@ will also return zero results, just the facet output.
 The ``facet_counts`` objects contains several sets of results - here, we're only
 interested in the ``facet_fields`` object. This contains a dictionary of results,
 keyed by each field where faceting was requested. (In this case, we only requested
-faceting on one field). The dictionary value is a list of two-tuples, mapping the 
+faceting on one field). The dictionary value is a list of two-tuples, mapping the
 value of the faceted field (in this case, ``sequence_i`` takes the values '1', '2', or '3')
 to the numbers of results for each value.
 
@@ -713,7 +713,7 @@ title, 2 of them have ``sequence_i=1``, 0 of them have ``sequence_i=2``, and 0 o
 
 You can facet on more than one field at a time:
 
-:: 
+::
 
  si.query(...).facet_by(field=["field1", "field2, ...])
 
@@ -861,7 +861,7 @@ convenient for displaying highlighted text snippets in a template;
 e.g., displaying highlights in a Django template might look like this:
 
 ::
-    
+
   {% for snippet in book.solr_highlights.name %}
      <p>... {{ snippet|safe }} ...</p>
   {% endfor %}
@@ -880,7 +880,7 @@ and all of these are exposed through sunburnt. The full list of supported option
  fields, snippets, fragsize, mergeContinuous, requireFieldMatch, maxAnalyzedChars,
  alternateField, maxAlternateFieldLength, formatter, simple.pre.simple.post,
  fragmenter, usePhrasehighlighter, hilightMultiTerm, regex.slop, regex.pattern,
- regex.maxAnalyzedChars            
+ regex.maxAnalyzedChars
 
 See the note above in `Faceting`_ about using keyword arguments with periods.
 
@@ -931,7 +931,7 @@ standard behaviour.
 The ``SolrResponse`` object has a ``more_like_these`` attribute. This is
 a dictionary of ``SolrResult`` objects, one dictionary entry for each
 result of the main query. Here, the query only produced one result (because
-we searched on the ``uniqueKey``. Inspecting the ``SolrResult`` object, we 
+we searched on the ``uniqueKey``. Inspecting the ``SolrResult`` object, we
 find that it contains only one document.
 
 We can read the above result as saying that under the ``mlt()`` parameters
@@ -955,6 +955,22 @@ to avoid having to do the extra dictionary lookup.
 ::
 
  fields, count, mintf, mindf, minwl, mawl, maxqt, maxntp, boost
+
+Join Queries
+------------
+
+From version 4.0 of Solr, join queries are supported (see http://wiki.apache.org/solr/Join).
+
+The join method takes a from field, a to field, and then a search term as
+supported in other sunburnt query methods.
+
+Here are the sunburnt equivalents of the first two examples from the Solr
+documentation.
+
+::
+
+ si.query().join("manu_id", "id", "ipod")
+ si.query().join("manu_id", "id", compName_s="Belkin)
 
 
 Spatial fields
