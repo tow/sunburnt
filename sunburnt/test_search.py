@@ -15,8 +15,9 @@ try:
 except ImportError:
     HAS_MX_DATETIME = False
 
-from .schema import SolrSchema, SolrError
-from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
+from .schema import solr_date, SolrSchema, SolrError
+from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, \
+                    FacetOptions, FacetRangeOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
 from .sunburnt import SolrInterface
 
@@ -308,6 +309,16 @@ good_option_data = {
         ({"fields":["int_field", "text_field"], "prefix":"abc", "limit":3},
          {"facet":True, "facet.field":["int_field", "text_field"], "f.int_field.facet.prefix":"abc", "f.int_field.facet.limit":3, "f.text_field.facet.prefix":"abc", "f.text_field.facet.limit":3, }),
         ),
+    FacetRangeOptions:(
+        ({"fields": {"int_field": {"start": 1, "end": 10, "gap": 2}}},
+         {'facet': True, 'facet.range': ['int_field'], 'f.int_field.facet.range.start': 1, 'f.int_field.facet.range.end': 10, 'f.int_field.facet.range.gap': 2}),
+        ({"fields": {"float_field": {"start": 2.5, "end": 11.5, "gap": 1.5}}},
+         {'facet': True, 'facet.range': ['float_field'], 'f.float_field.facet.range.start': 2.5, 'f.float_field.facet.range.end': 11.5, 'f.float_field.facet.range.gap': 1.5}),
+        ({"fields": {"date_field": {"start": solr_date(datetime.datetime(2000,1,1)), "end": solr_date(datetime.datetime(2010,12,1)), "gap": "+1YEAR"}}},
+         {'facet': True, 'facet.range': ['date_field'], 'f.date_field.facet.range.start': u"2000-01-01T00:00:00Z", 'f.date_field.facet.range.end': u"2010-12-01T00:00:00Z", 'f.date_field.facet.range.gap': '+1YEAR'}),
+        ({"fields": {"int_field": {"start": 1, "end": 10, "gap": 2, "hardend": True, "include": "lower", "other": "none"}}},
+         {'facet': True, 'facet.range': ['int_field'], 'f.int_field.facet.range.start': 1, 'f.int_field.facet.range.end': 10, 'f.int_field.facet.range.gap': 2, 'f.int_field.facet.range.hardend': True, 'f.int_field.facet.range.include': "lower", 'f.int_field.facet.range.other': "none"}),
+        ),
     SortOptions:(
         ({"field":"int_field"},
          {"sort":"int_field asc"}),
@@ -359,7 +370,7 @@ good_option_data = {
 def check_good_option_data(OptionClass, kwargs, output):
     optioner = OptionClass(schema)
     optioner.update(**kwargs)
-    assert optioner.options() == output
+    assert_equal(output, optioner.options())
 
 def test_good_option_data():
     for OptionClass, option_data in good_option_data.items():
@@ -379,6 +390,16 @@ bad_option_data = {
         {"limit":"a"}, # invalid type
         {"sort":"yes"}, # invalid choice
         {"offset":-1}, # invalid value
+        ),
+    FacetRangeOptions:(
+        {"fields": {"int_field": {"start": 1, "end": 10}}}, # start, end, & gap are all required
+        {"fields": {"int_field": {"start": "foo", "end": "bar", "gap": "+1YEAR"}}}, # string is not a valid type for range facet endpoint
+        {"fields": {"int_field": {"start": 1, "end": 10, "gap": "+1YEAR"}}}, # gap must be an appropriate type
+        {"fields": {"int_field": {"start": 10, "end": 1, "gap": 2}}}, # start must be less than end
+        {"fields": {"date_field": {"start": datetime.datetime(2000,1,1), "end": datetime.datetime(2010,1,1), "gap":"+1YEAR"}}}, # datetime is not a valid type for range facet endpoint
+        {"fields": {"date_field": {"start": datetime.datetime(2000,1,1), "end": datetime.datetime(2010,1,1), "gap": "blah blah"}}}, # if the gap is a string, it must meet solr syntax
+        {"fields": {"date_field": {"start": datetime.datetime(2000,1,1), "end": datetime.datetime(2010,1,1), "gap": "+1EON"}}}, # if the gap is a string, it must use valid lucene units
+        {"fields": {"date_field": {"start": 1, "end": 3.5, "gap": 0.5}}}, # incompatible types for start and end
         ),
     SortOptions:(
         {"field":"myarse"}, # Undefined field

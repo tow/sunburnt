@@ -2,9 +2,8 @@ from __future__ import absolute_import
 
 import collections, copy, operator, re
 
-from .schema import SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
+from .schema import solr_date, SolrError, SolrBooleanField, SolrUnicodeField, WildcardFieldInstance
 from .walktree import walk, event, leaf, exit
-
 
 class LuceneQuery(object):
     default_term_re = re.compile(r'^\w+$')
@@ -279,7 +278,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -376,7 +375,7 @@ class LuceneQuery(object):
 class BaseSearch(object):
     """Base class for common search options management"""
     option_modules = ('query_obj', 'filter_obj', 'paginator',
-                      'more_like_this', 'highlighter', 'faceter',
+                      'more_like_this', 'highlighter', 'faceter', 'facet_ranger',
                       'sorter', 'facet_querier', 'field_limiter',)
 
     result_constructor = dict
@@ -387,6 +386,7 @@ class BaseSearch(object):
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
+        self.facet_ranger = FacetRangeOptions(self.schema)
         self.sorter = SortOptions(self.schema)
         self.field_limiter = FieldLimitOptions(self.schema)
         self.facet_querier = FacetQueryOptions(self.schema)
@@ -444,6 +444,11 @@ class BaseSearch(object):
     def facet_by(self, field, **kwargs):
         newself = self.clone()
         newself.faceter.update(field, **kwargs)
+        return newself
+
+    def facet_by_range(self, field, **kwargs):
+        newself = self.clone()
+        newself.facet_ranger.update(field, **kwargs)
         return newself
 
     def facet_query(self, *args, **kwargs):
@@ -520,7 +525,7 @@ class BaseSearch(object):
 
     _count = None
     def count(self):
-        # get the total count for the current query without retrieving any results 
+        # get the total count for the current query without retrieving any results
         # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
@@ -775,6 +780,108 @@ class FacetOptions(Options):
         if fields:
             opts["facet.field"] = sorted(fields)
 
+class FacetRangeOptions(Options):
+    option_name = "facet.range"
+    opts = {"end": lambda self, v: self.__validate_range_endpoint(v),
+            "gap": lambda self, v: self.__validate_range_gap(v),
+            "hardend": bool,
+            "include": ["lower", "upper", "edge", "outer", "all"],
+            "other": ["before", "after", "between", "none", "all"],
+            "start": lambda self, v: self.__validate_range_endpoint(v),
+            }
+
+    # The list of valid Lucene unit keywords isn't documented anywhere except in its source code:
+    # http://svn.apache.org/repos/asf/lucene/dev/trunk/solr/core/src/java/org/apache/solr/util/DateMathParser.java
+    # Scroll to makeUnitsMap().
+    lucene_units = ["YEAR", "YEARS", "MONTH", "MONTHS", "DAY", "DAYS", "DATE",
+                    "HOUR", "HOURS", "MINUTE", "MINUTES", "SECOND", "SECONDS",
+                    "MILLI", "MILLIS", "MILLISECOND", "MILLISECONDS",]
+    lucene_unit_pattern = re.compile(r'^([-+])(\d+)(\w+)$')
+
+    def __init__(self, schema, original=None):
+        self.schema = schema
+        if original is None:
+            self.fields = collections.defaultdict(dict)
+        else:
+            self.fields = copy.copy(original.fields)
+
+    def __validate_range_endpoint(self, v):
+        """
+        Validate that the argument is a valid endpoint for a Solr range facet.
+
+        This includes integers, floats, and special strings like "+1YEAR".
+        """
+        if isinstance(v, (int, float)):
+            return v
+        elif isinstance(v, solr_date):
+            return unicode(v)
+        else:
+            return self.invalid_value()
+
+    def __validate_range_gap(self, v):
+        if isinstance(v, (int, float)):
+            return v
+        elif isinstance(v, basestring):
+            # A string gap must use Lucene syntax:
+            # http://lucene.apache.org/solr/4_0_0/solr-core/org/apache/solr/util/DateMathParser.html
+            match = self.__class__.lucene_unit_pattern.match(v)
+
+            if match is None:
+                return self.invalid_value()
+            elif match.group(3).upper() not in self.__class__.lucene_units:
+                return self.invalid_value()
+
+            return v
+        else:
+            return self.invalid_value()
+
+    def update(self, fields=None, **kwargs):
+        assert isinstance(fields, dict)
+        self.fields = dict()
+        if fields:
+            self.schema.check_fields(fields.keys())
+            for field, opts in fields.items():
+                self.fields[field] = dict()
+                checked_kwargs = self.check_opts(dict(opts.items() + kwargs.items()))
+                for k, v in checked_kwargs.items():
+                    self.fields[field][k] = v
+
+            # Validate field options.
+            if not ("start" in opts and "end" in opts and "gap" in opts):
+                raise SolrError("Start, end, and gap are required for range facet on '%s'." % field)
+
+            if (opts["start"] > opts["end"]):
+                raise SolrError("Range start for '%s' cannot be greater than range end." % field)
+
+            if isinstance(opts["start"], int) and not (isinstance(opts["end"], int) and isinstance(opts["gap"], int)):
+                raise SolrError("Incompatible types for start, end, and gap on '%s'." % field)
+
+            if isinstance(opts["start"], float) and not (isinstance(opts["end"], float) and isinstance(opts["gap"], float)):
+                raise SolrError("Incompatible types for start, end, and gap on '%s'." % field)
+
+            if isinstance(opts["start"], solr_date) and not (isinstance(opts["end"], solr_date) and isinstance(opts["gap"], basestring)):
+                raise SolrError("Incompatible types for start, end, and gap on '%s'." % field)
+
+    def options(self):
+        opts = {}
+
+        if self.fields:
+            opts["facet"] = True
+            opts[self.option_name] = True
+            fields = [field for field in self.fields.keys() if field]
+            self.field_names_in_opts(opts, fields)
+            for field_name, field_opts in self.fields.items():
+                if field_name:
+                    for field_opt, v in field_opts.items():
+                        opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
+
+        return opts
+
+    def field_names_in_opts(self, opts, fields):
+        if fields:
+            opts["facet.range"] = fields
+
+        return opts
 
 class HighlightOptions(Options):
     option_name = "hl"
