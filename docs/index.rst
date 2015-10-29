@@ -6,6 +6,10 @@
 Welcome to sunburnt's documentation!
 ====================================
 
+This project is unmaintained.  There is a 
+`fork called "scorched" <https://github.com/lugensa/scorched>`_ which is maintained
+(as of early 2015 at least).
+
 Sunburnt is a library to help Python programs interact with the `Apache
 Solr <http://lucene.apache.org/solr/>`_ search engine.
 
