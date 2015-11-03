@@ -303,12 +303,14 @@ Returning different fields
 
 By default, Solr will return all stored fields in the results. You
 might only be interested in a subset of those fields. To restrict
-the fields Solr returns, you apply the ``field_limit()`` method.
+the fields Solr returns, you apply the ``field_limit()`` or ``field_limit_exclude()`` methods.
 
 ::
 
   si.query("game").field_limit("id") # only return the id of each document
   si.query("game").field_limit(["id", "name"]) # only return the id and name of each document
+  si.query("game").field_limit_exclude("id") # returns all fields, but the id for each document
+  si.query("game").field_limit_exclude(["id", "name"]) # returns all fields, but the id and name for each document
 
 You can use the same option to get hold of the relevancy score that Solr
 has calculated for each document in the query:
@@ -317,6 +319,7 @@ has calculated for each document in the query:
 
  si.query("game").field_limit(score=True) # Return the score alongside each document
  si.query("game").field_limit("id", score=True") # return just the id and score.
+ si.query("game").field_limit_exclude("id", score=True") # returns all fields and score except the id field.
 
 The results appear just like the normal dictionary responses, but with a different
 selection of fields.
@@ -328,6 +331,28 @@ selection of fields.
 
  {'score': 1.1931472000000001, 'id': u'0553573403'}
  {'score': 1.1931472000000001, 'id': u'0812550706'}
+
+ >>> for result in si.query("game").field_limit_exclude("id", score=True"):
+ ...     print result
+
+ {'score': 1.1931472000000001,
+  'author_t': u'George R.R. Martin',
+  'cat': (u'book',),
+  'genre_s': u'fantasy',
+  'inStock': True,
+  'name': u'A Game of Thrones',
+  'price': 7.9900000000000002,
+  'sequence_i': 1,
+  'series_t': u'A Song of Ice and Fire'}
+ {'score': 1.1931472000000001,
+  'author_t': u'Orson Scott Card',
+  'cat': (u'book',),
+  'genre_s': u'scifi',
+  'inStock': True,
+  'name': u"Ender's Game",
+  'price': 6.9900000000000002,
+  'sequence_i': 1,
+  'series_t': u'Ender'}
 
   
 
