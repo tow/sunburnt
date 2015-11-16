@@ -9,7 +9,7 @@ import warnings
 
 from .http import ConnectionError, wrap_http_connection
 from .schema import SolrSchema, SolrError
-from .search import LuceneQuery, MltSolrSearch, SolrSearch, params_from_dict
+from .search import LuceneQuery, MltSolrSearch, SolrSearch, ClusterSolrSearch, params_from_dict
 
 MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
@@ -26,6 +26,7 @@ class SolrConnection(object):
         self.url = url.rstrip("/") + "/"
         self.update_url = self.url + "update/"
         self.select_url = self.url + "select/"
+        self.clustering_url = self.url + "clustering/"
         self.mlt_url = self.url + "mlt/"
         self.retry_timeout = retry_timeout
         self.max_length_get_url = max_length_get_url
@@ -152,6 +153,26 @@ class SolrConnection(object):
         if response.status_code != 200:
             raise SolrError(response)
         return response.content
+
+    def cluster(self, params, content=None):
+        """Perform a clustering query using the content specified
+        There may be no content if stream.url is specified in the params.
+        """
+        qs = urllib.urlencode(params)
+        base_url = "%s?%s" % (self.clustering_url, qs)
+        if content is None:
+            kwargs = {'uri': base_url, 'method': "GET"}
+        else:
+            get_url = "%s&stream.body=%s" % (base_url, urllib.quote_plus(content))
+            if len(get_url) <= self.max_length_get_url:
+                kwargs = {'uri': get_url, 'method': "GET"}
+            else:
+                kwargs = {'uri': base_url, 'method': "POST",
+                    'body': content, 'headers': {"Content-Type": "text/plain; charset=utf-8"}}
+        r, c = self.request(**kwargs)
+        if r.status != 200:
+            raise SolrError(r, c)
+        return c
 
 
 class SolrInterface(object):
@@ -305,6 +326,23 @@ class SolrInterface(object):
         """
         q = MltSolrSearch(self, content=content, content_charset=content_charset, url=url)
         return q.mlt(fields=fields, query_fields=query_fields, **kwargs)
+
+    def cluster_search(self, content=None, **kwargs):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        kwargs['clustering'] = 'true'
+        kwargs['clustering.results'] = 'true'
+        params = params_from_dict(**kwargs)
+        return self.schema.parse_response(self.conn.cluster(params, content=content))
+
+    def cluster_query(self, *args, **kwargs):
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        q = ClusterSolrSearch(self)
+        if len(args) + len(kwargs) > 0:
+            return q.query(*args, **kwargs)
+        else:
+            return q
 
     def Q(self, *args, **kwargs):
         q = LuceneQuery(self.schema)
