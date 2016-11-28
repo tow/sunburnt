@@ -495,7 +495,7 @@ Lloyd Alexander books by doing:
 
  si.exclude(author_t="Lloyd Alexander")
 
-``exclude()`` methods chain in the same way as ``query()`` methodms, so you can mix and match:
+``exclude()`` methods chain in the same way as ``query()`` methods, so you can mix and match:
 
 ::
 
