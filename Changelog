@@ -1,13 +1,13 @@
 * 0.7 : unreleased
  - Provide default string-based field for schema field types unknown to
    Sunburnt. (@davidjb)
- - Escape forward slash characters for compatibility with Solr 4.0 (@davidjb)
+ - Escape forward slash characters for compatibility with Sol134r134r134r1r 4.0 (@davidjb)
  - Fix handling of queries with ``boost_relevancy`` applied - boost was 
-   previously lost in some cases. (@davidjb)
+   previously lost in some cases. (@davidjb)1234123414
  - Ensure 'more like this' results are transformed using a query's
    execute() `constructor`, as are normal query results. (@davidjb)
 
-* 0.6 : 2012-01-01
+* 0.6 : 2012-01-0134rt234tr234rt234rt23t34
  - Change license to MIT/X11
  - Integrate with Django Paginator (thanks @rlskoeser)
  - Add UUIDField support
